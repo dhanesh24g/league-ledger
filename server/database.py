@@ -26,17 +26,27 @@ def get_supabase_client() -> Client | None:
     global _supabase_client
     
     if not SUPABASE_AVAILABLE:
+        print("Supabase library not available")
         return None
         
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_ANON_KEY")
     
+    # Debug logging
+    print(f"DEBUG: SUPABASE_URL exists: {bool(supabase_url)}")
+    print(f"DEBUG: SUPABASE_ANON_KEY exists: {bool(supabase_key)}")
+    if supabase_url:
+        print(f"DEBUG: SUPABASE_URL starts with: {supabase_url[:20]}...")
+    
     if not supabase_url or not supabase_key:
+        print("Missing Supabase environment variables")
         return None
     
     try:
         if _supabase_client is None:
+            print("Creating new Supabase client...")
             _supabase_client = create_client(supabase_url, supabase_key)
+            print("Supabase client created successfully")
         return _supabase_client
     except Exception as e:
         print(f"Error creating Supabase client: {e}")
