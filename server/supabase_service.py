@@ -14,17 +14,25 @@ def get_state() -> dict[str, Any]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
-    # Get league data
-    league_response = supabase.table("league").select("*").limit(1).execute()
-    league = league_response.data[0] if league_response.data else None
-    
-    # Get players
-    players_response = supabase.table("players").select("*").order("name").execute()
-    players = players_response.data
-    
-    # Get matches
-    matches_response = supabase.table("matches").select("*").order("id", desc=True).execute()
-    matches = matches_response.data
+    try:
+        print("DEBUG: Getting league data...")
+        league_response = supabase.table("league").select("*").limit(1).execute()
+        league = league_response.data[0] if league_response.data else None
+        print(f"DEBUG: League data: {league}")
+        
+        print("DEBUG: Getting players data...")
+        players_response = supabase.table("players").select("*").order("name").execute()
+        players = players_response.data
+        print(f"DEBUG: Players count: {len(players)}")
+        
+        print("DEBUG: Getting matches data...")
+        matches_response = supabase.table("matches").select("*").order("id", desc=True).execute()
+        matches = matches_response.data
+        print(f"DEBUG: Matches count: {len(matches)}")
+        
+    except Exception as e:
+        print(f"DEBUG: Supabase query error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     return {
         "league": {
