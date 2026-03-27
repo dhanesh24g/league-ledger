@@ -1,14 +1,29 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>League Ledger Prototype</title>
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
+
 <body>
+  <!-- Header with Logo -->
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">League Ledger</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
   <header class="shell-header">
-    <h1>League Ledger</h1>
     <p>Set up your group, log match winners, and settle money without spreadsheets.</p>
   </header>
 
@@ -23,7 +38,8 @@
 
     <section class="panel step-panel active" id="step-setup">
       <h2>League Setup</h2>
-      <p class="muted">Define your default rules once. Winner count is auto-calculated from winners you add below. You can edit this later if someone drops out permanently.</p>
+      <p class="muted">Define your default rules once. Winner count is auto-calculated from winners you add below. You
+        can edit this later if someone drops out permanently.</p>
 
       <form id="league-form" class="grid">
         <label>League Name
@@ -122,7 +138,12 @@
 
       <table>
         <thead>
-          <tr><th>Player</th><th>Spent</th><th>Won</th><th>Net</th></tr>
+          <tr>
+            <th>Player</th>
+            <th>Spent</th>
+            <th>Won</th>
+            <th>Net</th>
+          </tr>
         </thead>
         <tbody id="ledger-body"></tbody>
       </table>
@@ -136,4 +157,5 @@
 
   <script src="/static/app.js"></script>
 </body>
+
 </html>

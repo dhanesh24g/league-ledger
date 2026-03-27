@@ -12,12 +12,14 @@
   --bad: #ff8dae;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   margin: 0;
   font-family: "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
-  font-size: 17px;
+  font-size: 15px;
   line-height: 1.55;
   color: var(--text);
   background:
@@ -26,21 +28,65 @@ body {
     var(--bg);
 }
 
-.shell-header {
-  max-width: 1220px;
-  margin: 0 auto;
-  padding: 34px 24px 12px;
+/* App Header with Logo */
+.app-header {
+  background: rgba(31, 42, 61, 0.8);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  padding: 0.75rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.shell-header h1 {
-  margin: 0;
-  font-size: 40px;
+.header-content {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.brand-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
   letter-spacing: 0.02em;
 }
 
-.shell-header p {
-  margin-top: 10px;
+.app-name {
+  font-size: 12px;
   color: var(--muted);
+  font-weight: 500;
+}
+
+.shell-header {
+  max-width: 1220px;
+  margin: 0 auto;
+  padding: 20px 24px 12px;
+}
+
+.shell-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 .shell-main {
@@ -99,9 +145,17 @@ body {
 }
 
 @keyframes stepShine {
-  0% { left: -35%; }
-  55% { left: 112%; }
-  100% { left: 112%; }
+  0% {
+    left: -35%;
+  }
+
+  55% {
+    left: 112%;
+  }
+
+  100% {
+    left: 112%;
+  }
 }
 
 .step-pill:first-child {
@@ -126,10 +180,19 @@ body {
   padding: 24px;
 }
 
-.panel.active { display: block; }
+.panel.active {
+  display: block;
+}
 
-h2 { margin-top: 0; font-size: 30px; }
-h3 { margin: 0; font-size: 19px; }
+h2 {
+  margin-top: 0;
+  font-size: 30px;
+}
+
+h3 {
+  margin: 0;
+  font-size: 19px;
+}
 
 .grid {
   display: grid;
@@ -137,7 +200,9 @@ h3 { margin: 0; font-size: 19px; }
   gap: 16px;
 }
 
-.full { grid-column: 1 / -1; }
+.full {
+  grid-column: 1 / -1;
+}
 
 label {
   display: grid;
@@ -202,7 +267,10 @@ button.ghost {
   margin-bottom: 8px;
 }
 
-.stack { display: grid; gap: 10px; }
+.stack {
+  display: grid;
+  gap: 10px;
+}
 
 .payout-row {
   display: grid;
@@ -232,7 +300,9 @@ button.ghost {
   margin: 0;
 }
 
-.hidden { display: none !important; }
+.hidden {
+  display: none !important;
+}
 
 .soft-box {
   border: 1px dashed var(--border);
@@ -340,10 +410,16 @@ th {
   font-size: 13px;
 }
 
-.pos { color: var(--good); }
-.neg { color: var(--bad); }
+.pos {
+  color: var(--good);
+}
+
+.neg {
+  color: var(--bad);
+}
 
 @media (max-width: 760px) {
+
   .payout-row,
   .rank-select-row {
     grid-template-columns: 1fr;
@@ -415,6 +491,7 @@ th {
 .suggestions.hidden {
   display: none !important;
 }
+
 .field-error {
   border-color: var(--bad);
   box-shadow: 0 0 0 1px rgba(255, 141, 174, 0.35);
@@ -480,7 +557,7 @@ th {
   margin-right: 0;
 }
 
-.step-pill + .step-pill {
+.step-pill+.step-pill {
   margin-left: -6px;
 }
 
@@ -519,7 +596,7 @@ th {
   padding: 10px 14px;
 }
 
-.rank-card > .ghost {
+.rank-card>.ghost {
   justify-self: start;
   margin-top: 2px;
   padding: 8px 14px;
@@ -536,7 +613,7 @@ th {
     min-width: 0;
   }
 
-  .step-pill + .step-pill {
+  .step-pill+.step-pill {
     margin-left: 0;
   }
 }
