@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Prototype</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="shell-header">
+    <h1>League Ledger</h1>
+    <p>Set up your group, log match winners, and settle money without spreadsheets.</p>
+  </header>
+
+  <main class="shell-main">
+    <nav class="step-nav" aria-label="Flow steps">
+      <button class="step-pill active" data-step="setup">League Setup</button>
+      <button class="step-pill" data-step="players">Players</button>
+      <button class="step-pill" data-step="matches">Matches</button>
+      <button class="step-pill" data-step="winners">Winners</button>
+      <button class="step-pill" data-step="ledger">Ledger</button>
+    </nav>
+
+    <section class="panel step-panel active" id="step-setup">
+      <h2>League Setup</h2>
+      <p class="muted">Define your default rules once. Winner count is auto-calculated from winners you add below. You can edit this later if someone drops out permanently.</p>
+
+      <form id="league-form" class="grid">
+        <label>League Name
+          <input name="name" placeholder="Friday IPL Crew" required>
+        </label>
+        <label>Tournament
+          <input name="tournament" value="IPL" required>
+        </label>
+        <label>Entry Fee (per match)
+          <input type="number" name="entry_fee" value="100" min="1" required>
+        </label>
+        <label>Active League Players
+          <input type="number" name="active_player_count" value="5" min="2" required>
+        </label>
+
+        <div class="full">
+          <div class="line-head">
+            <h3>Default Winner Payouts</h3>
+            <button type="button" id="add-default-payout" class="ghost">+ Add Winner</button>
+          </div>
+          <div id="default-payouts" class="stack"></div>
+          <p id="default-payout-total" class="payout-total muted small"></p>
+        </div>
+
+        <div class="actions full">
+          <button type="submit">Save League Rules</button>
+        </div>
+      </form>
+      <p id="league-state" class="muted small"></p>
+    </section>
+
+    <section class="panel step-panel" id="step-players">
+      <h2>Players</h2>
+      <p class="muted">Add all league participants once, then reuse every match.</p>
+
+      <form id="player-form" class="inline-form">
+        <input name="name" placeholder="Enter player name" required>
+        <button type="submit">Add Player</button>
+      </form>
+
+      <ul id="players-list" class="chips"></ul>
+    </section>
+
+    <section class="panel step-panel" id="step-matches">
+      <h2>Matches</h2>
+      <p class="muted">Create matches for your league. Optional match exceptions are hidden until needed.</p>
+
+      <form id="match-form" class="grid">
+        <label>Match Title
+          <input name="title" placeholder="CSK vs MI" required>
+        </label>
+        <label>Match Date
+          <input type="date" name="match_date" required>
+        </label>
+
+        <label class="full toggle">
+          <input type="checkbox" id="enable-overrides"> Enable match-level exception settings
+        </label>
+
+        <div id="override-zone" class="full hidden soft-box">
+          <label>Override Winner Count
+            <input type="number" name="winner_count" min="1">
+          </label>
+          <div class="line-head">
+            <h3>Override Winner Payouts</h3>
+            <button type="button" id="add-override-payout" class="ghost">+ Add Winner</button>
+          </div>
+          <div id="override-payouts" class="stack"></div>
+          <p id="override-payout-total" class="payout-total muted small"></p>
+        </div>
+
+        <div class="actions full">
+          <button type="submit">Add Match</button>
+        </div>
+      </form>
+
+      <div id="match-feed" class="feed"></div>
+    </section>
+
+    <section class="panel step-panel" id="step-winners">
+      <h2>Winners</h2>
+      <p class="muted">Pick the match, then assign winners rank by rank with searchable selectors.</p>
+
+      <div class="inline-form">
+        <select id="match-select"></select>
+        <button id="load-winner-form" type="button">Start Assignment</button>
+        <button id="mark-cancelled" type="button" class="ghost">Washout / Cancelled</button>
+      </div>
+
+      <form id="winners-form" class="stack"></form>
+    </section>
+
+    <section class="panel step-panel" id="step-ledger">
+      <h2>Ledger</h2>
+      <p class="muted">Spent = completed matches x entry fee. Net = won - spent.</p>
+
+      <table>
+        <thead>
+          <tr><th>Player</th><th>Spent</th><th>Won</th><th>Net</th></tr>
+        </thead>
+        <tbody id="ledger-body"></tbody>
+      </table>
+    </section>
+
+    <div class="flow-controls">
+      <button type="button" id="prev-step" class="ghost">Back</button>
+      <button type="button" id="next-step">Continue</button>
+    </div>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
