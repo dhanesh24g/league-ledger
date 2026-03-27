@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
-from .db import init_db
+from .database import init_database
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -19,7 +19,7 @@ app.include_router(api_router)
 
 @app.on_event("startup")
 def startup() -> None:
-    init_db()
+    init_database()
 
 
 @app.get("/")

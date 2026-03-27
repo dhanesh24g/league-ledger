@@ -8,13 +8,16 @@
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "app.py"
+    },
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
       "src": "/(.*)",
       "dest": "app.py"
     }
-  ],
-  "functions": {
-    "app.py": {
-      "runtime": "python3.9"
-    }
-  }
+  ]
 }

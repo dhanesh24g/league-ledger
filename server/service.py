@@ -1,16 +1,36 @@
 from __future__ import annotations
 
-import json
+import os
 from typing import Any
 
 from fastapi import HTTPException
 
-from .db import conn, parse_payouts
+from .database import get_supabase_client, DatabaseManager, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+
+# Import Supabase service if available
+try:
+    from .supabase_service import (
+        get_state as supabase_get_state,
+        upsert_league as supabase_upsert_league,
+        add_player as supabase_add_player,
+        delete_player as supabase_delete_player,
+        add_match as supabase_add_match,
+        save_winners as supabase_save_winners,
+        cancel_match as supabase_cancel_match,
+        get_ledger as supabase_get_ledger,
+    )
+    SUPABASE_SERVICE_AVAILABLE = True
+except ImportError:
+    SUPABASE_SERVICE_AVAILABLE = False
 
 
 def get_state() -> dict[str, Any]:
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_get_state()
+    
+    # Fallback to SQLite
+    with DatabaseManager() as c:
         league = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
         players = c.execute("SELECT * FROM players ORDER BY name ASC").fetchall()
         matches = c.execute("SELECT * FROM matches ORDER BY id DESC").fetchall()
@@ -38,8 +58,12 @@ def get_state() -> dict[str, Any]:
 
 
 def upsert_league(payload: LeaguePayload) -> dict[str, str]:
-    payouts_json = json.dumps(payload.payouts)
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_upsert_league(payload)
+    
+    # Fallback to SQLite
+    payouts_json = __import__("json").dumps(payload.payouts)
+    with DatabaseManager() as c:
         c.execute(
             """
             INSERT INTO league (id, name, tournament, entry_fee, active_player_count, default_winner_count, payouts_json)
@@ -65,8 +89,12 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
 
 
 def add_player(payload: PlayerPayload) -> dict[str, str]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_add_player(payload)
+    
+    # Fallback to SQLite
     try:
-        with conn() as c:
+        with DatabaseManager() as c:
             c.execute("INSERT INTO players (name) VALUES (?)", (payload.name.strip(),))
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
@@ -76,14 +104,22 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
 
 
 def delete_player(player_id: int) -> dict[str, str]:
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_delete_player(player_id)
+    
+    # Fallback to SQLite
+    with DatabaseManager() as c:
         c.execute("DELETE FROM players WHERE id = ?", (player_id,))
     return {"message": "Player removed"}
 
 
 def add_match(payload: MatchPayload) -> dict[str, str]:
-    payouts_json = json.dumps(payload.payouts) if payload.payouts else None
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_add_match(payload)
+    
+    # Fallback to SQLite
+    payouts_json = __import__("json").dumps(payload.payouts) if payload.payouts else None
+    with DatabaseManager() as c:
         c.execute(
             "INSERT INTO matches (title, match_date, winner_count, payouts_json) VALUES (?, ?, ?, ?)",
             (
@@ -97,7 +133,11 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
 
 
 def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_save_winners(match_id, payload)
+    
+    # Fallback to SQLite
+    with DatabaseManager() as c:
         match_row = c.execute("SELECT * FROM matches WHERE id = ?", (match_id,)).fetchone()
         league_row = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
         if not match_row or not league_row:
@@ -143,7 +183,11 @@ def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
 
 
 def cancel_match(match_id: int) -> dict[str, str]:
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_cancel_match(match_id)
+    
+    # Fallback to SQLite
+    with DatabaseManager() as c:
         match_row = c.execute("SELECT * FROM matches WHERE id = ?", (match_id,)).fetchone()
         league_row = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
         players = c.execute("SELECT id FROM players ORDER BY id ASC").fetchall()
@@ -171,7 +215,11 @@ def cancel_match(match_id: int) -> dict[str, str]:
 
 
 def get_ledger() -> dict[str, Any]:
-    with conn() as c:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_get_ledger()
+    
+    # Fallback to SQLite
+    with DatabaseManager() as c:
         league_row = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
         if not league_row:
             return {"rows": [], "completed_matches": 0, "entry_fee": 0}
@@ -192,15 +240,13 @@ def get_ledger() -> dict[str, Any]:
         spent = round(completed_matches * entry_fee, 2)
         won = round(winnings_map.get(player["id"], 0.0), 2)
         net = round(won - spent, 2)
-        rows.append(
-            {
-                "player_id": player["id"],
-                "name": player["name"],
-                "spent": spent,
-                "won": won,
-                "net": net,
-            }
-        )
+        rows.append({
+            "player_id": player["id"],
+            "name": player["name"],
+            "spent": spent,
+            "won": won,
+            "net": net,
+        })
 
     return {
         "rows": rows,
