@@ -105,8 +105,48 @@ function setStep(index) {
     panel.classList.toggle('active', panel.id === `step-${activeStep}`);
   });
 
+  // Update flow controls visibility
+  updateFlowControls(activeStep);
+
   prevStepBtn.disabled = currentStepIndex === 0;
   nextStepBtn.textContent = currentStepIndex === stepOrder.length - 1 ? 'Done' : 'Continue';
+}
+
+function updateFlowControls(step) {
+  const flowControls = document.querySelector('.flow-controls');
+
+  // Show flow controls on all pages except we'll customize buttons per step
+  flowControls.style.display = 'flex';
+
+  switch (step) {
+    case 'setup':
+      // Only Continue button
+      prevStepBtn.style.display = 'none';
+      nextStepBtn.textContent = 'Continue';
+      break;
+
+    case 'players':
+    case 'matches':
+      // Back and Continue buttons
+      prevStepBtn.style.display = 'block';
+      nextStepBtn.textContent = 'Continue';
+      break;
+
+    case 'winners':
+      // Back and Continue buttons (Continue saves + goes next)
+      prevStepBtn.style.display = 'block';
+      nextStepBtn.textContent = 'Continue';
+      break;
+
+    case 'ledger':
+      // Only Back button
+      prevStepBtn.style.display = 'block';
+      nextStepBtn.style.display = 'none';
+      break;
+
+    default:
+      flowControls.style.display = 'none';
+  }
 }
 
 function renumberPayoutRows(container) {
@@ -498,12 +538,22 @@ function refreshConsumedRankCards(match) {
 }
 
 function validateWinnerDraft(match) {
+  // If the form is empty or shows cancelled message, don't validate
+  if (!winnersForm.innerHTML || winnersForm.innerHTML.includes('washout/cancelled')) {
+    return { errors: [], ranksPayload: [] };
+  }
+
   const playerMap = getPlayerMapByName();
   const seenPlayers = new Map();
   const errors = [];
   const ranksPayload = [];
 
   const rankCards = [...winnersForm.querySelectorAll('.rank-card:not(.rank-consumed)')];
+
+  // If no rank cards, don't validate (form is empty)
+  if (rankCards.length === 0) {
+    return { errors: [], ranksPayload: [] };
+  }
   rankCards.forEach((card) => {
     const rank = Number(card.dataset.rank);
     const inputs = [...card.querySelectorAll('input[type="text"]')];
@@ -549,8 +599,32 @@ function validateWinnerDraft(match) {
   return { errors, ranksPayload };
 }
 
+function buildWinnersPayload() {
+  const matchSelect = document.getElementById('match-select');
+  const match = state.matches.find((item) => String(item.id) === String(matchSelect.value));
+
+  if (!match) {
+    throw new Error('Please select a match first');
+  }
+
+  const { errors, ranksPayload } = validateWinnerDraft(match);
+  if (errors.length) {
+    throw new Error(errors[0]);
+  }
+
+  return { ranks: ranksPayload };
+}
+
 function updateWinnerFeedback(match) {
   const feedback = ensureWinnerFeedback();
+
+  // Don't show validation errors if the form shows cancelled message
+  if (winnersForm.innerHTML.includes('washout/cancelled')) {
+    feedback.classList.add('hidden');
+    feedback.textContent = '';
+    return true;
+  }
+
   const { errors } = validateWinnerDraft(match);
 
   if (!errors.length) {
@@ -682,8 +756,47 @@ stepPills.forEach((pill) => {
   });
 });
 
+nextStepBtn.addEventListener('click', async () => {
+  const activeStep = stepOrder[currentStepIndex];
+
+  // If on Winners page, auto-save before continuing
+  if (activeStep === 'winners') {
+    await saveWinnersAndContinue();
+  } else {
+    setStep(currentStepIndex + 1);
+  }
+});
+
 prevStepBtn.addEventListener('click', () => setStep(currentStepIndex - 1));
-nextStepBtn.addEventListener('click', () => setStep(currentStepIndex + 1));
+
+async function saveWinnersAndContinue() {
+  const matchSelect = document.getElementById('match-select');
+  if (!matchSelect.value) {
+    showError('Please select a match first');
+    return;
+  }
+
+  try {
+    const payload = buildWinnersPayload();
+    await callApi(`/api/matches/${matchSelect.value}/winners`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    // Show success feedback
+    const feedback = ensureWinnerFeedback();
+    feedback.textContent = 'Winners saved successfully!';
+    feedback.classList.remove('hidden');
+
+    // Continue to next step after a brief delay
+    setTimeout(() => {
+      setStep(currentStepIndex + 1);
+    }, 1000);
+
+  } catch (err) {
+    showError(err);
+  }
+}
 
 addDefaultPayoutBtn.addEventListener('click', () => createPayoutRow(defaultPayouts));
 addOverridePayoutBtn.addEventListener('click', () => createPayoutRow(overridePayouts));
@@ -805,8 +918,19 @@ cancelMatchBtn.addEventListener('click', async () => {
   if (!proceed) return;
 
   try {
+    // For cancelled matches, we don't need winners payload, just call the cancel endpoint
     await callApi(`/api/matches/${matchSelect.value}/cancel`, { method: 'POST' });
+
+    // Clear the winners form completely to avoid validation errors
     winnersForm.innerHTML = '<p class="muted">Match marked as washout/cancelled. Refund distributed equally.</p>';
+
+    // Clear any feedback messages
+    const feedback = document.querySelector('.winner-feedback');
+    if (feedback) {
+      feedback.classList.add('hidden');
+      feedback.textContent = '';
+    }
+
     await refresh();
   } catch (err) {
     showError(err);
