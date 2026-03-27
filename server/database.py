@@ -62,8 +62,16 @@ def init_database() -> None:
         # Supabase/Postgres schema
         init_supabase_schema()
     else:
-        # SQLite schema (existing logic)
-        init_sqlite_db()
+        # Check if we're in Vercel environment
+        if os.getenv("VERCEL"):
+            # In Vercel, we MUST have Supabase configured
+            raise RuntimeError(
+                "Supabase environment variables (SUPABASE_URL and SUPABASE_ANON_KEY) "
+                "must be set in Vercel deployment. SQLite is not supported in serverless functions."
+            )
+        else:
+            # SQLite schema (existing logic) - only for local development
+            init_sqlite_db()
 
 
 def init_supabase_schema() -> None:

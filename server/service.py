@@ -32,7 +32,14 @@ def get_state() -> dict[str, Any]:
     except Exception as e:
         print(f"Supabase error, falling back to SQLite: {e}")
     
-    # Fallback to SQLite
+    # Check if we're in Vercel environment
+    if os.getenv("VERCEL"):
+        raise HTTPException(
+            status_code=500, 
+            detail="Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables in Vercel."
+        )
+    
+    # Fallback to SQLite for local development
     with DatabaseManager() as c:
         league = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
         players = c.execute("SELECT * FROM players ORDER BY name ASC").fetchall()

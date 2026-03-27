@@ -4,7 +4,6 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
 from .database import init_database, get_supabase_client
@@ -13,7 +12,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
 
 app = FastAPI(title="Dream11 League Prototype")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.include_router(api_router)
 
 
@@ -35,3 +33,12 @@ def health_check() -> dict[str, str]:
         return {"status": "healthy", "database": "supabase"}
     else:
         return {"status": "healthy", "database": "sqlite"}
+
+
+@app.get("/static/{file_path:path}")
+def serve_static(file_path: str) -> FileResponse:
+    """Serve static files"""
+    file_path = STATIC_DIR / file_path
+    if file_path.exists():
+        return FileResponse(file_path)
+    return FileResponse(STATIC_DIR / "index.html", status_code=404)
