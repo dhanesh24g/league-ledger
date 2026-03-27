@@ -35,34 +35,6 @@ def health_check() -> dict[str, str]:
         return {"status": "healthy", "database": "sqlite"}
 
 
-@app.get("/debug")
-def debug_env() -> dict[str, Any]:
-    """Debug endpoint to check environment variables"""
-    import os
-    
-    # Check all environment variables (safely)
-    env_vars = {}
-    for key in ["SUPABASE_URL", "SUPABASE_ANON_KEY", "VERCEL", "VERCEL_ENV"]:
-        value = os.getenv(key)
-        if value:
-            if "KEY" in key:
-                env_vars[key] = f"{value[:10]}..." if len(value) > 10 else "***SET***"
-            else:
-                env_vars[key] = value[:50] + "..." if len(value) > 50 else value
-        else:
-            env_vars[key] = "NOT_SET"
-    
-    from .database import get_supabase_client, SUPABASE_AVAILABLE
-    supabase_client = get_supabase_client()
-    
-    return {
-        "environment": env_vars,
-        "supabase_available": SUPABASE_AVAILABLE,
-        "supabase_client_created": supabase_client is not None,
-        "all_env_keys": [k for k in os.environ.keys() if "SUPABASE" in k.upper() or "VERCEL" in k.upper()]
-    }
-
-
 @app.get("/static/{file_path:path}")
 def serve_static(file_path: str) -> FileResponse:
     """Serve static files"""
