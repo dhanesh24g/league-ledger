@@ -26,8 +26,11 @@ except ImportError:
 
 
 def get_state() -> dict[str, Any]:
-    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_get_state()
+    try:
+        if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+            return supabase_get_state()
+    except Exception as e:
+        print(f"Supabase error, falling back to SQLite: {e}")
     
     # Fallback to SQLite
     with DatabaseManager() as c:

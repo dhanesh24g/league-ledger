@@ -34,10 +34,13 @@ def get_supabase_client() -> Client | None:
     if not supabase_url or not supabase_key:
         return None
     
-    if _supabase_client is None:
-        _supabase_client = create_client(supabase_url, supabase_key)
-    
-    return _supabase_client
+    try:
+        if _supabase_client is None:
+            _supabase_client = create_client(supabase_url, supabase_key)
+        return _supabase_client
+    except Exception as e:
+        print(f"Error creating Supabase client: {e}")
+        return None
 
 
 def get_connection() -> Any:

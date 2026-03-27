@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .api import router as api_router
-from .database import init_database
+from .database import init_database, get_supabase_client
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
@@ -25,3 +25,13 @@ def startup() -> None:
 @app.get("/")
 def root() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/health")
+def health_check() -> dict[str, str]:
+    """Health check endpoint for debugging"""
+    supabase_client = get_supabase_client()
+    if supabase_client:
+        return {"status": "healthy", "database": "supabase"}
+    else:
+        return {"status": "healthy", "database": "sqlite"}
