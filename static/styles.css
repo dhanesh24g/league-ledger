@@ -50,6 +50,11 @@
   box-sizing: border-box;
 }
 
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
@@ -463,6 +468,7 @@ label {
 input,
 select,
 textarea {
+  max-width: 100%;
   width: 100%;
   padding: 0.875rem;
   border: 1px solid var(--input-border);
@@ -491,6 +497,7 @@ textarea::placeholder {
 }
 
 button {
+  max-width: 100%;
   padding: 0.875rem 1.5rem;
   border: none;
   border-radius: 12px;
@@ -534,8 +541,16 @@ button.ghost:hover {
 
 .inline-form input,
 .inline-form select {
-  min-width: 280px;
-  flex: 1;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.grid > *,
+.form-row > *,
+.match-vs-inline > *,
+.rank-select-row > *,
+.inline-form > * {
+  min-width: 0;
 }
 
 .actions {
@@ -613,6 +628,8 @@ button.ghost:hover {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .chips .remove {
@@ -704,6 +721,59 @@ th {
 }
 
 @media (max-width: 760px) {
+  .header-content {
+    padding: 0 14px;
+  }
+
+  .shell-header {
+    padding: 16px 14px 8px;
+  }
+
+  .shell-main {
+    padding: 10px 14px 28px;
+  }
+
+  .panel {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  h2 {
+    font-size: 24px;
+  }
+
+  h3 {
+    font-size: 17px;
+  }
+
+  .line-head {
+    flex-wrap: wrap;
+  }
+
+  .line-head > * {
+    min-width: 0;
+  }
+
+  .inline-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-form input,
+  .inline-form select,
+  .inline-form button {
+    width: 100%;
+  }
+
+  .match-vs-inline {
+    width: 100%;
+  }
+
+  .team-input-group,
+  .form-group,
+  .autocomplete {
+    width: 100%;
+  }
 
   .payout-row,
   .rank-select-row {
@@ -732,10 +802,35 @@ th {
   .flow-controls button {
     width: 100%;
   }
+
+  .chips {
+    grid-template-columns: 1fr;
+  }
+
+  .theme-toggle {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+
+  #step-ledger {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 520px;
+  }
+
+  th,
+  td {
+    font-size: 14px;
+    padding: 10px 8px;
+  }
 }
 
 .autocomplete {
   position: relative;
+  min-width: 0;
 }
 
 .suggestions {
@@ -743,7 +838,7 @@ th {
   top: calc(100% + 6px);
   left: 0;
   right: 0;
-  z-index: 40;
+  z-index: 300;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: linear-gradient(170deg, var(--panel), var(--panel-2));
@@ -900,6 +995,17 @@ th {
 
   .step-pill+.step-pill {
     margin-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .payout-row,
+  .rank-select-row {
+    grid-template-columns: 1fr;
+  }
+
+  .rank-card > .ghost {
+    justify-self: stretch;
   }
 }
 
