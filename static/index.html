@@ -4,12 +4,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>League Ledger Prototype</title>
+  <title>League Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
 </head>
 
 <body>
+  <!-- Theme Toggle Button -->
+  <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+    <span class="theme-icon" id="light-icon">☀️</span>
+    <span class="theme-icon" id="dark-icon">🌙</span>
+  </button>
+
   <!-- Header with Logo -->
   <header class="app-header">
     <div class="header-content">
@@ -87,13 +110,26 @@
       <h2>Matches</h2>
       <p class="muted">Create matches for your league. Optional match exceptions are hidden until needed.</p>
 
-      <form id="match-form" class="grid">
-        <label>Match Title
-          <input name="title" placeholder="CSK vs MI" required>
-        </label>
-        <label>Match Date
-          <input type="date" name="match_date" required>
-        </label>
+      <form id="match-form" class="match-form-grid">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="match_date">Match Date</label>
+            <input type="date" id="match_date" name="match_date" required>
+          </div>
+          <div class="match-vs-inline">
+            <div class="team-input-group">
+              <label for="team1">Home Team</label>
+              <input type="text" id="team1" name="team1" placeholder="Enter team name" required>
+            </div>
+            <div class="vs-divider">
+              <span>VS</span>
+            </div>
+            <div class="team-input-group">
+              <label for="team2">Away Team</label>
+              <input type="text" id="team2" name="team2" placeholder="Enter team name" required>
+            </div>
+          </div>
+        </div>
 
         <label class="full toggle">
           <input type="checkbox" id="enable-overrides"> Enable match-level exception settings

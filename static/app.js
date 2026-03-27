@@ -157,7 +157,7 @@ function renumberPayoutRows(container) {
     const icon = row.querySelector('.rank-icon');
     const text = row.querySelector('.rank-text');
     if (icon) icon.textContent = rankIcon(rank);
-    if (text) text.textContent = `Winner ${rank}`;
+    if (text) text.textContent = `W${rank}`;
   });
   updatePayoutTotal(container);
 }
@@ -190,7 +190,7 @@ function createPayoutRow(container, amount = '') {
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'remove';
-  removeBtn.textContent = 'Remove';
+  removeBtn.textContent = '🗑️';
   removeBtn.addEventListener('click', () => {
     row.remove();
     renumberPayoutRows(container);
@@ -277,7 +277,7 @@ function renderPlayers() {
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'remove';
-    removeBtn.textContent = 'Remove';
+    removeBtn.textContent = '🗑️';
     removeBtn.addEventListener('click', async () => {
       try {
         await callApi(`/api/players/${player.id}`, { method: 'DELETE' });
@@ -448,7 +448,7 @@ function createWinnerInputRow(rowsContainer, onUpdate, initialName = '') {
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'remove';
-  removeBtn.textContent = 'Remove';
+  removeBtn.textContent = '🗑️';
   removeBtn.addEventListener('click', () => {
     row.remove();
     if (!rowsContainer.children.length) {
@@ -867,8 +867,10 @@ matchForm.addEventListener('submit', async (event) => {
 
   try {
     const formData = new FormData(matchForm);
+    const team1 = String(formData.get('team1') || '').trim();
+    const team2 = String(formData.get('team2') || '').trim();
     const payload = {
-      title: String(formData.get('title') || ''),
+      title: `${team1} vs ${team2}`,
       match_date: String(formData.get('match_date') || ''),
       winner_count: null,
       payouts: null,
@@ -941,5 +943,36 @@ setStep(0);
 toggleOverrideSection(false);
 
 refresh().catch((err) => {
-  showError(err);
+  console.error('Initial refresh failed:', err);
 });
+
+// Theme toggle functionality
+const themeToggle = document.getElementById('theme-toggle');
+const lightIcon = document.getElementById('light-icon');
+const darkIcon = document.getElementById('dark-icon');
+
+// Load saved theme or default to system preference
+const savedTheme = localStorage.getItem('dhaneshlabs-theme') ||
+  (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+
+document.documentElement.setAttribute('data-theme', savedTheme);
+updateThemeIcons(savedTheme);
+
+themeToggle.addEventListener('click', () => {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('dhaneshlabs-theme', newTheme);
+  updateThemeIcons(newTheme);
+});
+
+function updateThemeIcons(theme) {
+  if (theme === 'light') {
+    lightIcon.classList.add('active');
+    darkIcon.classList.remove('active');
+  } else {
+    darkIcon.classList.add('active');
+    lightIcon.classList.remove('active');
+  }
+}
