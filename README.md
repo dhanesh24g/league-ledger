@@ -4,12 +4,13 @@ Python + FastAPI MVP to manage offline fantasy league money settlement.
 
 ## What this prototype supports
 
-- League setup (name, tournament, entry fee, default winner count)
-- Rank payout configuration (JSON map like rank -> amount)
-- Manual player name entry
-- Manual match entry
-- Rank-wise winner selection (multiple winners per rank)
-- Auto split of rank payout among tied winners
+- League setup (name, tournament, entry fee, active player count)
+- Winner payout builder with auto rank labels and live prize-pool validation
+- Manual player management
+- Manual match management with optional match-level payout overrides
+- Winner assignment with searchable inputs
+- Tie-aware payout logic (shared ranks consume combined payout slots)
+- Washout/cancel flow with equal refund distribution across all players
 - Live ledger per player: spent, won, net
 
 ## Tech stack
@@ -20,11 +21,16 @@ Python + FastAPI MVP to manage offline fantasy league money settlement.
 
 ## Project structure
 
-- `app.py` - FastAPI app and API endpoints
-- `static/index.html` - UI
-- `static/app.js` - Frontend logic
-- `static/styles.css` - Styling
-- `prototype.db` - Created on first run (local SQLite DB)
+- `app.py` - compatibility entrypoint (imports the FastAPI app)
+- `server/main.py` - FastAPI app wiring (startup, static mount, routers)
+- `server/api.py` - API route layer
+- `server/service.py` - business logic and DB operations
+- `server/schemas.py` - request payload schemas
+- `server/db.py` - SQLite connection, migration/init, helpers
+- `static/index.html` - UI shell
+- `static/app.js` - frontend logic
+- `static/styles.css` - styling
+- `prototype.db` - local SQLite database (created automatically)
 
 ## Run locally
 
@@ -42,37 +48,35 @@ Open in browser:
 
 ## Quick validation flow
 
-1. League setup
-   - Enter league name, entry fee, winner count, and payouts JSON.
-   - Example payouts JSON: `{"1":500,"2":300,"3":150,"4":50}`
+1. Setup league
+   - Set entry fee, active player count, and default winner payouts.
+   - Ensure total payout matches prize pool.
 
 2. Add players
-   - Add 5-10 names manually.
+   - Add names manually.
 
-3. Add matches
-   - Add a match title and date.
-   - Optionally override winner count and payouts for a match.
+3. Add match
+   - Add title/date.
+   - Optionally enable override settings.
 
-4. Choose winners
-   - Select a match from dropdown.
-   - Click `Load Ranks`.
-   - For each rank, check one or more winners.
-   - Click `Save Winners`.
+4. Record result
+   - Use `Start Assignment` for normal results and set winners rank-wise.
+   - Use `Washout / Cancelled` for canceled matches (equal refund handling).
 
 5. Verify ledger
-   - `Spent` should be: completed matches * entry fee.
-   - `Won` should be: sum of split payouts from winner entries.
-   - `Net` should be: won - spent.
+   - `Spent` = number of completed/canceled matches × entry fee.
+   - `Won` = payout entries (winner split or cancellation refund).
+   - `Net` = won - spent.
 
-## Current limitations (expected)
+## Current limitations
 
-- No auth/roles yet (single-admin style usage)
-- Manual match creation (no external sports API yet)
-- No payment tracking status yet (settled/pending)
+- No authentication/authorization yet
+- Manual match entry only
+- No settlement payment-status workflow yet
 
-## Next planned iteration
+## Next iteration ideas
 
-- Auth + league-level admin/member roles
-- API-based match import by tournament/date
-- Settlement workflow (paid/unpaid)
+- Auth + league-level roles
+- API-based match import
+- Settlement tracking (paid/unpaid)
 - Export reports (CSV)
