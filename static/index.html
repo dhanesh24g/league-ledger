@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dream11 League Prototype</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header>
+    <h1>Dream11 League Prototype</h1>
+    <p>Manual players + match winners + payout split (MVP)</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1) League Setup</h2>
+      <form id="league-form" class="grid-2">
+        <label>League Name <input name="name" placeholder="Friday IPL Crew" required></label>
+        <label>Tournament <input name="tournament" value="IPL" required></label>
+        <label>Entry Fee (per match) <input type="number" name="entry_fee" value="100" min="1" required></label>
+        <label>Default Winners Count <input type="number" name="default_winner_count" value="4" min="1" required></label>
+        <label class="full">Rank Payouts JSON
+          <textarea name="payouts" rows="3">{"1":500,"2":300,"3":150,"4":50}</textarea>
+        </label>
+        <button type="submit">Save League</button>
+      </form>
+      <p id="league-state" class="hint"></p>
+    </section>
+
+    <section class="card">
+      <h2>2) Players</h2>
+      <form id="player-form" class="inline">
+        <input name="name" placeholder="Enter player name" required>
+        <button type="submit">Add Player</button>
+      </form>
+      <ul id="players-list"></ul>
+    </section>
+
+    <section class="card">
+      <h2>3) Matches</h2>
+      <form id="match-form" class="grid-2">
+        <label>Match Title <input name="title" placeholder="CSK vs MI" required></label>
+        <label>Match Date <input type="date" name="match_date" required></label>
+        <label>Override Winner Count (optional) <input type="number" name="winner_count" min="1"></label>
+        <label class="full">Override Payout JSON (optional)
+          <textarea name="payouts" rows="2" placeholder='{"1":400,"2":300,"3":200,"4":100}'></textarea>
+        </label>
+        <button type="submit">Add Match</button>
+      </form>
+
+      <div class="divider"></div>
+
+      <h3>Choose Winners</h3>
+      <div class="inline">
+        <select id="match-select"></select>
+        <button id="load-winner-form" type="button">Load Ranks</button>
+      </div>
+      <form id="winners-form"></form>
+    </section>
+
+    <section class="card">
+      <h2>4) Ledger</h2>
+      <p class="hint">Spent = completed matches x entry fee | Won = total split payouts</p>
+      <table>
+        <thead>
+          <tr><th>Player</th><th>Spent</th><th>Won</th><th>Net</th></tr>
+        </thead>
+        <tbody id="ledger-body"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
