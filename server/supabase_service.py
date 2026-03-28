@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from fastapi import HTTPException
 
 from .database import get_supabase_client, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+logger = logging.getLogger(__name__)
 
 
 def get_state() -> dict[str, Any]:
@@ -59,29 +61,31 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
     
     payouts_json = json.dumps(payload.payouts)
     
-    # Check if league exists
-    existing_response = supabase.table("league").select("*").limit(1).execute()
-    
-    if existing_response.data:
-        # Update existing
-        supabase.table("league").update({
-            "name": payload.name.strip(),
-            "tournament": payload.tournament.strip(),
-            "entry_fee": payload.entry_fee,
-            "active_player_count": payload.active_player_count,
-            "default_winner_count": payload.default_winner_count,
-            "payouts_json": payouts_json,
-        }).eq("id", existing_response.data[0]["id"]).execute()
-    else:
-        # Insert new
-        supabase.table("league").insert({
-            "name": payload.name.strip(),
-            "tournament": payload.tournament.strip(),
-            "entry_fee": payload.entry_fee,
-            "active_player_count": payload.active_player_count,
-            "default_winner_count": payload.default_winner_count,
-            "payouts_json": payouts_json,
-        }).execute()
+    values = {
+        "name": payload.name.strip(),
+        "tournament": payload.tournament.strip(),
+        "entry_fee": payload.entry_fee,
+        "active_player_count": payload.active_player_count,
+        "default_winner_count": payload.default_winner_count,
+        "payouts_json": payouts_json,
+    }
+
+    try:
+        existing_response = supabase.table("league").select("*").limit(1).execute()
+
+        if existing_response.data:
+            supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
+        else:
+            supabase.table("league").insert(values).execute()
+
+        verify = supabase.table("league").select("*").limit(1).execute()
+        if not verify.data:
+            raise HTTPException(status_code=500, detail="League save verification failed")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Supabase league upsert failed")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
     
     return {"message": "League settings saved"}
 
@@ -91,14 +95,21 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
+    player_name = payload.name.strip()
     try:
         supabase.table("players").insert({
-            "name": payload.name.strip()
+            "name": player_name
         }).execute()
+        verify = supabase.table("players").select("id").eq("name", player_name).limit(1).execute()
+        if not verify.data:
+            raise HTTPException(status_code=500, detail="Player insert verification failed")
     except Exception as exc:
         if "duplicate" in str(exc).lower() or "unique" in str(exc).lower():
             raise HTTPException(status_code=409, detail="Player already exists")
-        raise
+        if isinstance(exc, HTTPException):
+            raise
+        logger.exception("Supabase player insert failed")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
     
     return {"message": "Player added"}
 
@@ -118,13 +129,29 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
     payouts_json = json.dumps(payload.payouts) if payload.payouts else None
-    
-    supabase.table("matches").insert({
+
+    values = {
         "title": payload.title.strip(),
         "match_date": payload.match_date.strip(),
         "winner_count": payload.winner_count,
         "payouts_json": payouts_json,
-    }).execute()
+    }
+
+    try:
+        before = supabase.table("matches").select("id").order("id", desc=True).limit(1).execute()
+        before_id = int(before.data[0]["id"]) if before.data else 0
+
+        supabase.table("matches").insert(values).execute()
+
+        after = supabase.table("matches").select("id").order("id", desc=True).limit(1).execute()
+        after_id = int(after.data[0]["id"]) if after.data else 0
+        if after_id <= before_id:
+            raise HTTPException(status_code=500, detail="Match insert verification failed")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Supabase match insert failed")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
     
     return {"message": "Match added"}
 

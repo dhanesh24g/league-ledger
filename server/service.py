@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 from typing import Any
 
@@ -7,6 +9,7 @@ from fastapi import HTTPException
 
 from .database import get_supabase_client, DatabaseManager, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+logger = logging.getLogger(__name__)
 
 # Import Supabase service if available
 try:
@@ -30,8 +33,8 @@ def get_state() -> dict[str, Any]:
     try:
         if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
             return supabase_get_state()
-    except Exception as e:
-        print(f"Supabase error, falling back to SQLite: {e}")
+    except Exception:
+        logger.exception("Supabase read failed; falling back to SQLite")
     
     # Check if we're in Vercel environment
     if os.getenv("VERCEL"):
@@ -73,9 +76,9 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
         return supabase_upsert_league(payload)
     
     # Fallback to SQLite
-    payouts_json = __import__("json").dumps(payload.payouts)
+    payouts_json = json.dumps(payload.payouts)
     with DatabaseManager() as c:
-        c.execute(
+        cursor = c.execute(
             """
             INSERT INTO league (id, name, tournament, entry_fee, active_player_count, default_winner_count, payouts_json)
             VALUES (1, ?, ?, ?, ?, ?, ?)
@@ -96,6 +99,8 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
                 payouts_json,
             ),
         )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=500, detail="League settings were not persisted")
     return {"message": "League settings saved"}
 
 
@@ -104,12 +109,20 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
         return supabase_add_player(payload)
     
     # Fallback to SQLite
+    player_name = payload.name.strip()
     try:
         with DatabaseManager() as c:
-            c.execute("INSERT INTO players (name) VALUES (?)", (payload.name.strip(),))
+            cursor = c.execute("INSERT INTO players (name) VALUES (?)", (player_name,))
+            if cursor.rowcount != 1:
+                raise HTTPException(status_code=500, detail="Player insert failed")
+            exists = c.execute("SELECT id FROM players WHERE name = ? LIMIT 1", (player_name,)).fetchone()
+            if not exists:
+                raise HTTPException(status_code=500, detail="Player insert verification failed")
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
             raise HTTPException(status_code=409, detail="Player already exists")
+        if isinstance(exc, HTTPException):
+            raise
         raise
     return {"message": "Player added"}
 
@@ -120,7 +133,9 @@ def delete_player(player_id: int) -> dict[str, str]:
     
     # Fallback to SQLite
     with DatabaseManager() as c:
-        c.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        cursor = c.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Player not found")
     return {"message": "Player removed"}
 
 
@@ -129,9 +144,9 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
         return supabase_add_match(payload)
     
     # Fallback to SQLite
-    payouts_json = __import__("json").dumps(payload.payouts) if payload.payouts else None
+    payouts_json = json.dumps(payload.payouts) if payload.payouts else None
     with DatabaseManager() as c:
-        c.execute(
+        cursor = c.execute(
             "INSERT INTO matches (title, match_date, winner_count, payouts_json) VALUES (?, ?, ?, ?)",
             (
                 payload.title.strip(),
@@ -140,6 +155,11 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
                 payouts_json,
             ),
         )
+        if cursor.rowcount != 1:
+            raise HTTPException(status_code=500, detail="Match insert failed")
+        created_match = c.execute("SELECT id FROM matches WHERE id = ? LIMIT 1", (cursor.lastrowid,)).fetchone()
+        if not created_match:
+            raise HTTPException(status_code=500, detail="Match insert verification failed")
     return {"message": "Match added"}
 
 
