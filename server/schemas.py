@@ -30,3 +30,8 @@ class RankWinners(BaseModel):
 
 class WinnersPayload(BaseModel):
     ranks: list[RankWinners]
+
+
+class LoginPayload(BaseModel):
+    username: str = Field(min_length=1, max_length=80)
+    password: str = Field(min_length=1, max_length=200)

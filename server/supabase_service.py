@@ -278,3 +278,89 @@ def get_ledger() -> dict[str, Any]:
         "completed_matches": completed_matches,
         "entry_fee": entry_fee,
     }
+
+
+def get_stats() -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    players_response = supabase.table("players").select("id, name").order("name").execute()
+    players = players_response.data
+
+    matches_response = supabase.table("matches").select("id, title, match_date, status").order("id", desc=True).execute()
+    matches = matches_response.data
+
+    winners_response = supabase.table("winner_entries").select("match_id, rank, player_id, amount").order("match_id", desc=True).order("rank").execute()
+    winners = winners_response.data
+
+    player_name_by_id = {int(p["id"]): str(p["name"]) for p in players}
+    player_stats: dict[int, dict[str, Any]] = {
+        int(p["id"]): {
+            "player_id": int(p["id"]),
+            "name": str(p["name"]),
+            "wins_total": 0,
+            "rank_counts": {},
+            "matches_won": 0,
+            "total_amount": 0.0,
+        }
+        for p in players
+    }
+
+    by_match: dict[int, list[dict[str, Any]]] = {}
+    for row in winners:
+        match_id = int(row["match_id"])
+        player_id = int(row["player_id"])
+        rank = int(row["rank"])
+        amount = float(row["amount"])
+        player_name = player_name_by_id.get(player_id, f"Player {player_id}")
+        record = {
+            "match_id": match_id,
+            "player_id": player_id,
+            "rank": rank,
+            "amount": amount,
+            "player_name": player_name,
+        }
+        by_match.setdefault(match_id, []).append(record)
+
+        stat = player_stats.get(player_id)
+        if not stat:
+            continue
+        stat["wins_total"] += 1
+        rank_key = str(rank)
+        stat["rank_counts"][rank_key] = int(stat["rank_counts"].get(rank_key, 0)) + 1
+        stat["total_amount"] = round(float(stat["total_amount"]) + amount, 2)
+
+    for match_rows in by_match.values():
+        unique_players = {row["player_id"] for row in match_rows}
+        for player_id in unique_players:
+            stat = player_stats.get(player_id)
+            if stat:
+                stat["matches_won"] += 1
+
+    match_stats: list[dict[str, Any]] = []
+    for match in matches:
+        match_id = int(match["id"])
+        rows = by_match.get(match_id, [])
+        rank_map: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            rank = int(row["rank"])
+            if rank not in rank_map:
+                rank_map[rank] = {"rank": rank, "players": [], "amount_each": float(row["amount"])}
+            rank_map[rank]["players"].append(row["player_name"])
+
+        match_stats.append(
+            {
+                "match_id": match_id,
+                "title": str(match["title"]),
+                "match_date": str(match["match_date"]),
+                "status": str(match["status"]),
+                "winners": [rank_map[key] for key in sorted(rank_map)],
+            }
+        )
+
+    player_stats_list = sorted(
+        player_stats.values(),
+        key=lambda item: (-item["wins_total"], item["name"].lower()),
+    )
+    return {"matches": match_stats, "players": player_stats_list}

@@ -24,6 +24,9 @@ const stepPills = [...document.querySelectorAll('.step-pill')];
 const stepPanels = [...document.querySelectorAll('.step-panel')];
 const prevStepBtn = document.getElementById('prev-step');
 const nextStepBtn = document.getElementById('next-step');
+const topNav = document.getElementById('top-nav');
+const logoutBtn = document.getElementById('logout-btn');
+const authRole = document.getElementById('auth-role');
 
 const stepOrder = ['setup', 'players', 'matches', 'winners', 'ledger'];
 const RANK_ICONS = ['🥇', '🥈', '🥉', '🏅', '🎖️', '🏆'];
@@ -31,12 +34,33 @@ const RANK_ICONS = ['🥇', '🥈', '🥉', '🏅', '🎖️', '🏆'];
 let currentStepIndex = 0;
 let state = { league: null, players: [], matches: [] };
 let winnerFeedbackEl = null;
+let authUser = { username: '', role: 'viewer' };
+
+function getToken() {
+  return localStorage.getItem('league-ledger-token') || '';
+}
+
+function authHeaders() {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 async function callApi(url, options = {}) {
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders(),
+      ...(options.headers || {}),
+    },
     ...options,
   });
+  if (res.status === 401) {
+    localStorage.removeItem('league-ledger-token');
+    localStorage.removeItem('league-ledger-user-role');
+    localStorage.removeItem('league-ledger-username');
+    window.location.replace('/login');
+    throw new Error('Session expired. Please login again.');
+  }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || 'Request failed');
@@ -47,6 +71,51 @@ async function callApi(url, options = {}) {
 function showError(err) {
   const message = err instanceof Error ? err.message : String(err);
   window.alert(message);
+}
+
+function applyRoleBasedUI() {
+  const isAdmin = authUser.role === 'admin';
+  authRole.textContent = `${authUser.username} (${authUser.role})`;
+
+  [
+    addDefaultPayoutBtn,
+    addOverridePayoutBtn,
+    enableOverrides,
+    loadWinnerBtn,
+    cancelMatchBtn,
+    prevStepBtn,
+    nextStepBtn,
+  ].forEach((element) => {
+    if (!element) return;
+    if (element === prevStepBtn || element === nextStepBtn) return;
+    element.disabled = !isAdmin;
+  });
+
+  [leagueForm, playerForm, matchForm].forEach((form) => {
+    if (!form) return;
+    const controls = form.querySelectorAll('input, select, textarea, button');
+    controls.forEach((control) => {
+      control.disabled = !isAdmin;
+    });
+  });
+
+  if (!isAdmin) {
+    winnersForm.innerHTML = '<p class="muted">Viewer mode: winners can only be updated by admin.</p>';
+  }
+}
+
+async function initAuth() {
+  const token = getToken();
+  if (!token) {
+    window.location.replace('/login');
+    return;
+  }
+
+  const profile = await callApi('/api/auth/me');
+  authUser = profile.user;
+  localStorage.setItem('league-ledger-user-role', authUser.role);
+  localStorage.setItem('league-ledger-username', authUser.username);
+  applyRoleBasedUI();
 }
 
 function rankIcon(rank) {
@@ -278,7 +347,12 @@ function renderPlayers() {
     removeBtn.type = 'button';
     removeBtn.className = 'remove';
     removeBtn.textContent = '🗑️';
+    removeBtn.disabled = authUser.role !== 'admin';
     removeBtn.addEventListener('click', async () => {
+      if (authUser.role !== 'admin') {
+        showError('Only admin can remove players.');
+        return;
+      }
       try {
         await callApi(`/api/players/${player.id}`, { method: 'DELETE' });
         await refresh();
@@ -761,6 +835,10 @@ nextStepBtn.addEventListener('click', async () => {
 
   // If on Winners page, auto-save before continuing
   if (activeStep === 'winners') {
+    if (authUser.role !== 'admin') {
+      setStep(currentStepIndex + 1);
+      return;
+    }
     await saveWinnersAndContinue();
   } else {
     setStep(currentStepIndex + 1);
@@ -768,6 +846,17 @@ nextStepBtn.addEventListener('click', async () => {
 });
 
 prevStepBtn.addEventListener('click', () => setStep(currentStepIndex - 1));
+
+topNav.addEventListener('change', () => {
+  window.location.href = topNav.value;
+});
+
+logoutBtn.addEventListener('click', () => {
+  localStorage.removeItem('league-ledger-token');
+  localStorage.removeItem('league-ledger-user-role');
+  localStorage.removeItem('league-ledger-username');
+  window.location.replace('/login');
+});
 
 async function saveWinnersAndContinue() {
   const matchSelect = document.getElementById('match-select');
@@ -808,6 +897,10 @@ leagueForm.elements.active_player_count.addEventListener('input', () => updatePa
 
 leagueForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (authUser.role !== 'admin') {
+    showError('Only admin can update league settings.');
+    return;
+  }
 
   try {
     const formData = new FormData(leagueForm);
@@ -847,6 +940,10 @@ leagueForm.addEventListener('submit', async (event) => {
 
 playerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (authUser.role !== 'admin') {
+    showError('Only admin can add players.');
+    return;
+  }
 
   try {
     const formData = new FormData(playerForm);
@@ -864,6 +961,10 @@ playerForm.addEventListener('submit', async (event) => {
 
 matchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+  if (authUser.role !== 'admin') {
+    showError('Only admin can add matches.');
+    return;
+  }
 
   try {
     const formData = new FormData(matchForm);
@@ -903,6 +1004,10 @@ matchForm.addEventListener('submit', async (event) => {
 });
 
 loadWinnerBtn.addEventListener('click', () => {
+  if (authUser.role !== 'admin') {
+    showError('Only admin can assign winners.');
+    return;
+  }
   if (!matchSelect.value) {
     showError('Choose a match first.');
     return;
@@ -911,6 +1016,10 @@ loadWinnerBtn.addEventListener('click', () => {
 });
 
 cancelMatchBtn.addEventListener('click', async () => {
+  if (authUser.role !== 'admin') {
+    showError('Only admin can cancel a match.');
+    return;
+  }
   if (!matchSelect.value) {
     showError('Choose a match first.');
     return;
@@ -942,9 +1051,11 @@ cancelMatchBtn.addEventListener('click', async () => {
 setStep(0);
 toggleOverrideSection(false);
 
-refresh().catch((err) => {
-  console.error('Initial refresh failed:', err);
-});
+initAuth()
+  .then(() => refresh())
+  .catch((err) => {
+    console.error('Initial refresh failed:', err);
+  });
 
 // Theme toggle functionality
 const themeToggle = document.getElementById('theme-toggle');

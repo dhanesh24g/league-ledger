@@ -15,6 +15,11 @@
   <script>
     (function () {
       try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
         var key = "dhaneshlabs-theme";
         var stored = localStorage.getItem(key);
         var theme = (stored === "light" || stored === "dark")
@@ -42,6 +47,14 @@
           <span class="brand-name">Dhanesh Labs</span>
           <span class="app-name">League Ledger</span>
         </div>
+      </div>
+      <div class="header-actions">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/">League Ledger</option>
+          <option value="/stats">Stats Dashboard</option>
+        </select>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
       </div>
     </div>
   </header>
