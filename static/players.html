@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Players</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+    <span class="theme-icon" id="light-icon">☀️</span>
+    <span class="theme-icon" id="dark-icon">🌙</span>
+  </button>
+
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">Players</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/players">League Workflow</option>
+          <option value="/stats">Stats Dashboard</option>
+        </select>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <header class="shell-header">
+    <p>Add and manage your league members. Refresh keeps you on this page instead of sending you back to setup.</p>
+  </header>
+
+  <main class="shell-main">
+    <nav class="step-nav" aria-label="Workflow navigation">
+      <a class="step-pill" data-route="/setup" data-workflow-link href="/setup">League Setup</a>
+      <a class="step-pill" data-route="/players" data-workflow-link href="/players">Players</a>
+      <a class="step-pill" data-route="/matches" data-workflow-link href="/matches">Matches</a>
+      <a class="step-pill" data-route="/winners" data-workflow-link href="/winners">Winners</a>
+      <a class="step-pill" data-route="/ledger" data-workflow-link href="/ledger">Ledger</a>
+    </nav>
+
+    <section class="panel active">
+      <h2>Players</h2>
+      <p class="muted">Add all league participants once, then reuse every match.</p>
+
+      <form id="player-form" class="inline-form">
+        <input name="name" placeholder="Enter player name" required>
+        <button type="submit">Add Player</button>
+      </form>
+
+      <ul id="players-list" class="chips"></ul>
+
+      <div class="flow-controls">
+        <a class="button-link ghost" data-workflow-link href="/setup">Back to Setup</a>
+        <a class="button-link primary" data-workflow-link href="/matches">Continue to Matches</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/players.js"></script>
+</body>
+
+</html>

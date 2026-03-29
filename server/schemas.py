@@ -21,6 +21,7 @@ class MatchPayload(BaseModel):
     match_date: str = Field(min_length=4, max_length=40)
     winner_count: int | None = Field(default=None, ge=1, le=20)
     payouts: dict[int, float] | None = None
+    participant_ids: list[int] = Field(default_factory=list)
 
 
 class RankWinners(BaseModel):

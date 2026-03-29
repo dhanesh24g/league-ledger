@@ -6,9 +6,44 @@ from typing import Any
 
 from fastapi import HTTPException
 
-from .database import get_supabase_client, parse_payouts
+from .database import get_supabase_client, parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
+
+
+def _normalize_participant_ids(raw_ids: list[int] | tuple[int, ...] | None) -> list[int]:
+    normalized: list[int] = []
+    seen: set[int] = set()
+    for item in raw_ids or []:
+        try:
+            player_id = int(item)
+        except (TypeError, ValueError):
+            continue
+        if player_id in seen:
+            continue
+        seen.add(player_id)
+        normalized.append(player_id)
+    return normalized
+
+
+def _rank_label(rank: int, status: str, has_result: bool) -> str:
+    if rank == 0:
+        return "Washout / Refund"
+    if rank == 1:
+        return "Champion"
+    if rank == 2:
+        return "Runner-up"
+    if rank == 3:
+        return "Third place"
+    if rank > 3:
+        return f"Rank {rank}"
+    if status == "pending":
+        return "Scheduled"
+    if status == "canceled":
+        return "Washout"
+    if status == "completed":
+        return "Played"
+    return "Played" if has_result else status.title()
 
 
 def get_state() -> dict[str, Any]:
@@ -31,6 +66,7 @@ def get_state() -> dict[str, Any]:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    fallback_participant_ids = [int(player["id"]) for player in players]
 
     return {
         "league": {
@@ -48,6 +84,7 @@ def get_state() -> dict[str, Any]:
             {
                 **match,
                 "payouts": parse_payouts(match["payouts_json"]),
+                "participant_ids": parse_participant_ids(match.get("participant_ids_json")) or fallback_participant_ids,
             }
             for match in matches
         ],
@@ -130,11 +167,25 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
     
     payouts_json = json.dumps(payload.payouts) if payload.payouts else None
 
+    players_response = supabase.table("players").select("id").order("id").execute()
+    valid_player_ids = {int(player["id"]) for player in players_response.data}
+    participant_ids = _normalize_participant_ids(payload.participant_ids)
+    if participant_ids:
+        invalid_ids = [player_id for player_id in participant_ids if player_id not in valid_player_ids]
+        if invalid_ids:
+            raise HTTPException(status_code=400, detail="Match participants include unknown players")
+    else:
+        participant_ids = [int(player["id"]) for player in players_response.data]
+
+    if len(participant_ids) < 2:
+        raise HTTPException(status_code=400, detail="Select at least two match participants")
+
     values = {
         "title": payload.title.strip(),
         "match_date": payload.match_date.strip(),
         "winner_count": payload.winner_count,
         "payouts_json": payouts_json,
+        "participant_ids_json": json.dumps(participant_ids),
     }
 
     try:
@@ -173,12 +224,15 @@ def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
     
     payouts = parse_payouts(match["payouts_json"]) or parse_payouts(league["payouts_json"])
     winner_limit = int(match["winner_count"] or league["default_winner_count"])
+    participant_ids = parse_participant_ids(match.get("participant_ids_json")) or [int(player["id"]) for player in supabase.table("players").select("id").order("id").execute().data]
     
     rank_to_players = {row.rank: [pid for pid in row.player_ids] for row in payload.ranks}
     
     used_players: set[int] = set()
     for rank_players in rank_to_players.values():
         for player_id in rank_players:
+            if player_id not in participant_ids:
+                raise HTTPException(status_code=400, detail="Only match participants can be assigned as winners")
             if player_id in used_players:
                 raise HTTPException(status_code=400, detail="A player is assigned in multiple ranks")
             used_players.add(player_id)
@@ -231,21 +285,22 @@ def cancel_match(match_id: int) -> dict[str, str]:
     match = match_response.data[0]
     league = league_response.data[0]
     players = players_response.data
+    participant_ids = parse_participant_ids(match.get("participant_ids_json")) or [int(player["id"]) for player in players]
     
     # Delete existing winner entries
     supabase.table("winner_entries").delete().eq("match_id", match_id).execute()
     
-    if players:
-        pool = float(league["entry_fee"]) * len(players)
-        split = round(pool / len(players), 2)
-        remainder = round(pool - (split * len(players)), 2)
+    if participant_ids:
+        pool = float(league["entry_fee"]) * len(participant_ids)
+        split = round(pool / len(participant_ids), 2)
+        remainder = round(pool - (split * len(participant_ids)), 2)
         
-        for idx, player in enumerate(players):
+        for idx, player_id in enumerate(participant_ids):
             amount = split + (remainder if idx == 0 else 0.0)
             supabase.table("winner_entries").insert({
                 "match_id": match_id,
                 "rank": 0,
-                "player_id": player["id"],
+                "player_id": player_id,
                 "amount": round(amount, 2),
             }).execute()
     
@@ -268,8 +323,9 @@ def get_ledger() -> dict[str, Any]:
     league = league_response.data[0]
     
     # Get completed matches count
-    matches_response = supabase.table("matches").select("id", count="exact").in_("status", ["completed", "canceled"]).execute()
-    completed_matches = matches_response.count or 0
+    matches_response = supabase.table("matches").select("id, participant_ids_json").in_("status", ["completed", "canceled"]).order("id", desc=True).execute()
+    matches = matches_response.data
+    completed_matches = len(matches)
     
     # Get players
     players_response = supabase.table("players").select("id, name").order("name").execute()
@@ -286,10 +342,17 @@ def get_ledger() -> dict[str, Any]:
         winnings_map[player_id] = winnings_map.get(player_id, 0) + amount
     
     entry_fee = float(league["entry_fee"])
+    fallback_participants = [int(player["id"]) for player in players]
+    match_counts_by_player: dict[int, int] = {}
+
+    for match in matches:
+        participant_ids = parse_participant_ids(match.get("participant_ids_json")) or fallback_participants
+        for player_id in participant_ids:
+            match_counts_by_player[player_id] = match_counts_by_player.get(player_id, 0) + 1
     
     rows = []
     for player in players:
-        spent = round(completed_matches * entry_fee, 2)
+        spent = round(match_counts_by_player.get(int(player["id"]), 0) * entry_fee, 2)
         won = round(winnings_map.get(player["id"], 0.0), 2)
         net = round(won - spent, 2)
         rows.append({
@@ -315,7 +378,7 @@ def get_stats() -> dict[str, Any]:
     players_response = supabase.table("players").select("id, name").order("name").execute()
     players = players_response.data
 
-    matches_response = supabase.table("matches").select("id, title, match_date, status").order("id", desc=True).execute()
+    matches_response = supabase.table("matches").select("id, title, match_date, status, participant_ids_json").order("id", desc=True).execute()
     matches = matches_response.data
 
     winners_response = supabase.table("winner_entries").select("match_id, rank, player_id, amount").order("match_id", desc=True).order("rank").execute()
@@ -328,19 +391,25 @@ def get_stats() -> dict[str, Any]:
             "name": str(p["name"]),
             "wins_total": 0,
             "rank_counts": {},
+            "matches_played": 0,
             "matches_won": 0,
+            "washout_matches": 0,
             "total_amount": 0.0,
+            "match_history": [],
+            "_played_match_ids": set(),
+            "_washout_match_ids": set(),
         }
         for p in players
     }
 
     by_match: dict[int, list[dict[str, Any]]] = {}
+    winner_lookup: dict[int, dict[int, dict[str, Any]]] = {}
     for row in winners:
         match_id = int(row["match_id"])
         player_id = int(row["player_id"])
         rank = int(row["rank"])
         amount = float(row["amount"])
-        player_name = player_name_by_id.get(player_id, f"Player {player_id}")
+        player_name = player_name_by_id.get(player_id, f"Archived Player #{player_id}")
         record = {
             "match_id": match_id,
             "player_id": player_id,
@@ -349,17 +418,37 @@ def get_stats() -> dict[str, Any]:
             "player_name": player_name,
         }
         by_match.setdefault(match_id, []).append(record)
+        winner_lookup.setdefault(match_id, {})[player_id] = {
+            "rank": rank,
+            "amount": amount,
+        }
 
         stat = player_stats.get(player_id)
         if not stat:
-            continue
-        stat["wins_total"] += 1
+            stat = {
+                "player_id": player_id,
+                "name": player_name,
+                "wins_total": 0,
+                "rank_counts": {},
+                "matches_played": 0,
+                "matches_won": 0,
+                "washout_matches": 0,
+                "total_amount": 0.0,
+                "match_history": [],
+                "_played_match_ids": set(),
+                "_washout_match_ids": set(),
+            }
+            player_stats[player_id] = stat
+        if rank == 1:
+            stat["wins_total"] += 1
+        if rank == 0:
+            stat["_washout_match_ids"].add(match_id)
         rank_key = str(rank)
         stat["rank_counts"][rank_key] = int(stat["rank_counts"].get(rank_key, 0)) + 1
         stat["total_amount"] = round(float(stat["total_amount"]) + amount, 2)
 
     for match_rows in by_match.values():
-        unique_players = {row["player_id"] for row in match_rows}
+        unique_players = {row["player_id"] for row in match_rows if int(row["rank"]) > 0}
         for player_id in unique_players:
             stat = player_stats.get(player_id)
             if stat:
@@ -376,18 +465,75 @@ def get_stats() -> dict[str, Any]:
                 rank_map[rank] = {"rank": rank, "players": [], "amount_each": float(row["amount"])}
             rank_map[rank]["players"].append(row["player_name"])
 
+        participant_ids = _normalize_participant_ids(parse_participant_ids(match.get("participant_ids_json")))
+        if not participant_ids:
+            participant_ids = _normalize_participant_ids(list(player_name_by_id.keys()))
+        participant_names = [player_name_by_id.get(player_id, f"Archived Player #{player_id}") for player_id in participant_ids]
+
+        for player_id in participant_ids:
+            stat = player_stats.get(player_id)
+            if not stat:
+                stat = {
+                    "player_id": player_id,
+                    "name": player_name_by_id.get(player_id, f"Archived Player #{player_id}"),
+                    "wins_total": 0,
+                    "rank_counts": {},
+                    "matches_played": 0,
+                    "matches_won": 0,
+                    "washout_matches": 0,
+                    "total_amount": 0.0,
+                    "match_history": [],
+                    "_played_match_ids": set(),
+                    "_washout_match_ids": set(),
+                }
+                player_stats[player_id] = stat
+
+            result = winner_lookup.get(match_id, {}).get(player_id)
+            if str(match["status"]) in {"completed", "canceled"}:
+                stat["_played_match_ids"].add(match_id)
+            if str(match["status"]) == "canceled" or (result and int(result["rank"]) == 0):
+                stat["_washout_match_ids"].add(match_id)
+            stat["match_history"].append(
+                {
+                    "match_id": match_id,
+                    "title": str(match["title"]),
+                    "match_date": str(match["match_date"]),
+                    "status": str(match["status"]),
+                    "result": _rank_label(int(result["rank"]) if result else -1, str(match["status"]), bool(result)),
+                    "amount_won": round(float(result["amount"]), 2) if result else 0.0,
+                }
+            )
+
         match_stats.append(
             {
                 "match_id": match_id,
                 "title": str(match["title"]),
                 "match_date": str(match["match_date"]),
                 "status": str(match["status"]),
+                "participant_ids": participant_ids,
+                "participants": participant_names,
+                "participant_count": len(participant_names),
                 "winners": [rank_map[key] for key in sorted(rank_map)],
             }
         )
 
+    for stat in player_stats.values():
+        stat["matches_played"] = len(stat.pop("_played_match_ids", set()))
+        stat["washout_matches"] = len(stat.pop("_washout_match_ids", set()))
+
     player_stats_list = sorted(
         player_stats.values(),
-        key=lambda item: (-item["wins_total"], item["name"].lower()),
+        key=lambda item: (-item["wins_total"], -item["total_amount"], item["name"].lower()),
     )
-    return {"matches": match_stats, "players": player_stats_list}
+    total_matches = len(matches)
+    played_matches = sum(1 for match in matches if str(match["status"]) == "completed")
+    canceled_matches = sum(1 for match in matches if str(match["status"]) == "canceled")
+    return {
+        "summary": {
+            "total_matches": total_matches,
+            "played_matches": played_matches,
+            "canceled_matches": canceled_matches,
+        },
+        "matches": match_stats,
+        "players": player_stats_list,
+    }
