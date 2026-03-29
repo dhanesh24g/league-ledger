@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Stats</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">Stats Dashboard</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/stats">Stats Dashboard</option>
+          <option value="/">League Ledger</option>
+        </select>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell-main">
+    <section class="panel active">
+      <h2>Match Winners</h2>
+      <div class="inline-form">
+        <select id="match-filter"></select>
+      </div>
+      <div id="match-winners-card" class="feed"></div>
+    </section>
+
+    <section class="panel active" style="margin-top: 16px;">
+      <h2>Player Performance</h2>
+      <div class="inline-form">
+        <select id="player-filter"></select>
+      </div>
+      <div id="player-stats-card" class="feed"></div>
+    </section>
+  </main>
+
+  <script src="/static/stats.js"></script>
+</body>
+
+</html>

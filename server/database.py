@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 
@@ -19,26 +20,32 @@ DB_PATH = BASE_DIR / "prototype.db"
 
 # Global Supabase client
 _supabase_client: Client | None = None
+_supabase_signature: tuple[str, str] | None = None
+logger = logging.getLogger(__name__)
 
 
 def get_supabase_client() -> Client | None:
     """Get Supabase client if configured"""
-    global _supabase_client
+    global _supabase_client, _supabase_signature
     
     if not SUPABASE_AVAILABLE:
         return None
         
     supabase_url = os.getenv("SUPABASE_URL")
-    supabase_key = os.getenv("SUPABASE_ANON_KEY")
+    # Use service-role key for server-side writes when available.
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
     
     if not supabase_url or not supabase_key:
         return None
     
     try:
-        if _supabase_client is None:
+        signature = (supabase_url, supabase_key)
+        if _supabase_client is None or _supabase_signature != signature:
             _supabase_client = create_client(supabase_url, supabase_key)
+            _supabase_signature = signature
         return _supabase_client
-    except Exception as e:
+    except Exception:
+        logger.exception("Failed to initialize Supabase client")
         return None
 
 
@@ -79,56 +86,8 @@ def init_supabase_schema() -> None:
     if not supabase:
         return
     
-    # Create tables using raw SQL
-    tables_sql = [
-        """
-        CREATE TABLE IF NOT EXISTS league (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            tournament TEXT NOT NULL,
-            entry_fee REAL NOT NULL,
-            active_player_count INTEGER NOT NULL DEFAULT 5,
-            default_winner_count INTEGER NOT NULL,
-            payouts_json TEXT NOT NULL
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS players (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL UNIQUE
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS matches (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            match_date TEXT NOT NULL,
-            winner_count INTEGER,
-            payouts_json TEXT,
-            status TEXT NOT NULL DEFAULT 'pending'
-        )
-        """,
-        """
-        CREATE TABLE IF NOT EXISTS winner_entries (
-            id SERIAL PRIMARY KEY,
-            match_id INTEGER NOT NULL,
-            rank INTEGER NOT NULL,
-            player_id INTEGER NOT NULL,
-            amount REAL NOT NULL,
-            FOREIGN KEY(match_id) REFERENCES matches(id),
-            FOREIGN KEY(player_id) REFERENCES players(id)
-        )
-        """
-    ]
-    
-    # Execute table creation
-    for sql in tables_sql:
-        try:
-            # Use Supabase RPC or direct SQL execution
-            # For now, we'll assume tables are created manually in Supabase dashboard
-            pass
-        except Exception as e:
-            print(f"Table creation note: {e}")
+    # Supabase schema should be managed via migrations / SQL editor.
+    logger.info("Supabase client available; assuming schema is managed externally.")
 
 
 def init_sqlite_db() -> None:
@@ -203,6 +162,10 @@ class DatabaseManager:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.connection and not self.supabase:
+            if exc_type is None:
+                self.connection.commit()
+            else:
+                self.connection.rollback()
             self.connection.close()
 
 

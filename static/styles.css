@@ -149,6 +149,11 @@ body {
   max-width: 1220px;
   margin: 0 auto;
   padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .brand {
@@ -180,6 +185,22 @@ body {
   font-size: 12px;
   color: var(--muted);
   font-weight: 500;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.header-actions select {
+  min-width: 180px;
+}
+
+.auth-panel {
+  max-width: 520px;
+  margin: 8vh auto 0;
 }
 
 .shell-header {
@@ -721,6 +742,15 @@ th {
 }
 
 @media (max-width: 760px) {
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions select,
+  .header-actions button {
+    width: 100%;
+  }
+
   .header-content {
     padding: 0 14px;
   }

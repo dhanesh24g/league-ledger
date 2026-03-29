@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <main class="shell-main">
+    <section class="panel active auth-panel">
+      <h2>League Ledger Login</h2>
+      <p class="muted">Login as <strong>admin</strong> (edit rights) or <strong>viewer</strong> (read-only).</p>
+      <form id="login-form" class="stack">
+        <label>Username
+          <input name="username" placeholder="admin" required>
+        </label>
+        <label>Password
+          <input type="password" name="password" placeholder="••••••••" required>
+        </label>
+        <button type="submit">Login</button>
+      </form>
+      <p id="login-hint" class="muted small"></p>
+    </section>
+  </main>
+  <script src="/static/login.js"></script>
+</body>
+
+</html>

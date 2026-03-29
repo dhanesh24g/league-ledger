@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from fastapi import HTTPException
 
 from .database import get_supabase_client, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+logger = logging.getLogger(__name__)
 
 
 def get_state() -> dict[str, Any]:
@@ -59,29 +61,31 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
     
     payouts_json = json.dumps(payload.payouts)
     
-    # Check if league exists
-    existing_response = supabase.table("league").select("*").limit(1).execute()
-    
-    if existing_response.data:
-        # Update existing
-        supabase.table("league").update({
-            "name": payload.name.strip(),
-            "tournament": payload.tournament.strip(),
-            "entry_fee": payload.entry_fee,
-            "active_player_count": payload.active_player_count,
-            "default_winner_count": payload.default_winner_count,
-            "payouts_json": payouts_json,
-        }).eq("id", existing_response.data[0]["id"]).execute()
-    else:
-        # Insert new
-        supabase.table("league").insert({
-            "name": payload.name.strip(),
-            "tournament": payload.tournament.strip(),
-            "entry_fee": payload.entry_fee,
-            "active_player_count": payload.active_player_count,
-            "default_winner_count": payload.default_winner_count,
-            "payouts_json": payouts_json,
-        }).execute()
+    values = {
+        "name": payload.name.strip(),
+        "tournament": payload.tournament.strip(),
+        "entry_fee": payload.entry_fee,
+        "active_player_count": payload.active_player_count,
+        "default_winner_count": payload.default_winner_count,
+        "payouts_json": payouts_json,
+    }
+
+    try:
+        existing_response = supabase.table("league").select("*").limit(1).execute()
+
+        if existing_response.data:
+            supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
+        else:
+            supabase.table("league").insert(values).execute()
+
+        verify = supabase.table("league").select("*").limit(1).execute()
+        if not verify.data:
+            raise HTTPException(status_code=500, detail="League save verification failed")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Supabase league upsert failed")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
     
     return {"message": "League settings saved"}
 
@@ -91,14 +95,21 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
+    player_name = payload.name.strip()
     try:
         supabase.table("players").insert({
-            "name": payload.name.strip()
+            "name": player_name
         }).execute()
+        verify = supabase.table("players").select("id").eq("name", player_name).limit(1).execute()
+        if not verify.data:
+            raise HTTPException(status_code=500, detail="Player insert verification failed")
     except Exception as exc:
         if "duplicate" in str(exc).lower() or "unique" in str(exc).lower():
             raise HTTPException(status_code=409, detail="Player already exists")
-        raise
+        if isinstance(exc, HTTPException):
+            raise
+        logger.exception("Supabase player insert failed")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
     
     return {"message": "Player added"}
 
@@ -118,13 +129,29 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     
     payouts_json = json.dumps(payload.payouts) if payload.payouts else None
-    
-    supabase.table("matches").insert({
+
+    values = {
         "title": payload.title.strip(),
         "match_date": payload.match_date.strip(),
         "winner_count": payload.winner_count,
         "payouts_json": payouts_json,
-    }).execute()
+    }
+
+    try:
+        before = supabase.table("matches").select("id").order("id", desc=True).limit(1).execute()
+        before_id = int(before.data[0]["id"]) if before.data else 0
+
+        supabase.table("matches").insert(values).execute()
+
+        after = supabase.table("matches").select("id").order("id", desc=True).limit(1).execute()
+        after_id = int(after.data[0]["id"]) if after.data else 0
+        if after_id <= before_id:
+            raise HTTPException(status_code=500, detail="Match insert verification failed")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("Supabase match insert failed")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
     
     return {"message": "Match added"}
 
@@ -278,3 +305,89 @@ def get_ledger() -> dict[str, Any]:
         "completed_matches": completed_matches,
         "entry_fee": entry_fee,
     }
+
+
+def get_stats() -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    players_response = supabase.table("players").select("id, name").order("name").execute()
+    players = players_response.data
+
+    matches_response = supabase.table("matches").select("id, title, match_date, status").order("id", desc=True).execute()
+    matches = matches_response.data
+
+    winners_response = supabase.table("winner_entries").select("match_id, rank, player_id, amount").order("match_id", desc=True).order("rank").execute()
+    winners = winners_response.data
+
+    player_name_by_id = {int(p["id"]): str(p["name"]) for p in players}
+    player_stats: dict[int, dict[str, Any]] = {
+        int(p["id"]): {
+            "player_id": int(p["id"]),
+            "name": str(p["name"]),
+            "wins_total": 0,
+            "rank_counts": {},
+            "matches_won": 0,
+            "total_amount": 0.0,
+        }
+        for p in players
+    }
+
+    by_match: dict[int, list[dict[str, Any]]] = {}
+    for row in winners:
+        match_id = int(row["match_id"])
+        player_id = int(row["player_id"])
+        rank = int(row["rank"])
+        amount = float(row["amount"])
+        player_name = player_name_by_id.get(player_id, f"Player {player_id}")
+        record = {
+            "match_id": match_id,
+            "player_id": player_id,
+            "rank": rank,
+            "amount": amount,
+            "player_name": player_name,
+        }
+        by_match.setdefault(match_id, []).append(record)
+
+        stat = player_stats.get(player_id)
+        if not stat:
+            continue
+        stat["wins_total"] += 1
+        rank_key = str(rank)
+        stat["rank_counts"][rank_key] = int(stat["rank_counts"].get(rank_key, 0)) + 1
+        stat["total_amount"] = round(float(stat["total_amount"]) + amount, 2)
+
+    for match_rows in by_match.values():
+        unique_players = {row["player_id"] for row in match_rows}
+        for player_id in unique_players:
+            stat = player_stats.get(player_id)
+            if stat:
+                stat["matches_won"] += 1
+
+    match_stats: list[dict[str, Any]] = []
+    for match in matches:
+        match_id = int(match["id"])
+        rows = by_match.get(match_id, [])
+        rank_map: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            rank = int(row["rank"])
+            if rank not in rank_map:
+                rank_map[rank] = {"rank": rank, "players": [], "amount_each": float(row["amount"])}
+            rank_map[rank]["players"].append(row["player_name"])
+
+        match_stats.append(
+            {
+                "match_id": match_id,
+                "title": str(match["title"]),
+                "match_date": str(match["match_date"]),
+                "status": str(match["status"]),
+                "winners": [rank_map[key] for key in sorted(rank_map)],
+            }
+        )
+
+    player_stats_list = sorted(
+        player_stats.values(),
+        key=lambda item: (-item["wins_total"], item["name"].lower()),
+    )
+    return {"matches": match_stats, "players": player_stats_list}

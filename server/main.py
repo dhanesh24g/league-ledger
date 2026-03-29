@@ -25,6 +25,16 @@ def root() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/login")
+def login_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/stats")
+def stats_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "stats.html")
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     """Health check endpoint for debugging"""

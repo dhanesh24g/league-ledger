@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 from typing import Any
 
@@ -7,6 +9,7 @@ from fastapi import HTTPException
 
 from .database import get_supabase_client, DatabaseManager, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+logger = logging.getLogger(__name__)
 
 # Import Supabase service if available
 try:
@@ -19,6 +22,7 @@ try:
         save_winners as supabase_save_winners,
         cancel_match as supabase_cancel_match,
         get_ledger as supabase_get_ledger,
+        get_stats as supabase_get_stats,
     )
     SUPABASE_SERVICE_AVAILABLE = True
 except ImportError:
@@ -29,8 +33,8 @@ def get_state() -> dict[str, Any]:
     try:
         if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
             return supabase_get_state()
-    except Exception as e:
-        print(f"Supabase error, falling back to SQLite: {e}")
+    except Exception:
+        logger.exception("Supabase read failed; falling back to SQLite")
     
     # Check if we're in Vercel environment
     if os.getenv("VERCEL"):
@@ -72,9 +76,9 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
         return supabase_upsert_league(payload)
     
     # Fallback to SQLite
-    payouts_json = __import__("json").dumps(payload.payouts)
+    payouts_json = json.dumps(payload.payouts)
     with DatabaseManager() as c:
-        c.execute(
+        cursor = c.execute(
             """
             INSERT INTO league (id, name, tournament, entry_fee, active_player_count, default_winner_count, payouts_json)
             VALUES (1, ?, ?, ?, ?, ?, ?)
@@ -95,6 +99,8 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
                 payouts_json,
             ),
         )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=500, detail="League settings were not persisted")
     return {"message": "League settings saved"}
 
 
@@ -103,12 +109,20 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
         return supabase_add_player(payload)
     
     # Fallback to SQLite
+    player_name = payload.name.strip()
     try:
         with DatabaseManager() as c:
-            c.execute("INSERT INTO players (name) VALUES (?)", (payload.name.strip(),))
+            cursor = c.execute("INSERT INTO players (name) VALUES (?)", (player_name,))
+            if cursor.rowcount != 1:
+                raise HTTPException(status_code=500, detail="Player insert failed")
+            exists = c.execute("SELECT id FROM players WHERE name = ? LIMIT 1", (player_name,)).fetchone()
+            if not exists:
+                raise HTTPException(status_code=500, detail="Player insert verification failed")
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
             raise HTTPException(status_code=409, detail="Player already exists")
+        if isinstance(exc, HTTPException):
+            raise
         raise
     return {"message": "Player added"}
 
@@ -119,7 +133,9 @@ def delete_player(player_id: int) -> dict[str, str]:
     
     # Fallback to SQLite
     with DatabaseManager() as c:
-        c.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        cursor = c.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Player not found")
     return {"message": "Player removed"}
 
 
@@ -128,9 +144,9 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
         return supabase_add_match(payload)
     
     # Fallback to SQLite
-    payouts_json = __import__("json").dumps(payload.payouts) if payload.payouts else None
+    payouts_json = json.dumps(payload.payouts) if payload.payouts else None
     with DatabaseManager() as c:
-        c.execute(
+        cursor = c.execute(
             "INSERT INTO matches (title, match_date, winner_count, payouts_json) VALUES (?, ?, ?, ?)",
             (
                 payload.title.strip(),
@@ -139,6 +155,11 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
                 payouts_json,
             ),
         )
+        if cursor.rowcount != 1:
+            raise HTTPException(status_code=500, detail="Match insert failed")
+        created_match = c.execute("SELECT id FROM matches WHERE id = ? LIMIT 1", (cursor.lastrowid,)).fetchone()
+        if not created_match:
+            raise HTTPException(status_code=500, detail="Match insert verification failed")
     return {"message": "Match added"}
 
 
@@ -262,4 +283,83 @@ def get_ledger() -> dict[str, Any]:
         "rows": rows,
         "completed_matches": completed_matches,
         "entry_fee": entry_fee,
+    }
+
+
+def get_stats() -> dict[str, Any]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_get_stats()
+
+    with DatabaseManager() as c:
+        players = c.execute("SELECT id, name FROM players ORDER BY name ASC").fetchall()
+        matches = c.execute(
+            "SELECT id, title, match_date, status FROM matches ORDER BY id DESC"
+        ).fetchall()
+        winners = c.execute(
+            """
+            SELECT we.match_id, we.rank, we.player_id, we.amount, p.name AS player_name
+            FROM winner_entries we
+            JOIN players p ON p.id = we.player_id
+            ORDER BY we.match_id DESC, we.rank ASC, p.name ASC
+            """
+        ).fetchall()
+
+    player_stats: dict[int, dict[str, Any]] = {
+        p["id"]: {
+            "player_id": p["id"],
+            "name": p["name"],
+            "wins_total": 0,
+            "rank_counts": {},
+            "matches_won": 0,
+            "total_amount": 0.0,
+        }
+        for p in players
+    }
+
+    by_match: dict[int, list[dict[str, Any]]] = {}
+    for row in winners:
+        by_match.setdefault(row["match_id"], []).append(dict(row))
+
+        stat = player_stats.get(row["player_id"])
+        if not stat:
+            continue
+        stat["wins_total"] += 1
+        rank_key = str(row["rank"])
+        stat["rank_counts"][rank_key] = int(stat["rank_counts"].get(rank_key, 0)) + 1
+        stat["total_amount"] = round(float(stat["total_amount"]) + float(row["amount"]), 2)
+
+    for match_id, rows in by_match.items():
+        unique_players = {r["player_id"] for r in rows}
+        for player_id in unique_players:
+            stat = player_stats.get(player_id)
+            if stat:
+                stat["matches_won"] += 1
+
+    match_stats: list[dict[str, Any]] = []
+    for match in matches:
+        rows = by_match.get(match["id"], [])
+        rank_map: dict[int, dict[str, Any]] = {}
+        for row in rows:
+            rank = int(row["rank"])
+            if rank not in rank_map:
+                rank_map[rank] = {"rank": rank, "players": [], "amount_each": float(row["amount"])}
+            rank_map[rank]["players"].append(row["player_name"])
+
+        match_stats.append(
+            {
+                "match_id": match["id"],
+                "title": match["title"],
+                "match_date": match["match_date"],
+                "status": match["status"],
+                "winners": [rank_map[key] for key in sorted(rank_map)],
+            }
+        )
+
+    player_stats_list = sorted(
+        player_stats.values(),
+        key=lambda item: (-item["wins_total"], item["name"].lower()),
+    )
+    return {
+        "matches": match_stats,
+        "players": player_stats_list,
     }
