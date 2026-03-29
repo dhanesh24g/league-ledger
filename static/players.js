@@ -13,7 +13,7 @@ const playersList = document.getElementById('players-list');
 let authUser = { username: '', role: 'viewer' };
 
 function applyRoleBasedUI() {
-  const isAdmin = authUser.role === 'admin';
+  const isAdmin = authUser.league_role === 'admin';
   const controls = playerForm.querySelectorAll('input, button');
   controls.forEach((control) => {
     control.disabled = !isAdmin;
@@ -46,9 +46,9 @@ function renderPlayers(players) {
     removeBtn.textContent = '🗑️';
     removeBtn.title = 'Remove player';
     removeBtn.setAttribute('aria-label', 'Remove player');
-    removeBtn.disabled = authUser.role !== 'admin';
+    removeBtn.disabled = authUser.league_role !== 'admin';
     removeBtn.addEventListener('click', async () => {
-      if (authUser.role !== 'admin') {
+      if (authUser.league_role !== 'admin') {
         showError('Only admin can remove players.');
         return;
       }
@@ -72,7 +72,7 @@ playerForm.elements.name.addEventListener('input', persistDraft);
 
 playerForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (authUser.role !== 'admin') {
+  if (authUser.league_role !== 'admin') {
     showError('Only admin can add players.');
     return;
   }

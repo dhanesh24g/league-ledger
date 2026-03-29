@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Sign Up</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <main class="shell-main">
+    <section class="panel active auth-panel auth-panel-premium">
+      <div class="auth-header">
+        <span class="auth-eyebrow">Get Started</span>
+        <h2>Create Your Account</h2>
+        <p class="muted">Set up your personal identity once, then create the first league or request access to an existing one.</p>
+      </div>
+
+      <div class="auth-subtle-grid">
+        <div class="auth-note-card">
+          <strong>Secure Password Storage</strong>
+          <span class="muted small">Passwords are stored as hashes, not plain text.</span>
+        </div>
+        <div class="auth-note-card">
+          <strong>Fast Onboarding</strong>
+          <span class="muted small">Sign up, then either create the league or send a join request.</span>
+        </div>
+      </div>
+
+      <form id="signup-form" class="stack auth-form">
+        <div class="grid auth-grid">
+          <label>First Name
+            <input name="first_name" placeholder="Enter first name" autocomplete="given-name" required>
+          </label>
+          <label>Last Name
+            <input name="last_name" placeholder="Enter last name" autocomplete="family-name" required>
+          </label>
+        </div>
+        <label>User ID
+          <input name="user_id" placeholder="Choose a user ID" autocomplete="username" required>
+        </label>
+        <label>Email
+          <input type="email" name="email" placeholder="Enter your email" autocomplete="email" required>
+        </label>
+        <label>Password
+          <input type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required>
+        </label>
+        <button type="submit" class="primary auth-primary-button">Create Account</button>
+      </form>
+      <div class="auth-switch">
+        <span class="muted small">Already have an account?</span>
+        <a class="button-link ghost auth-secondary-button" href="/login">Back to Login</a>
+      </div>
+      <p id="signup-hint" class="muted small auth-helper"></p>
+    </section>
+  </main>
+  <script src="/static/signup.js"></script>
+</body>
+
+</html>

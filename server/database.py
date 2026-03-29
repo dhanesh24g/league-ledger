@@ -103,8 +103,10 @@ def init_sqlite_db() -> None:
                 tournament TEXT NOT NULL,
                 entry_fee REAL NOT NULL,
                 active_player_count INTEGER NOT NULL DEFAULT 5,
+                owner_user_id INTEGER,
                 default_winner_count INTEGER NOT NULL,
-                payouts_json TEXT NOT NULL
+                payouts_json TEXT NOT NULL,
+                FOREIGN KEY(owner_user_id) REFERENCES users(id)
             )
         """)
         
@@ -112,6 +114,44 @@ def init_sqlite_db() -> None:
             connection.execute("ALTER TABLE league ADD COLUMN active_player_count INTEGER NOT NULL DEFAULT 5")
         except sqlite3.OperationalError:
             pass
+        try:
+            connection.execute("ALTER TABLE league ADD COLUMN owner_user_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                first_name TEXT NOT NULL,
+                last_name TEXT NOT NULL,
+                user_id TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS league_memberships (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                role TEXT NOT NULL DEFAULT 'viewer',
+                status TEXT NOT NULL DEFAULT 'active',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+        """)
+
+        connection.execute("""
+            CREATE TABLE IF NOT EXISTS league_join_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL UNIQUE,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                reviewed_at TEXT,
+                FOREIGN KEY(user_id) REFERENCES users(id)
+            )
+        """)
 
         connection.execute("""
             CREATE TABLE IF NOT EXISTS players (

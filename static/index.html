@@ -9,16 +9,13 @@
     (function () {
       try {
         var token = localStorage.getItem("league-ledger-token");
-        var raw = localStorage.getItem("league-ledger-workflow");
-        var workflow = raw ? JSON.parse(raw) : {};
-        var target = workflow && workflow.currentPage ? workflow.currentPage : "/setup";
         if (!token) {
           window.location.replace("/login");
           return;
         }
-        window.location.replace(target);
+        window.location.replace("/welcome");
       } catch (e) {
-        window.location.replace("/setup");
+        window.location.replace("/welcome");
       }
     })();
   </script>

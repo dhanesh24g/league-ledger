@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   token: 'league-ledger-token',
   role: 'league-ledger-user-role',
   username: 'league-ledger-username',
+  fullName: 'league-ledger-full-name',
   theme: 'dhaneshlabs-theme',
   workflow: 'league-ledger-workflow',
 };
@@ -143,6 +144,7 @@ export function clearAuthStorage() {
   localStorage.removeItem(STORAGE_KEYS.token);
   localStorage.removeItem(STORAGE_KEYS.role);
   localStorage.removeItem(STORAGE_KEYS.username);
+  localStorage.removeItem(STORAGE_KEYS.fullName);
 }
 
 export function authHeaders() {
@@ -276,12 +278,20 @@ export async function initWorkflowShell(currentPath) {
 
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
-  localStorage.setItem(STORAGE_KEYS.role, user.role);
-  localStorage.setItem(STORAGE_KEYS.username, user.username);
+  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'viewer';
+  localStorage.setItem(STORAGE_KEYS.role, effectiveRole);
+  localStorage.setItem(STORAGE_KEYS.username, user.user_id);
+  localStorage.setItem(STORAGE_KEYS.fullName, user.full_name || user.user_id);
+
+  const canCreateFirstLeague = currentPath === '/setup' && !user.league_exists;
+  if (user.membership_status !== 'active' && !canCreateFirstLeague) {
+    window.location.replace('/welcome');
+    return null;
+  }
 
   const authRole = document.getElementById('auth-role');
   if (authRole) {
-    authRole.textContent = `${user.username} (${user.role})`;
+    authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
   }
 
   return user;

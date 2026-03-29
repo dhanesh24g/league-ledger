@@ -187,25 +187,17 @@ function renderOverview() {
       <span class="spotlight-metric">${formatCurrency(topEarner.total_amount)}</span>
       <p>Total amount won across all recorded results.</p>
     </article>
-    <article id="top-earners-card" class="spotlight-card leaders" tabindex="0" role="button" aria-label="Open earnings deep dive">
+    <article id="top-earners-card" class="spotlight-card leaders">
       <span class="spotlight-label">Top 3 Earners</span>
       <div class="top-earner-list">${topEarnerRows}</div>
-      <p>Hover, focus, or click to zoom into the full winnings board.</p>
+      <div class="spotlight-card-actions">
+        <p>Open a richer view of the winnings table with all players ranked together.</p>
+        <button id="open-earners-modal" type="button" class="ghost stats-action-button">Click For Deep Dive</button>
+      </div>
     </article>
   `;
 
-  const topEarnersCard = document.getElementById('top-earners-card');
-  if (topEarnersCard) {
-    topEarnersCard.addEventListener('mouseenter', openEarnersModal);
-    topEarnersCard.addEventListener('click', openEarnersModal);
-    topEarnersCard.addEventListener('focus', openEarnersModal);
-    topEarnersCard.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        openEarnersModal();
-      }
-    });
-  }
+  document.getElementById('open-earners-modal')?.addEventListener('click', openEarnersModal);
 }
 
 function renderLeaderboardChart() {
@@ -262,10 +254,6 @@ function renderLeaderboardChart() {
 
 function setupHeader() {
   initThemeToggle();
-  const role = localStorage.getItem('league-ledger-user-role') || 'viewer';
-  const username = localStorage.getItem('league-ledger-username') || 'user';
-  authRole.textContent = `${username} (${role})`;
-
   topNav.addEventListener('change', () => {
     window.location.href = topNav.value;
   });
@@ -274,6 +262,7 @@ function setupHeader() {
     localStorage.removeItem('league-ledger-token');
     localStorage.removeItem('league-ledger-user-role');
     localStorage.removeItem('league-ledger-username');
+    localStorage.removeItem('league-ledger-full-name');
     window.location.replace('/login');
   });
 }
@@ -524,6 +513,17 @@ function renderSelectedPlayer() {
 async function init() {
   setupHeader();
   setupModal();
+  const profile = await callApi('/api/auth/me');
+  const user = profile.user;
+  if (user.membership_status !== 'active') {
+    window.location.replace('/welcome');
+    return;
+  }
+  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'viewer';
+  localStorage.setItem('league-ledger-user-role', effectiveRole);
+  localStorage.setItem('league-ledger-username', user.user_id);
+  localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
+  authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
   stats = await callApi('/api/stats');
   renderOverview();
   renderEarnersModal();

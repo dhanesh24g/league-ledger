@@ -108,22 +108,27 @@ def get_state() -> dict[str, Any]:
     }
 
 
-def upsert_league(payload: LeaguePayload) -> dict[str, str]:
+def upsert_league(payload: LeaguePayload, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_upsert_league(payload)
+        return supabase_upsert_league(payload, user)
     
     # Fallback to SQLite
     payouts_json = json.dumps(payload.payouts)
     with DatabaseManager() as c:
+        existing = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
+        if existing and user["league_role"] != "admin":
+            raise HTTPException(status_code=403, detail="Admin role required")
+
         cursor = c.execute(
             """
-            INSERT INTO league (id, name, tournament, entry_fee, active_player_count, default_winner_count, payouts_json)
-            VALUES (1, ?, ?, ?, ?, ?, ?)
+            INSERT INTO league (id, name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json)
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 tournament = excluded.tournament,
                 entry_fee = excluded.entry_fee,
                 active_player_count = excluded.active_player_count,
+                owner_user_id = COALESCE(league.owner_user_id, excluded.owner_user_id),
                 default_winner_count = excluded.default_winner_count,
                 payouts_json = excluded.payouts_json
             """,
@@ -132,12 +137,23 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
                 payload.tournament.strip(),
                 payload.entry_fee,
                 payload.active_player_count,
+                int(user["id"]),
                 payload.default_winner_count,
                 payouts_json,
             ),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=500, detail="League settings were not persisted")
+        if not existing:
+            c.execute(
+                """
+                INSERT INTO league_memberships (user_id, role, status)
+                VALUES (?, 'admin', 'active')
+                ON CONFLICT(user_id) DO UPDATE SET role = 'admin', status = 'active'
+                """,
+                (int(user["id"]),),
+            )
+            c.execute("DELETE FROM league_join_requests WHERE user_id = ?", (int(user["id"]),))
     return {"message": "League settings saved"}
 
 

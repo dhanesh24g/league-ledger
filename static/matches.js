@@ -109,7 +109,7 @@ function renderParticipantPicker() {
 }
 
 function applyRoleBasedUI() {
-  const isAdmin = authUser.role === 'admin';
+  const isAdmin = authUser.league_role === 'admin';
   const controls = matchForm.querySelectorAll('input, button');
   controls.forEach((control) => {
     control.disabled = !isAdmin;
@@ -224,7 +224,7 @@ enableOverrides.addEventListener('change', () => toggleOverrideSection(enableOve
 
 matchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (authUser.role !== 'admin') {
+  if (authUser.league_role !== 'admin') {
     showError('Only admin can add matches.');
     return;
   }

@@ -27,19 +27,38 @@
 
 <body>
   <main class="shell-main">
-    <section class="panel active auth-panel">
-      <h2>League Ledger Login</h2>
-      <p class="muted">Login as <strong>admin</strong> (edit rights) or <strong>viewer</strong> (read-only).</p>
-      <form id="login-form" class="stack">
-        <label>Username
-          <input name="username" placeholder="admin" required>
+    <section class="panel active auth-panel auth-panel-premium">
+      <div class="auth-header">
+        <span class="auth-eyebrow">League Ledger</span>
+        <h2>Sign In</h2>
+        <p class="muted">Access your league workspace, match history, and stats dashboard with your personal account.</p>
+      </div>
+
+      <div class="auth-subtle-grid">
+        <div class="auth-note-card">
+          <strong>Private Access</strong>
+          <span class="muted small">Every user signs in with their own account instead of shared credentials.</span>
+        </div>
+        <div class="auth-note-card">
+          <strong>League Membership</strong>
+          <span class="muted small">Your access follows the league role assigned after approval.</span>
+        </div>
+      </div>
+
+      <form id="login-form" class="stack auth-form">
+        <label>User ID
+          <input name="user_id" placeholder="Enter your user ID" autocomplete="username" required>
         </label>
         <label>Password
-          <input type="password" name="password" placeholder="••••••••" required>
+          <input type="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
         </label>
-        <button type="submit">Login</button>
+        <button type="submit" class="primary auth-primary-button">Sign In to League</button>
       </form>
-      <p id="login-hint" class="muted small"></p>
+      <div class="auth-switch">
+        <span class="muted small">New here?</span>
+        <a class="button-link ghost auth-secondary-button" href="/signup">Create Account</a>
+      </div>
+      <p id="login-hint" class="muted small auth-helper"></p>
     </section>
   </main>
   <script src="/static/login.js"></script>

@@ -30,6 +30,11 @@ def setup_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "setup.html")
 
 
+@app.get("/welcome")
+def welcome_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "welcome.html")
+
+
 @app.get("/players")
 def players_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "players.html")
@@ -53,6 +58,11 @@ def ledger_page() -> FileResponse:
 @app.get("/login")
 def login_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/signup")
+def signup_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "signup.html")
 
 
 @app.get("/stats")

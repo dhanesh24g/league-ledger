@@ -39,7 +39,7 @@ function clearWinnerFeedback() {
 }
 
 function applyRoleBasedUI() {
-  const isAdmin = authUser.role === 'admin';
+  const isAdmin = authUser.league_role === 'admin';
   [loadWinnerBtn, cancelMatchBtn, continueLedgerBtn].forEach((element) => {
     element.disabled = !isAdmin;
   });
@@ -524,7 +524,7 @@ async function saveWinners(match, options = {}) {
 }
 
 loadWinnerBtn.addEventListener('click', () => {
-  if (authUser.role !== 'admin') {
+  if (authUser.league_role !== 'admin') {
     showError('Only admin can assign winners.');
     return;
   }
@@ -538,13 +538,13 @@ loadWinnerBtn.addEventListener('click', () => {
 
 matchSelect.addEventListener('change', () => {
   setSelectedMatchId(matchSelect.value);
-  if (authUser.role === 'admin') {
+  if (authUser.league_role === 'admin') {
     renderWinnerForm(matchSelect.value);
   }
 });
 
 cancelMatchBtn.addEventListener('click', async () => {
-  if (authUser.role !== 'admin') {
+  if (authUser.league_role !== 'admin') {
     showError('Only admin can cancel a match.');
     return;
   }
@@ -567,7 +567,7 @@ cancelMatchBtn.addEventListener('click', async () => {
 });
 
 continueLedgerBtn.addEventListener('click', async () => {
-  if (authUser.role !== 'admin') {
+  if (authUser.league_role !== 'admin') {
     navigateTo('/ledger');
     return;
   }
@@ -592,7 +592,7 @@ async function init() {
   appState = await callApi('/api/state');
   renderMatchSelect();
 
-  if (authUser.role === 'admin' && matchSelect.value) {
+  if (authUser.league_role === 'admin' && matchSelect.value) {
     renderWinnerForm(matchSelect.value);
   }
 }
