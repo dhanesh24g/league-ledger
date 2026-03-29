@@ -4,12 +4,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>League Ledger Stats</title>
+  <title>League Ledger Winners</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
     rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="stylesheet" href="/static/styles.css">
   <script>
     (function () {
@@ -42,13 +43,13 @@
         <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
         <div class="brand-text">
           <span class="brand-name">Dhanesh Labs</span>
-          <span class="app-name">Stats Dashboard</span>
+          <span class="app-name">Winners</span>
         </div>
       </div>
       <div class="header-actions">
         <select id="top-nav" aria-label="Quick navigation">
+          <option value="/winners">League Workflow</option>
           <option value="/stats">Stats Dashboard</option>
-          <option value="/">League Workflow</option>
         </select>
         <span id="auth-role" class="muted small"></span>
         <button id="logout-btn" type="button" class="ghost">Logout</button>
@@ -56,54 +57,39 @@
     </div>
   </header>
 
+  <header class="shell-header">
+    <p>Pick a match, assign winners rank by rank, and keep the same draft loaded on refresh.</p>
+  </header>
+
   <main class="shell-main">
-    <section class="panel active">
-      <h2>League Pulse</h2>
-      <p class="muted">A quick read on the current leaders, money table, and how the season is unfolding.</p>
-      <div id="stats-summary-strip" class="stats-summary-strip"></div>
-      <div id="stats-overview" class="stats-overview"></div>
-    </section>
+    <nav class="step-nav" aria-label="Workflow navigation">
+      <a class="step-pill" data-route="/setup" data-workflow-link href="/setup">League Setup</a>
+      <a class="step-pill" data-route="/players" data-workflow-link href="/players">Players</a>
+      <a class="step-pill" data-route="/matches" data-workflow-link href="/matches">Matches</a>
+      <a class="step-pill" data-route="/winners" data-workflow-link href="/winners">Winners</a>
+      <a class="step-pill" data-route="/ledger" data-workflow-link href="/ledger">Ledger</a>
+    </nav>
 
     <section class="panel active">
-      <h2>Match Winners</h2>
-      <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
-      <div class="inline-form">
-        <select id="match-filter"></select>
-      </div>
-      <div id="match-winners-card" class="feed"></div>
-    </section>
+      <h2>Winners</h2>
+      <p class="muted">Pick the match, then assign winners rank by rank with searchable selectors.</p>
 
-    <section class="panel active" style="margin-top: 16px;">
-      <h2>League Ladder</h2>
-      <p class="muted">Compare the entire table side by side across wins and winnings.</p>
-      <div id="leaderboard-chart" class="leaderboard-chart"></div>
-    </section>
-
-    <section class="panel active" style="margin-top: 16px;">
-      <h2>Player Performance</h2>
-      <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
       <div class="inline-form">
-        <select id="player-filter"></select>
+        <select id="match-select"></select>
+        <button id="load-winner-form" type="button">Load Assignment</button>
+        <button id="mark-cancelled" type="button" class="ghost">Washout / Cancelled</button>
       </div>
-      <div id="player-stats-card" class="feed"></div>
+
+      <form id="winners-form" class="stack"></form>
+
+      <div class="flow-controls">
+        <a class="button-link ghost" data-workflow-link href="/matches">Back to Matches</a>
+        <button id="continue-ledger" type="button" class="primary">Continue to Ledger</button>
+      </div>
     </section>
   </main>
 
-  <div id="earners-modal" class="dashboard-modal hidden" aria-hidden="true">
-    <div class="dashboard-modal-backdrop" data-close-earners></div>
-    <section class="dashboard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="earners-modal-title">
-      <div class="dashboard-modal-head">
-        <div>
-          <h2 id="earners-modal-title">Earnings Deep Dive</h2>
-          <p class="muted">A zoomed-in look at every player and their winnings table.</p>
-        </div>
-        <button id="close-earners-modal" type="button" class="ghost">Close</button>
-      </div>
-      <div id="earners-modal-body" class="dashboard-modal-body"></div>
-    </section>
-  </div>
-
-  <script type="module" src="/static/stats.js"></script>
+  <script type="module" src="/static/winners.js"></script>
 </body>
 
 </html>

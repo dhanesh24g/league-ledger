@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Setup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+    <span class="theme-icon" id="light-icon">☀️</span>
+    <span class="theme-icon" id="dark-icon">🌙</span>
+  </button>
+
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">League Setup</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/setup">League Workflow</option>
+          <option value="/stats">Stats Dashboard</option>
+        </select>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <header class="shell-header">
+    <p>Set up your group, log match winners, and settle money without spreadsheets.</p>
+  </header>
+
+  <main class="shell-main">
+    <nav class="step-nav" aria-label="Workflow navigation">
+      <a class="step-pill" data-route="/setup" data-workflow-link href="/setup">League Setup</a>
+      <a class="step-pill" data-route="/players" data-workflow-link href="/players">Players</a>
+      <a class="step-pill" data-route="/matches" data-workflow-link href="/matches">Matches</a>
+      <a class="step-pill" data-route="/winners" data-workflow-link href="/winners">Winners</a>
+      <a class="step-pill" data-route="/ledger" data-workflow-link href="/ledger">Ledger</a>
+    </nav>
+
+    <section class="panel active">
+      <h2>League Setup</h2>
+      <p class="muted">Define your default rules once. Refreshing this page keeps your draft instead of resetting the workflow.</p>
+
+      <form id="league-form" class="grid">
+        <label>League Name
+          <input name="name" placeholder="Friday IPL Crew" required>
+        </label>
+        <label>Tournament
+          <input name="tournament" value="IPL" required>
+        </label>
+        <label>Entry Fee (per match)
+          <input type="number" name="entry_fee" value="100" min="1" required>
+        </label>
+        <label>Active League Players
+          <input type="number" name="active_player_count" value="5" min="2" required>
+        </label>
+
+        <div class="full">
+          <div class="line-head">
+            <h3>Default Winner Payouts</h3>
+            <button type="button" id="add-default-payout" class="ghost">+ Add Winner</button>
+          </div>
+          <div id="default-payouts" class="stack"></div>
+          <p id="default-payout-total" class="payout-total muted small"></p>
+        </div>
+
+        <div class="actions full">
+          <button type="submit">Save League Rules</button>
+        </div>
+      </form>
+      <p id="league-state" class="muted small"></p>
+      <div class="flow-controls">
+        <a class="button-link primary" data-workflow-link href="/players">Continue to Players</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/setup.js"></script>
+</body>
+
+</html>

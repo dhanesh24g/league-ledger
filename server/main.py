@@ -25,6 +25,31 @@ def root() -> FileResponse:
     return FileResponse(STATIC_DIR / "index.html")
 
 
+@app.get("/setup")
+def setup_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "setup.html")
+
+
+@app.get("/players")
+def players_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "players.html")
+
+
+@app.get("/matches")
+def matches_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "matches.html")
+
+
+@app.get("/winners")
+def winners_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "winners.html")
+
+
+@app.get("/ledger")
+def ledger_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "ledger.html")
+
+
 @app.get("/login")
 def login_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "login.html")

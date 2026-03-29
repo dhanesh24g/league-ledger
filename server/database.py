@@ -127,9 +127,15 @@ def init_sqlite_db() -> None:
                 match_date TEXT NOT NULL,
                 winner_count INTEGER,
                 payouts_json TEXT,
+                participant_ids_json TEXT,
                 status TEXT NOT NULL DEFAULT 'pending'
             )
         """)
+
+        try:
+            connection.execute("ALTER TABLE matches ADD COLUMN participant_ids_json TEXT")
+        except sqlite3.OperationalError:
+            pass
         
         connection.execute("""
             CREATE TABLE IF NOT EXISTS winner_entries (
@@ -176,3 +182,29 @@ def parse_payouts(raw: str | None) -> dict[int, float]:
         return {}
     data = json.loads(raw)
     return {int(k): float(v) for k, v in data.items()}
+
+
+def parse_participant_ids(raw: Any) -> list[int]:
+    """Parse participant ids from JSON string or array-like value"""
+    import json
+
+    if raw in (None, ""):
+        return []
+
+    data = raw
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+
+    if not isinstance(data, (list, tuple)):
+        return []
+
+    participant_ids: list[int] = []
+    for item in data:
+        try:
+            participant_ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return participant_ids

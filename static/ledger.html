@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+    <span class="theme-icon" id="light-icon">☀️</span>
+    <span class="theme-icon" id="dark-icon">🌙</span>
+  </button>
+
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">Ledger</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/ledger">League Workflow</option>
+          <option value="/stats">Stats Dashboard</option>
+        </select>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <header class="shell-header">
+    <p>Review spent, won, and net figures without losing your place in the workflow when refreshing.</p>
+  </header>
+
+  <main class="shell-main">
+    <nav class="step-nav" aria-label="Workflow navigation">
+      <a class="step-pill" data-route="/setup" data-workflow-link href="/setup">League Setup</a>
+      <a class="step-pill" data-route="/players" data-workflow-link href="/players">Players</a>
+      <a class="step-pill" data-route="/matches" data-workflow-link href="/matches">Matches</a>
+      <a class="step-pill" data-route="/winners" data-workflow-link href="/winners">Winners</a>
+      <a class="step-pill" data-route="/ledger" data-workflow-link href="/ledger">Ledger</a>
+    </nav>
+
+    <section class="panel active ledger-panel">
+      <h2>Ledger</h2>
+      <p id="ledger-summary" class="muted">Spent = completed matches x entry fee. Net = won - spent.</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Spent</th>
+            <th>Won</th>
+            <th>Net</th>
+          </tr>
+        </thead>
+        <tbody id="ledger-body"></tbody>
+      </table>
+
+      <div class="flow-controls">
+        <a class="button-link ghost" data-workflow-link href="/winners">Back to Winners</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/ledger.js"></script>
+</body>
+
+</html>

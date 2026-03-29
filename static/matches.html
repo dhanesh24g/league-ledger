@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Matches</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">
+    <span class="theme-icon" id="light-icon">☀️</span>
+    <span class="theme-icon" id="dark-icon">🌙</span>
+  </button>
+
+  <header class="app-header">
+    <div class="header-content">
+      <div class="brand">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">Matches</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/matches">League Workflow</option>
+          <option value="/stats">Stats Dashboard</option>
+        </select>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <header class="shell-header">
+    <p>Create matches for your league. Refresh keeps any unsaved match draft on this page.</p>
+  </header>
+
+  <main class="shell-main">
+    <nav class="step-nav" aria-label="Workflow navigation">
+      <a class="step-pill" data-route="/setup" data-workflow-link href="/setup">League Setup</a>
+      <a class="step-pill" data-route="/players" data-workflow-link href="/players">Players</a>
+      <a class="step-pill" data-route="/matches" data-workflow-link href="/matches">Matches</a>
+      <a class="step-pill" data-route="/winners" data-workflow-link href="/winners">Winners</a>
+      <a class="step-pill" data-route="/ledger" data-workflow-link href="/ledger">Ledger</a>
+    </nav>
+
+    <section class="panel active">
+      <h2>Matches</h2>
+      <p class="muted">Create matches for your league. Optional match exceptions stay hidden until needed.</p>
+
+      <form id="match-form" class="match-form-grid">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="match_date">Match Date</label>
+            <input type="date" id="match_date" name="match_date" required>
+          </div>
+          <div class="match-vs-inline">
+            <div class="team-input-group">
+              <label for="team1">Home Team</label>
+              <input type="text" id="team1" name="team1" placeholder="Enter team name" required>
+            </div>
+            <div class="vs-divider">
+              <span>VS</span>
+            </div>
+            <div class="team-input-group">
+              <label for="team2">Away Team</label>
+              <input type="text" id="team2" name="team2" placeholder="Enter team name" required>
+            </div>
+          </div>
+        </div>
+
+        <div class="full soft-box">
+          <div class="line-head">
+            <div>
+              <h3>Who Is Playing?</h3>
+              <p class="muted small">These players will be charged entry, appear in history, and be eligible for winners.</p>
+            </div>
+            <button type="button" id="select-all-participants" class="ghost">Select All Players</button>
+          </div>
+          <div id="participant-picker" class="participant-picker"></div>
+          <p id="participant-count" class="muted small"></p>
+        </div>
+
+        <label class="full toggle">
+          <input type="checkbox" id="enable-overrides"> Enable match-level exception settings
+        </label>
+
+        <div id="override-zone" class="full hidden soft-box">
+          <label>Override Winner Count
+            <input type="number" name="winner_count" min="1">
+          </label>
+          <div class="line-head">
+            <h3>Override Winner Payouts</h3>
+            <button type="button" id="add-override-payout" class="ghost">+ Add Winner</button>
+          </div>
+          <div id="override-payouts" class="stack"></div>
+          <p id="override-payout-total" class="payout-total muted small"></p>
+        </div>
+
+        <div class="actions full">
+          <button type="submit">Add Match</button>
+        </div>
+      </form>
+
+      <div id="match-feed" class="feed"></div>
+
+      <div class="flow-controls">
+        <a class="button-link ghost" data-workflow-link href="/players">Back to Players</a>
+        <a class="button-link primary" data-workflow-link href="/winners">Continue to Winners</a>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/matches.js"></script>
+</body>
+
+</html>
