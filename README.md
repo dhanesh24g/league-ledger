@@ -1,4 +1,4 @@
-# League Ledger (Prototype)
+# League Ledger
 
 Python + FastAPI MVP to manage offline fantasy league money settlement.
 
