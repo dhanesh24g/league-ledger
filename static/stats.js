@@ -187,25 +187,17 @@ function renderOverview() {
       <span class="spotlight-metric">${formatCurrency(topEarner.total_amount)}</span>
       <p>Total amount won across all recorded results.</p>
     </article>
-    <article id="top-earners-card" class="spotlight-card leaders" tabindex="0" role="button" aria-label="Open earnings deep dive">
+    <article id="top-earners-card" class="spotlight-card leaders">
       <span class="spotlight-label">Top 3 Earners</span>
       <div class="top-earner-list">${topEarnerRows}</div>
-      <p>Hover, focus, or click to zoom into the full winnings board.</p>
+      <div class="spotlight-card-actions">
+        <p>Open a richer view of the winnings table with all players ranked together.</p>
+        <button id="open-earners-modal" type="button" class="ghost stats-action-button">Click For Deep Dive</button>
+      </div>
     </article>
   `;
 
-  const topEarnersCard = document.getElementById('top-earners-card');
-  if (topEarnersCard) {
-    topEarnersCard.addEventListener('mouseenter', openEarnersModal);
-    topEarnersCard.addEventListener('click', openEarnersModal);
-    topEarnersCard.addEventListener('focus', openEarnersModal);
-    topEarnersCard.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        openEarnersModal();
-      }
-    });
-  }
+  document.getElementById('open-earners-modal')?.addEventListener('click', openEarnersModal);
 }
 
 function renderLeaderboardChart() {

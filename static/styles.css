@@ -207,8 +207,91 @@ body.modal-open {
   margin: 8vh auto 0;
 }
 
+.auth-panel-premium {
+  max-width: 620px;
+  padding: 28px;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(61, 217, 235, 0.12), transparent 34%),
+    radial-gradient(circle at top left, rgba(122, 60, 255, 0.14), transparent 32%),
+    linear-gradient(165deg, var(--panel), rgba(255, 255, 255, 0.04));
+}
+
+.auth-header {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.auth-header h2 {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.05;
+  font-family: "Space Grotesk", "Manrope", sans-serif;
+}
+
+.auth-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .auth-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.auth-subtle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.auth-note-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.auth-note-card strong {
+  font-size: 14px;
+  font-family: "Space Grotesk", "Manrope", sans-serif;
+}
+
+.auth-form {
+  gap: 14px;
+}
+
+.auth-form label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.auth-form input {
+  min-height: 52px;
+  border-radius: 16px;
+  font-size: 15px;
+}
+
+.auth-primary-button,
+.auth-secondary-button {
+  min-height: 52px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .auth-switch {
@@ -218,6 +301,10 @@ body.modal-open {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.auth-helper {
+  margin-top: 14px;
 }
 
 .info-card {
@@ -797,7 +884,7 @@ button.ghost:hover,
 
 .summary-chip strong,
 .match-summary-card strong {
-  font-size: 28px;
+  font-size: 22px;
   line-height: 1;
   font-family: "Space Grotesk", "Manrope", sans-serif;
 }
@@ -832,12 +919,12 @@ button.ghost:hover,
 }
 
 .spotlight-card strong {
-  font-size: 24px;
+  font-size: 20px;
   font-family: "Space Grotesk", "Manrope", sans-serif;
 }
 
 .spotlight-metric {
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 700;
   line-height: 1;
 }
@@ -845,15 +932,13 @@ button.ghost:hover,
 .spotlight-card p {
   margin: 0;
   color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .top-earner-list {
   display: grid;
   gap: 10px;
-}
-
-#top-earners-card {
-  cursor: zoom-in;
 }
 
 .top-earner-row {
@@ -870,7 +955,19 @@ button.ghost:hover,
 .top-earner-rank,
 .top-earner-amount {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+}
+
+.spotlight-card-actions {
+  display: grid;
+  gap: 10px;
+  align-items: start;
+}
+
+.stats-action-button {
+  width: fit-content;
+  padding: 0.7rem 1rem;
+  font-size: 13px;
 }
 
 .match-spotlight,
@@ -908,6 +1005,7 @@ button.ghost:hover,
 .player-breakdown-card h4 {
   margin: 0;
   font-family: "Space Grotesk", "Manrope", sans-serif;
+  font-size: 20px;
 }
 
 .match-spotlight-meta,
@@ -928,7 +1026,7 @@ button.ghost:hover,
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .winner-rank-grid {
@@ -992,6 +1090,7 @@ button.ghost:hover,
   color: var(--text);
   border: 1px solid rgba(255, 255, 255, 0.1);
   font-weight: 600;
+  font-size: 13px;
 }
 
 .winner-pill.subdued {
@@ -1019,6 +1118,7 @@ button.ghost:hover,
 .chart-header h3 {
   margin: 0 0 6px;
   font-family: "Space Grotesk", "Manrope", sans-serif;
+  font-size: 20px;
 }
 
 .chart-legend {
@@ -1071,6 +1171,7 @@ button.ghost:hover,
 .chart-lane-label {
   color: var(--text);
   font-weight: 600;
+  font-size: 13px;
 }
 
 .chart-bar-track {
@@ -1130,7 +1231,7 @@ button.ghost:hover,
 }
 
 .player-metric-card strong {
-  font-size: 28px;
+  font-size: 24px;
   line-height: 1;
 }
 
@@ -1173,6 +1274,7 @@ button.ghost:hover,
 
 .history-row p {
   margin: 4px 0 0;
+  font-size: 13px;
 }
 
 .history-row-meta {
@@ -1222,6 +1324,7 @@ button.ghost:hover,
 
 .dashboard-modal-head h2 {
   margin: 0 0 6px;
+  font-size: 24px;
 }
 
 .dashboard-modal-body {
@@ -1289,6 +1392,7 @@ button.ghost:hover,
 .rank-distribution-label {
   color: var(--text);
   font-weight: 600;
+  font-size: 13px;
 }
 
 .rank-distribution-bar {
@@ -1444,6 +1548,10 @@ th {
   }
 
   .auth-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-subtle-grid {
     grid-template-columns: 1fr;
   }
 
