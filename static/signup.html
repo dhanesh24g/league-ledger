@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>League Ledger Login</title>
+  <title>League Ledger Sign Up</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -28,25 +28,36 @@
 <body>
   <main class="shell-main">
     <section class="panel active auth-panel">
-      <h2>Welcome Back</h2>
-      <p class="muted">Sign in with your user ID and password to open your league workspace.</p>
-      <form id="login-form" class="stack">
+      <h2>Create Your Account</h2>
+      <p class="muted">Join the league with your own identity. Your password is stored as a secure hash, not plain text.</p>
+      <form id="signup-form" class="stack">
+        <div class="grid auth-grid">
+          <label>First Name
+            <input name="first_name" placeholder="Dhanesh" required>
+          </label>
+          <label>Last Name
+            <input name="last_name" placeholder="Patel" required>
+          </label>
+        </div>
         <label>User ID
           <input name="user_id" placeholder="dhanesh24g" required>
         </label>
-        <label>Password
-          <input type="password" name="password" placeholder="••••••••" required>
+        <label>Email
+          <input type="email" name="email" placeholder="you@example.com" required>
         </label>
-        <button type="submit">Login</button>
+        <label>Password
+          <input type="password" name="password" placeholder="At least 8 characters" required>
+        </label>
+        <button type="submit">Create Account</button>
       </form>
       <div class="auth-switch">
-        <span class="muted small">New here?</span>
-        <a class="button-link ghost" href="/signup">Create Account</a>
+        <span class="muted small">Already have an account?</span>
+        <a class="button-link ghost" href="/login">Back to Login</a>
       </div>
-      <p id="login-hint" class="muted small"></p>
+      <p id="signup-hint" class="muted small"></p>
     </section>
   </main>
-  <script src="/static/login.js"></script>
+  <script src="/static/signup.js"></script>
 </body>
 
 </html>

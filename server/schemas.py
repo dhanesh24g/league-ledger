@@ -34,5 +34,13 @@ class WinnersPayload(BaseModel):
 
 
 class LoginPayload(BaseModel):
-    username: str = Field(min_length=1, max_length=80)
+    user_id: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=1, max_length=200)
+
+
+class SignupPayload(BaseModel):
+    first_name: str = Field(min_length=1, max_length=80)
+    last_name: str = Field(min_length=1, max_length=80)
+    user_id: str = Field(min_length=3, max_length=80)
+    email: str = Field(min_length=5, max_length=160)
+    password: str = Field(min_length=8, max_length=200)

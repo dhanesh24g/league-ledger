@@ -262,10 +262,6 @@ function renderLeaderboardChart() {
 
 function setupHeader() {
   initThemeToggle();
-  const role = localStorage.getItem('league-ledger-user-role') || 'viewer';
-  const username = localStorage.getItem('league-ledger-username') || 'user';
-  authRole.textContent = `${username} (${role})`;
-
   topNav.addEventListener('change', () => {
     window.location.href = topNav.value;
   });
@@ -274,6 +270,7 @@ function setupHeader() {
     localStorage.removeItem('league-ledger-token');
     localStorage.removeItem('league-ledger-user-role');
     localStorage.removeItem('league-ledger-username');
+    localStorage.removeItem('league-ledger-full-name');
     window.location.replace('/login');
   });
 }
@@ -524,6 +521,17 @@ function renderSelectedPlayer() {
 async function init() {
   setupHeader();
   setupModal();
+  const profile = await callApi('/api/auth/me');
+  const user = profile.user;
+  if (user.membership_status !== 'active') {
+    window.location.replace('/welcome');
+    return;
+  }
+  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'viewer';
+  localStorage.setItem('league-ledger-user-role', effectiveRole);
+  localStorage.setItem('league-ledger-username', user.user_id);
+  localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
+  authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
   stats = await callApi('/api/stats');
   renderOverview();
   renderEarnersModal();

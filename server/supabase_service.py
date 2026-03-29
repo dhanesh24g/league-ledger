@@ -91,7 +91,7 @@ def get_state() -> dict[str, Any]:
     }
 
 
-def upsert_league(payload: LeaguePayload) -> dict[str, str]:
+def upsert_league(payload: LeaguePayload, user: dict[str, Any]) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -103,6 +103,7 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
         "tournament": payload.tournament.strip(),
         "entry_fee": payload.entry_fee,
         "active_player_count": payload.active_player_count,
+        "owner_user_id": int(user["id"]),
         "default_winner_count": payload.default_winner_count,
         "payouts_json": payouts_json,
     }
@@ -111,9 +112,19 @@ def upsert_league(payload: LeaguePayload) -> dict[str, str]:
         existing_response = supabase.table("league").select("*").limit(1).execute()
 
         if existing_response.data:
+            if user["league_role"] != "admin":
+                raise HTTPException(status_code=403, detail="Admin role required")
+            existing_owner = existing_response.data[0].get("owner_user_id")
+            values["owner_user_id"] = existing_owner or int(user["id"])
             supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
         else:
             supabase.table("league").insert(values).execute()
+            supabase.table("league_memberships").upsert({
+                "user_id": int(user["id"]),
+                "role": "admin",
+                "status": "active",
+            }, on_conflict="user_id").execute()
+            supabase.table("league_join_requests").delete().eq("user_id", int(user["id"])).execute()
 
         verify = supabase.table("league").select("*").limit(1).execute()
         if not verify.data:

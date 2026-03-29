@@ -14,6 +14,7 @@ const leagueState = document.getElementById('league-state');
 const defaultPayouts = document.getElementById('default-payouts');
 const defaultPayoutTotal = document.getElementById('default-payout-total');
 const addDefaultPayoutBtn = document.getElementById('add-default-payout');
+const joinRequestsZone = document.getElementById('join-requests-zone');
 
 let suppressDraftSync = false;
 let authUser = { username: '', role: 'viewer' };
@@ -33,11 +34,62 @@ const payoutController = createPayoutController({
 });
 
 function applyRoleBasedUI() {
-  const isAdmin = authUser.role === 'admin';
+  const isAdmin = authUser.league_role === 'admin' || !authUser.league_exists;
   const controls = leagueForm.querySelectorAll('input, select, textarea, button');
   controls.forEach((control) => {
     control.disabled = !isAdmin;
   });
+}
+
+async function renderJoinRequests() {
+  if (authUser.league_role !== 'admin') {
+    joinRequestsZone.classList.add('hidden');
+    joinRequestsZone.innerHTML = '';
+    return;
+  }
+
+  try {
+    const result = await callApi('/api/league/requests');
+    if (!result.requests.length) {
+      joinRequestsZone.classList.add('hidden');
+      joinRequestsZone.innerHTML = '';
+      return;
+    }
+
+    joinRequestsZone.classList.remove('hidden');
+    joinRequestsZone.innerHTML = `
+      <div class="info-card">
+        <h3>Pending Join Requests</h3>
+        <div class="request-list">
+          ${result.requests.map((request) => `
+            <div class="request-row">
+              <div>
+                <strong>${request.first_name} ${request.last_name}</strong>
+                <p class="muted">${request.user_id_label} • ${request.email}</p>
+              </div>
+              <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    joinRequestsZone.querySelectorAll('.approve-request').forEach((button) => {
+      button.addEventListener('click', async () => {
+        try {
+          button.disabled = true;
+          await callApi(`/api/league/requests/${button.dataset.requestId}/approve`, { method: 'POST' });
+          await renderJoinRequests();
+        } catch (error) {
+          showError(error);
+          button.disabled = false;
+        }
+      });
+    });
+  } catch (error) {
+    joinRequestsZone.classList.add('hidden');
+    joinRequestsZone.innerHTML = '';
+  }
 }
 
 function getDraftPayload() {
@@ -108,8 +160,8 @@ leagueForm.elements.tournament.addEventListener('input', persistDraft);
 
 leagueForm.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (authUser.role !== 'admin') {
-    showError('Only admin can update league settings.');
+  if (authUser.league_role !== 'admin' && authUser.league_exists) {
+    showError('Only the league admin can update league settings.');
     return;
   }
 
@@ -153,8 +205,13 @@ async function init() {
   authUser = await initWorkflowShell('/setup');
   if (!authUser) return;
   applyRoleBasedUI();
+  if (!authUser.league_exists) {
+    renderLeague(null);
+    return;
+  }
   const state = await callApi('/api/state');
   renderLeague(state.league);
+  await renderJoinRequests();
 }
 
 init().catch((error) => {

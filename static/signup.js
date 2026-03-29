@@ -1,5 +1,5 @@
-const loginForm = document.getElementById('login-form');
-const loginHint = document.getElementById('login-hint');
+const signupForm = document.getElementById('signup-form');
+const signupHint = document.getElementById('signup-hint');
 
 async function callApi(url, options = {}) {
   const res = await fetch(url, {
@@ -13,32 +13,27 @@ async function callApi(url, options = {}) {
   return res.json();
 }
 
-async function initLogin() {
+async function initSignup() {
   const token = localStorage.getItem('league-ledger-token');
   if (token) {
     window.location.replace('/welcome');
     return;
   }
-
-  try {
-    const config = await callApi('/api/auth/config');
-    loginHint.textContent = config.signup_enabled
-      ? 'Use your user ID to login. New users can create an account first.'
-      : '';
-  } catch (err) {
-    loginHint.textContent = '';
-  }
+  signupHint.textContent = 'After signup, you can create the first league or request access to an existing one.';
 }
 
-loginForm.addEventListener('submit', async (event) => {
+signupForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   try {
-    const formData = new FormData(loginForm);
+    const formData = new FormData(signupForm);
     const payload = {
+      first_name: String(formData.get('first_name') || '').trim(),
+      last_name: String(formData.get('last_name') || '').trim(),
       user_id: String(formData.get('user_id') || '').trim(),
+      email: String(formData.get('email') || '').trim(),
       password: String(formData.get('password') || ''),
     };
-    const result = await callApi('/api/auth/login', {
+    const result = await callApi('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -52,6 +47,6 @@ loginForm.addEventListener('submit', async (event) => {
   }
 });
 
-initLogin().catch((err) => {
-  console.error('Login initialization failed:', err);
+initSignup().catch((err) => {
+  console.error('Signup initialization failed:', err);
 });
