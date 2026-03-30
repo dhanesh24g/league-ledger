@@ -35,6 +35,11 @@ def welcome_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "welcome.html")
 
 
+@app.get("/join/{invite_code}")
+def join_page(invite_code: str) -> FileResponse:
+    return FileResponse(STATIC_DIR / "welcome.html")
+
+
 @app.get("/players")
 def players_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "players.html")
@@ -95,7 +100,9 @@ def favicon() -> FileResponse:
     favicon_path = STATIC_DIR / "favicon.ico"
     if favicon_path.exists():
         return FileResponse(favicon_path)
-    # Return default favicon or 404
+    png_favicon_path = STATIC_DIR / "favicon.png"
+    if png_favicon_path.exists():
+        return FileResponse(png_favicon_path, media_type="image/png")
     return FileResponse(STATIC_DIR / "index.html", status_code=404)
 
 

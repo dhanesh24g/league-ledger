@@ -3,8 +3,10 @@ const STORAGE_KEYS = {
   role: 'league-ledger-user-role',
   username: 'league-ledger-username',
   fullName: 'league-ledger-full-name',
+  leagueId: 'league-ledger-active-league-id',
   theme: 'dhaneshlabs-theme',
   workflow: 'league-ledger-workflow',
+  postAuthPath: 'league-ledger-post-auth-path',
 };
 
 const WORKFLOW_ROUTES = ['/setup', '/players', '/matches', '/winners', '/ledger'];
@@ -39,11 +41,16 @@ function mergeWorkflowState(value) {
 }
 
 export function readWorkflowState() {
-  return mergeWorkflowState(safeParse(localStorage.getItem(STORAGE_KEYS.workflow), DEFAULT_WORKFLOW_STATE));
+  const leagueKey = getActiveLeagueId() || 'global';
+  const allStates = safeParse(localStorage.getItem(STORAGE_KEYS.workflow), {});
+  return mergeWorkflowState(allStates[leagueKey] || DEFAULT_WORKFLOW_STATE);
 }
 
 export function writeWorkflowState(nextState) {
-  localStorage.setItem(STORAGE_KEYS.workflow, JSON.stringify(mergeWorkflowState(nextState)));
+  const leagueKey = getActiveLeagueId() || 'global';
+  const allStates = safeParse(localStorage.getItem(STORAGE_KEYS.workflow), {});
+  allStates[leagueKey] = mergeWorkflowState(nextState);
+  localStorage.setItem(STORAGE_KEYS.workflow, JSON.stringify(allStates));
 }
 
 export function updateWorkflowState(updater) {
@@ -140,16 +147,45 @@ export function getToken() {
   return localStorage.getItem(STORAGE_KEYS.token) || '';
 }
 
+export function getActiveLeagueId() {
+  const value = localStorage.getItem(STORAGE_KEYS.leagueId);
+  return value ? String(value) : '';
+}
+
+export function setActiveLeagueId(leagueId) {
+  if (!leagueId) {
+    localStorage.removeItem(STORAGE_KEYS.leagueId);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEYS.leagueId, String(leagueId));
+}
+
+export function getPostAuthPath() {
+  return localStorage.getItem(STORAGE_KEYS.postAuthPath) || '';
+}
+
+export function setPostAuthPath(pathname) {
+  if (!pathname) return;
+  localStorage.setItem(STORAGE_KEYS.postAuthPath, pathname);
+}
+
+export function clearPostAuthPath() {
+  localStorage.removeItem(STORAGE_KEYS.postAuthPath);
+}
+
 export function clearAuthStorage() {
   localStorage.removeItem(STORAGE_KEYS.token);
   localStorage.removeItem(STORAGE_KEYS.role);
   localStorage.removeItem(STORAGE_KEYS.username);
   localStorage.removeItem(STORAGE_KEYS.fullName);
+  localStorage.removeItem(STORAGE_KEYS.leagueId);
+  localStorage.removeItem(STORAGE_KEYS.postAuthPath);
 }
 
 export function authHeaders() {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const leagueId = getActiveLeagueId();
+  return token ? { Authorization: `Bearer ${token}`, ...(leagueId ? { 'X-League-ID': leagueId } : {}) } : {};
 }
 
 export async function callApi(url, options = {}) {
@@ -264,6 +300,41 @@ function initLogout() {
   });
 }
 
+function ensureLeagueSwitcher(user) {
+  const headerActions = document.querySelector('.header-actions');
+  if (!headerActions) return;
+  const memberships = Array.isArray(user.memberships) ? user.memberships : [];
+  const existing = document.getElementById('league-switcher');
+  if (existing) existing.remove();
+  if (!memberships.length) return;
+
+  const select = document.createElement('select');
+  select.id = 'league-switcher';
+  select.setAttribute('aria-label', 'Switch league');
+  memberships.forEach((membership) => {
+    const option = document.createElement('option');
+    option.value = String(membership.league_id);
+    option.textContent = membership.league.name;
+    if (String(membership.league_id) === String(user.active_league_id || '')) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  });
+
+  select.addEventListener('change', () => {
+    setActiveLeagueId(select.value);
+    writeWorkflowState(readWorkflowState());
+    window.location.reload();
+  });
+
+  const topNav = document.getElementById('top-nav');
+  if (topNav) {
+    headerActions.insertBefore(select, topNav);
+  } else {
+    headerActions.prepend(select);
+  }
+}
+
 export async function initWorkflowShell(currentPath) {
   setCurrentWorkflowPage(currentPath);
   initThemeToggle();
@@ -278,12 +349,16 @@ export async function initWorkflowShell(currentPath) {
 
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
-  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'viewer';
+  if (user.active_league_id) {
+    setActiveLeagueId(user.active_league_id);
+  }
+  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'read';
   localStorage.setItem(STORAGE_KEYS.role, effectiveRole);
   localStorage.setItem(STORAGE_KEYS.username, user.user_id);
   localStorage.setItem(STORAGE_KEYS.fullName, user.full_name || user.user_id);
 
-  const canCreateFirstLeague = currentPath === '/setup' && !user.league_exists;
+  const createMode = currentPath === '/setup' && new URLSearchParams(window.location.search).get('mode') === 'create';
+  const canCreateFirstLeague = currentPath === '/setup' && createMode;
   if (user.membership_status !== 'active' && !canCreateFirstLeague) {
     window.location.replace('/welcome');
     return null;
@@ -293,6 +368,8 @@ export async function initWorkflowShell(currentPath) {
   if (authRole) {
     authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
   }
+
+  ensureLeagueSwitcher(user);
 
   return user;
 }

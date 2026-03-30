@@ -16,7 +16,7 @@ async function callApi(url, options = {}) {
 async function initLogin() {
   const token = localStorage.getItem('league-ledger-token');
   if (token) {
-    window.location.replace('/welcome');
+    window.location.replace(localStorage.getItem('league-ledger-post-auth-path') || '/welcome');
     return;
   }
 
@@ -43,10 +43,15 @@ loginForm.addEventListener('submit', async (event) => {
       body: JSON.stringify(payload),
     });
     localStorage.setItem('league-ledger-token', result.token);
-    localStorage.setItem('league-ledger-user-role', result.user.league_role === 'admin' ? 'admin' : 'viewer');
+    localStorage.setItem('league-ledger-user-role', result.user.league_role === 'admin' ? 'admin' : 'read');
     localStorage.setItem('league-ledger-username', result.user.user_id);
     localStorage.setItem('league-ledger-full-name', result.user.full_name || result.user.user_id);
-    window.location.replace('/welcome');
+    if (result.user.active_league_id) {
+      localStorage.setItem('league-ledger-active-league-id', String(result.user.active_league_id));
+    }
+    const next = localStorage.getItem('league-ledger-post-auth-path') || '/welcome';
+    localStorage.removeItem('league-ledger-post-auth-path');
+    window.location.replace(next);
   } catch (err) {
     window.alert(err instanceof Error ? err.message : String(err));
   }

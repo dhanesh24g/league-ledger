@@ -2,31 +2,38 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
 from fastapi import HTTPException
 
-from .database import get_supabase_client, DatabaseManager, parse_participant_ids, parse_payouts
+from .database import DatabaseManager, get_supabase_client, parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+
 logger = logging.getLogger(__name__)
 
-# Import Supabase service if available
 try:
     from .supabase_service import (
-        get_state as supabase_get_state,
-        upsert_league as supabase_upsert_league,
-        add_player as supabase_add_player,
-        delete_player as supabase_delete_player,
         add_match as supabase_add_match,
-        save_winners as supabase_save_winners,
+        add_player as supabase_add_player,
         cancel_match as supabase_cancel_match,
+        delete_player as supabase_delete_player,
         get_ledger as supabase_get_ledger,
+        get_state as supabase_get_state,
         get_stats as supabase_get_stats,
+        upsert_league as supabase_upsert_league,
+        save_winners as supabase_save_winners,
     )
+
     SUPABASE_SERVICE_AVAILABLE = True
 except ImportError:
     SUPABASE_SERVICE_AVAILABLE = False
+
+
+def _league_id_from_user(user: dict[str, Any]) -> int:
+    league_id = user.get("active_league_id")
+    if not league_id:
+        raise HTTPException(status_code=400, detail="Select a league first")
+    return int(league_id)
 
 
 def _normalize_participant_ids(raw_ids: list[int] | tuple[int, ...] | None) -> list[int]:
@@ -64,35 +71,35 @@ def _rank_label(rank: int, status: str, has_result: bool) -> str:
     return "Played" if has_result else status.title()
 
 
-def get_state() -> dict[str, Any]:
-    try:
-        if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-            return supabase_get_state()
-    except Exception:
-        logger.exception("Supabase read failed; falling back to SQLite")
-    
-    # Check if we're in Vercel environment
-    if os.getenv("VERCEL"):
-        raise HTTPException(
-            status_code=500, 
-            detail="Supabase not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY environment variables in Vercel."
-        )
-    
-    # Fallback to SQLite for local development
-    with DatabaseManager() as c:
-        league = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
-        players = c.execute("SELECT * FROM players ORDER BY name ASC").fetchall()
-        matches = c.execute("SELECT * FROM matches ORDER BY id DESC").fetchall()
-    fallback_participant_ids = [int(player["id"]) for player in players]
+def _generate_invite_code(name: str, league_id: int) -> str:
+    import re
 
+    base = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-") or "league"
+    return f"{base}-{league_id}"
+
+
+def get_state(user: dict[str, Any]) -> dict[str, Any]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_get_state(user)
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        league = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
+        players = c.execute("SELECT * FROM players WHERE league_id = ? ORDER BY name ASC", (league_id,)).fetchall()
+        matches = c.execute("SELECT * FROM matches WHERE league_id = ? ORDER BY id DESC", (league_id,)).fetchall()
+
+    fallback_participant_ids = [int(player["id"]) for player in players]
     return {
         "league": {
+            "id": int(league["id"]),
             "name": league["name"],
             "tournament": league["tournament"],
             "entry_fee": league["entry_fee"],
             "active_player_count": league["active_player_count"],
             "default_winner_count": league["default_winner_count"],
             "payouts": parse_payouts(league["payouts_json"]),
+            "invite_code": league["invite_code"],
+            "invite_link": f"/join/{league['invite_code']}",
         }
         if league
         else None,
@@ -108,69 +115,82 @@ def get_state() -> dict[str, Any]:
     }
 
 
-def upsert_league(payload: LeaguePayload, user: dict[str, Any]) -> dict[str, str]:
+def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool = False) -> dict[str, Any]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_upsert_league(payload, user)
-    
-    # Fallback to SQLite
+        return supabase_upsert_league(payload, user, create_new=create_new)
+
     payouts_json = json.dumps(payload.payouts)
     with DatabaseManager() as c:
-        existing = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
-        if existing and user["league_role"] != "admin":
+        if create_new or not payload.league_id:
+            cursor = c.execute(
+                """
+                INSERT INTO league (name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json, invite_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?, '')
+                """,
+                (
+                    payload.name.strip(),
+                    payload.tournament.strip(),
+                    payload.entry_fee,
+                    payload.active_player_count,
+                    int(user["id"]),
+                    payload.default_winner_count,
+                    payouts_json,
+                ),
+            )
+            league_id = int(cursor.lastrowid)
+            invite_code = _generate_invite_code(payload.name, league_id)
+            c.execute("UPDATE league SET invite_code = ? WHERE id = ?", (invite_code, league_id))
+            c.execute(
+                """
+                INSERT INTO league_memberships (user_id, league_id, role, status)
+                VALUES (?, ?, 'admin', 'active')
+                ON CONFLICT(user_id, league_id) DO UPDATE SET role = 'admin', status = 'active'
+                """,
+                (int(user["id"]), league_id),
+            )
+            c.execute(
+                "DELETE FROM league_join_requests WHERE user_id = ? AND league_id = ?",
+                (int(user["id"]), league_id),
+            )
+            return {"message": "League created", "league_id": league_id, "invite_code": invite_code}
+
+        league_id = int(payload.league_id)
+        existing = c.execute("SELECT * FROM league WHERE id = ? LIMIT 1", (league_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="League not found")
+        if user["league_role"] != "admin" or int(user.get("active_league_id") or 0) != league_id:
             raise HTTPException(status_code=403, detail="Admin role required")
 
-        cursor = c.execute(
+        c.execute(
             """
-            INSERT INTO league (id, name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json)
-            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                name = excluded.name,
-                tournament = excluded.tournament,
-                entry_fee = excluded.entry_fee,
-                active_player_count = excluded.active_player_count,
-                owner_user_id = COALESCE(league.owner_user_id, excluded.owner_user_id),
-                default_winner_count = excluded.default_winner_count,
-                payouts_json = excluded.payouts_json
+            UPDATE league
+            SET name = ?, tournament = ?, entry_fee = ?, active_player_count = ?, default_winner_count = ?, payouts_json = ?
+            WHERE id = ?
             """,
             (
                 payload.name.strip(),
                 payload.tournament.strip(),
                 payload.entry_fee,
                 payload.active_player_count,
-                int(user["id"]),
                 payload.default_winner_count,
                 payouts_json,
+                league_id,
             ),
         )
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=500, detail="League settings were not persisted")
-        if not existing:
-            c.execute(
-                """
-                INSERT INTO league_memberships (user_id, role, status)
-                VALUES (?, 'admin', 'active')
-                ON CONFLICT(user_id) DO UPDATE SET role = 'admin', status = 'active'
-                """,
-                (int(user["id"]),),
-            )
-            c.execute("DELETE FROM league_join_requests WHERE user_id = ?", (int(user["id"]),))
-    return {"message": "League settings saved"}
+        return {"message": "League settings saved", "league_id": league_id, "invite_code": existing["invite_code"]}
 
 
-def add_player(payload: PlayerPayload) -> dict[str, str]:
+def add_player(payload: PlayerPayload, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_add_player(payload)
-    
-    # Fallback to SQLite
+        return supabase_add_player(payload, user)
+
+    league_id = _league_id_from_user(user)
     player_name = payload.name.strip()
     try:
         with DatabaseManager() as c:
-            cursor = c.execute("INSERT INTO players (name) VALUES (?)", (player_name,))
+            cursor = c.execute("INSERT INTO players (league_id, name) VALUES (?, ?)", (league_id, player_name))
             if cursor.rowcount != 1:
                 raise HTTPException(status_code=500, detail="Player insert failed")
-            exists = c.execute("SELECT id FROM players WHERE name = ? LIMIT 1", (player_name,)).fetchone()
-            if not exists:
-                raise HTTPException(status_code=500, detail="Player insert verification failed")
     except Exception as exc:
         if "UNIQUE" in str(exc).upper():
             raise HTTPException(status_code=409, detail="Player already exists")
@@ -180,41 +200,45 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
     return {"message": "Player added"}
 
 
-def delete_player(player_id: int) -> dict[str, str]:
+def delete_player(player_id: int, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_delete_player(player_id)
-    
-    # Fallback to SQLite
+        return supabase_delete_player(player_id, user)
+
+    league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
-        cursor = c.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        cursor = c.execute("DELETE FROM players WHERE id = ? AND league_id = ?", (player_id, league_id))
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Player not found")
     return {"message": "Player removed"}
 
 
-def add_match(payload: MatchPayload) -> dict[str, str]:
+def add_match(payload: MatchPayload, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_add_match(payload)
-    
-    # Fallback to SQLite
+        return supabase_add_match(payload, user)
+
+    league_id = _league_id_from_user(user)
     payouts_json = json.dumps(payload.payouts) if payload.payouts else None
     with DatabaseManager() as c:
-        players = c.execute("SELECT id FROM players ORDER BY id ASC").fetchall()
+        players = c.execute("SELECT id FROM players WHERE league_id = ? ORDER BY id ASC", (league_id,)).fetchall()
         valid_player_ids = {int(player["id"]) for player in players}
         participant_ids = _normalize_participant_ids(payload.participant_ids)
         if participant_ids:
-          invalid_ids = [player_id for player_id in participant_ids if player_id not in valid_player_ids]
-          if invalid_ids:
-              raise HTTPException(status_code=400, detail="Match participants include unknown players")
+            invalid_ids = [player_id for player_id in participant_ids if player_id not in valid_player_ids]
+            if invalid_ids:
+                raise HTTPException(status_code=400, detail="Match participants include unknown players")
         else:
-          participant_ids = [int(player["id"]) for player in players]
+            participant_ids = [int(player["id"]) for player in players]
 
         if len(participant_ids) < 2:
             raise HTTPException(status_code=400, detail="Select at least two match participants")
 
         cursor = c.execute(
-            "INSERT INTO matches (title, match_date, winner_count, payouts_json, participant_ids_json) VALUES (?, ?, ?, ?, ?)",
+            """
+            INSERT INTO matches (league_id, title, match_date, winner_count, payouts_json, participant_ids_json)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
             (
+                league_id,
                 payload.title.strip(),
                 payload.match_date.strip(),
                 payload.winner_count,
@@ -224,23 +248,20 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
         )
         if cursor.rowcount != 1:
             raise HTTPException(status_code=500, detail="Match insert failed")
-        created_match = c.execute("SELECT id FROM matches WHERE id = ? LIMIT 1", (cursor.lastrowid,)).fetchone()
-        if not created_match:
-            raise HTTPException(status_code=500, detail="Match insert verification failed")
     return {"message": "Match added"}
 
 
-def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
+def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_save_winners(match_id, payload)
-    
-    # Fallback to SQLite
+        return supabase_save_winners(match_id, payload, user)
+
+    league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
-        match_row = c.execute("SELECT * FROM matches WHERE id = ?", (match_id,)).fetchone()
-        league_row = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
+        match_row = c.execute("SELECT * FROM matches WHERE id = ? AND league_id = ?", (match_id, league_id)).fetchone()
+        league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
         players_by_id = {
             int(row["id"]): dict(row)
-            for row in c.execute("SELECT id, name FROM players ORDER BY id ASC").fetchall()
+            for row in c.execute("SELECT id, name FROM players WHERE league_id = ? ORDER BY id ASC", (league_id,)).fetchall()
         }
         if not match_row or not league_row:
             raise HTTPException(status_code=404, detail="League or match not found")
@@ -250,7 +271,6 @@ def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
         participant_ids = parse_participant_ids(match_row["participant_ids_json"]) or list(players_by_id.keys())
 
         rank_to_players = {row.rank: [pid for pid in row.player_ids] for row in payload.ranks}
-
         used_players: set[int] = set()
         for rank_players in rank_to_players.values():
             for player_id in rank_players:
@@ -287,15 +307,15 @@ def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
     return {"message": "Winners saved"}
 
 
-def cancel_match(match_id: int) -> dict[str, str]:
+def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_cancel_match(match_id)
-    
-    # Fallback to SQLite
+        return supabase_cancel_match(match_id, user)
+
+    league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
-        match_row = c.execute("SELECT * FROM matches WHERE id = ?", (match_id,)).fetchone()
-        league_row = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
-        players = c.execute("SELECT id FROM players ORDER BY id ASC").fetchall()
+        match_row = c.execute("SELECT * FROM matches WHERE id = ? AND league_id = ?", (match_id, league_id)).fetchone()
+        league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
+        players = c.execute("SELECT id FROM players WHERE league_id = ? ORDER BY id ASC", (league_id,)).fetchall()
 
         if not match_row or not league_row:
             raise HTTPException(status_code=404, detail="League or match not found")
@@ -320,22 +340,30 @@ def cancel_match(match_id: int) -> dict[str, str]:
     return {"message": "Match marked as canceled and refund distributed equally"}
 
 
-def get_ledger() -> dict[str, Any]:
+def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_get_ledger()
-    
-    # Fallback to SQLite
+        return supabase_get_ledger(user)
+
+    league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
-        league_row = c.execute("SELECT * FROM league WHERE id = 1").fetchone()
+        league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
         if not league_row:
             return {"rows": [], "completed_matches": 0, "entry_fee": 0}
 
-        players = c.execute("SELECT id, name FROM players ORDER BY name ASC").fetchall()
+        players = c.execute("SELECT id, name FROM players WHERE league_id = ? ORDER BY name ASC", (league_id,)).fetchall()
         matches = c.execute(
-            "SELECT id, participant_ids_json FROM matches WHERE status IN ('completed', 'canceled') ORDER BY id DESC"
+            "SELECT id, participant_ids_json FROM matches WHERE league_id = ? AND status IN ('completed', 'canceled') ORDER BY id DESC",
+            (league_id,),
         ).fetchall()
         winnings = c.execute(
-            "SELECT player_id, COALESCE(SUM(amount), 0) AS total FROM winner_entries GROUP BY player_id"
+            """
+            SELECT we.player_id, COALESCE(SUM(we.amount), 0) AS total
+            FROM winner_entries we
+            JOIN matches m ON m.id = we.match_id
+            WHERE m.league_id = ?
+            GROUP BY we.player_id
+            """,
+            (league_id,),
         ).fetchall()
 
     winnings_map = {row["player_id"]: float(row["total"]) for row in winnings}
@@ -354,29 +382,21 @@ def get_ledger() -> dict[str, Any]:
         spent = round(match_counts_by_player.get(int(player["id"]), 0) * entry_fee, 2)
         won = round(winnings_map.get(player["id"], 0.0), 2)
         net = round(won - spent, 2)
-        rows.append({
-            "player_id": player["id"],
-            "name": player["name"],
-            "spent": spent,
-            "won": won,
-            "net": net,
-        })
+        rows.append({"player_id": player["id"], "name": player["name"], "spent": spent, "won": won, "net": net})
 
-    return {
-        "rows": rows,
-        "completed_matches": completed_matches,
-        "entry_fee": entry_fee,
-    }
+    return {"rows": rows, "completed_matches": completed_matches, "entry_fee": entry_fee}
 
 
-def get_stats() -> dict[str, Any]:
+def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        return supabase_get_stats()
+        return supabase_get_stats(user)
 
+    league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
-        players = c.execute("SELECT id, name FROM players ORDER BY name ASC").fetchall()
+        players = c.execute("SELECT id, name FROM players WHERE league_id = ? ORDER BY name ASC", (league_id,)).fetchall()
         matches = c.execute(
-            "SELECT id, title, match_date, status, participant_ids_json FROM matches ORDER BY id DESC"
+            "SELECT id, title, match_date, status, participant_ids_json FROM matches WHERE league_id = ? ORDER BY id DESC",
+            (league_id,),
         ).fetchall()
         winners = c.execute(
             """
@@ -387,9 +407,12 @@ def get_stats() -> dict[str, Any]:
                 we.amount,
                 COALESCE(p.name, 'Archived Player #' || we.player_id) AS player_name
             FROM winner_entries we
+            JOIN matches m ON m.id = we.match_id
             LEFT JOIN players p ON p.id = we.player_id
+            WHERE m.league_id = ?
             ORDER BY we.match_id DESC, we.rank ASC, player_name ASC
-            """
+            """,
+            (league_id,),
         ).fetchall()
 
     player_name_by_id = {int(player["id"]): str(player["name"]) for player in players}

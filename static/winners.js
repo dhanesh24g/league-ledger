@@ -18,7 +18,7 @@ const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
 const winnersForm = document.getElementById('winners-form');
 
-let authUser = { username: '', role: 'viewer' };
+let authUser = { username: '', role: 'read' };
 let appState = { league: null, players: [], matches: [] };
 let winnerFeedbackEl = null;
 let saveWinnersBtn = null;

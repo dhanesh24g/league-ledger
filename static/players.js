@@ -10,7 +10,7 @@ import {
 const playerForm = document.getElementById('player-form');
 const playersList = document.getElementById('players-list');
 
-let authUser = { username: '', role: 'viewer' };
+let authUser = { username: '', role: 'read' };
 
 function applyRoleBasedUI() {
   const isAdmin = authUser.league_role === 'admin';
