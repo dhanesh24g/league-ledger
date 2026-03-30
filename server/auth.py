@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import random
 import secrets
 import time
 from typing import Any
@@ -16,6 +17,8 @@ from .database import DatabaseManager, get_supabase_client
 
 TOKEN_TTL_SECONDS = 60 * 60 * 4
 PBKDF2_ITERATIONS = 120_000
+USER_ID_CACHE_TTL_SECONDS = 60
+_USER_ID_CACHE: dict[str, Any] = {"loaded_at": 0.0, "values": set()}
 
 
 def _secret() -> bytes:
@@ -94,16 +97,36 @@ def _reserved_usernames() -> set[str]:
     }
 
 
-def _is_user_id_taken(normalized_user_id: str) -> bool:
+def _load_existing_user_ids(force_refresh: bool = False) -> set[str]:
+    now = time.time()
+    cached_values = _USER_ID_CACHE.get("values")
+    loaded_at = float(_USER_ID_CACHE.get("loaded_at") or 0.0)
+    if not force_refresh and isinstance(cached_values, set) and (now - loaded_at) < USER_ID_CACHE_TTL_SECONDS:
+        return set(cached_values)
+
+    user_ids: set[str] = set()
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
-        response = supabase.table("users").select("id").eq("user_id", normalized_user_id).limit(1).execute()
-        return bool(response.data)
+        response = supabase.table("users").select("user_id").execute()
+        user_ids = {str(row.get("user_id") or "") for row in (response.data or []) if row.get("user_id")}
+    else:
+        with DatabaseManager() as connection:
+            rows = connection.execute("SELECT user_id FROM users").fetchall()
+        user_ids = {str(row["user_id"]) for row in rows if row["user_id"]}
 
-    with DatabaseManager() as connection:
-        row = connection.execute("SELECT id FROM users WHERE user_id = ? LIMIT 1", (normalized_user_id,)).fetchone()
-    return row is not None
+    _USER_ID_CACHE["values"] = set(user_ids)
+    _USER_ID_CACHE["loaded_at"] = now
+    return user_ids
+
+
+def _invalidate_user_id_cache() -> None:
+    _USER_ID_CACHE["loaded_at"] = 0.0
+    _USER_ID_CACHE["values"] = set()
+
+
+def _is_user_id_taken(normalized_user_id: str) -> bool:
+    return normalized_user_id in _load_existing_user_ids()
 
 
 def user_id_availability(user_id_value: str) -> dict[str, Any]:
@@ -118,7 +141,12 @@ def user_id_availability(user_id_value: str) -> dict[str, Any]:
 def suggest_user_ids(first_name: str, last_name: str) -> dict[str, Any]:
     first = _normalize_user_id(first_name)[:24]
     last = _normalize_user_id(last_name)[:24]
-    seeds = [
+    if not first:
+        return {"suggestions": []}
+
+    existing_user_ids = _load_existing_user_ids()
+    reserved = _reserved_usernames()
+    base_seeds = [
         f"{first}{last}" if last else first,
         f"{first}.{last}" if last else f"{first}.league",
         f"{first}_{last}" if last else f"{first}_play",
@@ -128,27 +156,29 @@ def suggest_user_ids(first_name: str, last_name: str) -> dict[str, Any]:
 
     suggestions: list[str] = []
     seen: set[str] = set()
-    for seed in seeds:
-        candidate = _normalize_user_id(seed)
-        if len(candidate) < 3 or candidate in seen or candidate in _reserved_usernames():
+    rng = random.SystemRandom()
+
+    for seed in base_seeds:
+        candidate_base = _normalize_user_id(seed)[:28]
+        if len(candidate_base) < 3 or candidate_base in reserved:
             continue
-        seen.add(candidate)
-        if not _is_user_id_taken(candidate):
-            suggestions.append(candidate)
-            if len(suggestions) >= 3:
-                break
-        for suffix in range(2, 20):
-            suffixed = _normalize_user_id(f"{candidate}{suffix}")
-            if suffixed in seen or suffixed in _reserved_usernames():
+
+        attempts = 0
+        while attempts < 24 and len(suggestions) < 4:
+            digit_count = 3 if rng.random() < 0.5 else 4
+            suffix = "".join(rng.choice("0123456789") for _ in range(digit_count))
+            candidate = _normalize_user_id(f"{candidate_base}{suffix}")[:32]
+            attempts += 1
+            if len(candidate) < 6 or candidate in seen or candidate in reserved or candidate in existing_user_ids:
                 continue
-            seen.add(suffixed)
-            if not _is_user_id_taken(suffixed):
-                suggestions.append(suffixed)
-                break
-        if len(suggestions) >= 3:
+            seen.add(candidate)
+            suggestions.append(candidate)
+            existing_user_ids.add(candidate)
+
+        if len(suggestions) >= 4:
             break
 
-    return {"suggestions": suggestions[:3]}
+    return {"suggestions": suggestions[:4]}
 
 
 def _random_password_seed() -> str:
@@ -464,6 +494,7 @@ def signup_user(
             if "duplicate" in detail or "unique" in detail:
                 raise HTTPException(status_code=409, detail="User ID or email already exists") from exc
             raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
+        _invalidate_user_id_cache()
         user = get_user_profile_by_user_id(normalized_user_id)
         if not user:
             raise HTTPException(status_code=500, detail="Signup verification failed")
@@ -491,6 +522,7 @@ def signup_user(
             raise HTTPException(status_code=409, detail="User ID or email already exists") from exc
         raise
 
+    _invalidate_user_id_cache()
     user = get_user_profile_by_user_id(normalized_user_id)
     if not user:
         raise HTTPException(status_code=500, detail="Signup verification failed")

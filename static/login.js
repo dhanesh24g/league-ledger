@@ -36,6 +36,46 @@ function setGoogleState(kind, text) {
   googleLoginHint.classList.toggle('auth-text-error', kind === 'error');
 }
 
+function getSavedTheme() {
+  const stored = localStorage.getItem('dhaneshlabs-theme');
+  if (stored === 'light' || stored === 'dark') return stored;
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+    return 'light';
+  }
+  return 'dark';
+}
+
+function updateThemeIcons(theme) {
+  const themeToggle = document.getElementById('theme-toggle');
+  const lightIcon = document.getElementById('light-icon');
+  const darkIcon = document.getElementById('dark-icon');
+  if (!lightIcon || !darkIcon) return;
+
+  lightIcon.classList.toggle('active', theme === 'light');
+  darkIcon.classList.toggle('active', theme !== 'light');
+  if (themeToggle) {
+    themeToggle.setAttribute('aria-label', `Theme setting: ${theme === 'light' ? 'Light' : 'Dark'}`);
+    themeToggle.dataset.theme = theme;
+  }
+}
+
+function initThemeToggle() {
+  const themeToggle = document.getElementById('theme-toggle');
+  if (!themeToggle) return;
+
+  const savedTheme = getSavedTheme();
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  updateThemeIcons(savedTheme);
+
+  themeToggle.addEventListener('click', () => {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('dhaneshlabs-theme', nextTheme);
+    updateThemeIcons(nextTheme);
+  });
+}
+
 function initGoogleLogin() {
   if (!authConfig.google_enabled || !authConfig.google_client_id || !window.google?.accounts?.id) {
     googleLoginBtn.disabled = true;
@@ -64,6 +104,7 @@ function initGoogleLogin() {
 }
 
 async function initLogin() {
+  initThemeToggle();
   const token = localStorage.getItem('league-ledger-token');
   if (token) {
     window.location.replace(localStorage.getItem('league-ledger-post-auth-path') || '/welcome');

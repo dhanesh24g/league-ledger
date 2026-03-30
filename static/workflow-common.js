@@ -227,6 +227,7 @@ export function getSavedTheme() {
 }
 
 function updateThemeIcons(theme) {
+  const themeToggle = document.getElementById('theme-toggle');
   const lightIcon = document.getElementById('light-icon');
   const darkIcon = document.getElementById('dark-icon');
   if (!lightIcon || !darkIcon) return;
@@ -237,6 +238,11 @@ function updateThemeIcons(theme) {
   } else {
     darkIcon.classList.add('active');
     lightIcon.classList.remove('active');
+  }
+
+  if (themeToggle) {
+    themeToggle.setAttribute('aria-label', `Theme setting: ${theme === 'light' ? 'Light' : 'Dark'}`);
+    themeToggle.dataset.theme = theme;
   }
 }
 

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
     rel="stylesheet">
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="shortcut icon" href="/favicon.ico">
@@ -29,77 +29,93 @@
 </head>
 
 <body>
-  <main class="shell-main">
-    <section class="panel active auth-panel auth-panel-premium auth-shell-grid">
-      <aside class="auth-hero-panel">
-        <span class="auth-eyebrow">Get Started</span>
-        <h1>Build your league identity once, then move across leagues smoothly.</h1>
-        <p class="muted">Create your account, claim a clean username, and join or launch leagues without shared credentials.</p>
-        <div class="auth-hero-stack">
-          <div class="auth-note-card auth-note-card-hero">
-            <strong>4 Hour Secure Session</strong>
-            <span class="muted small">Short-lived JWT sessions keep access safer while still feeling frictionless.</span>
-          </div>
-          <div class="auth-note-card auth-note-card-hero">
-            <strong>Google Assisted Signup</strong>
-            <span class="muted small">Pull verified name and email from Google, then choose your own username.</span>
-          </div>
-          <div class="auth-note-card auth-note-card-hero">
-            <strong>League-Based Access</strong>
-            <span class="muted small">Roles stay scoped per league, so your permissions do not bleed across groups.</span>
-          </div>
+  <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span class="theme-option-label">Light</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span class="theme-option-label">Dark</span></span>
+  </button>
+  <main class="shell-main auth-split-shell-wrap">
+    <section class="panel active auth-split-shell auth-split-shell-signup">
+      <div class="auth-split-card auth-split-form-card auth-signup-form-card">
+        <div class="auth-split-brand-row">
+          <span class="auth-split-brand-pill">League Ledger</span>
         </div>
-      </aside>
-
-      <div class="auth-form-panel">
-        <div class="auth-header">
-          <span class="auth-eyebrow">Create Account</span>
-          <h2>Sign Up</h2>
-          <p class="muted">Use Google to fill your verified profile faster, or enter everything manually and continue with password login.</p>
+        <div class="auth-split-header">
+          <p class="auth-split-kicker">Create account</p>
+          <h1>Set up your identity</h1>
+          <p class="muted">Choose your username, add your details, and then use Google only if you want faster verified signup.</p>
         </div>
 
-        <div class="auth-provider-card">
-          <button id="google-signup-btn" type="button" class="auth-provider-button">
-            <span class="auth-provider-mark">G</span>
-            <span>Continue With Google</span>
-          </button>
-          <p id="google-signup-hint" class="muted small auth-inline-hint">We use Google only for your verified name and email.</p>
-        </div>
-
-        <div class="auth-divider">
-          <span>or continue with your details</span>
-        </div>
-
-        <form id="signup-form" class="stack auth-form">
+        <form id="signup-form" class="stack auth-form auth-split-form auth-signup-form">
           <input type="hidden" name="google_token">
-          <div class="grid auth-grid">
-            <label>First Name
-              <input name="first_name" placeholder="Enter first name" autocomplete="given-name" required>
+          <div class="auth-signup-grid auth-signup-name-row">
+            <label>First name
+              <input name="first_name" placeholder="First name" autocomplete="given-name" required>
             </label>
-            <label>Last Name
-              <input name="last_name" placeholder="Enter last name" autocomplete="family-name" required>
+            <label>Last name
+              <input name="last_name" placeholder="Last name" autocomplete="family-name" required>
             </label>
           </div>
-          <label>Username
-            <input name="user_id" placeholder="Choose a username" autocomplete="username" required>
-            <span id="user-id-status" class="muted small auth-inline-hint"></span>
-          </label>
-          <div id="user-id-suggestions" class="suggestion-chip-row hidden"></div>
+          <div class="auth-signup-username-row">
+            <label>Username
+              <input name="user_id" placeholder="Choose a username" autocomplete="username" required>
+              <span id="user-id-status" class="muted small auth-inline-hint"></span>
+            </label>
+            <div class="auth-signup-suggestion-panel">
+              <span class="auth-signup-side-label">Suggestions</span>
+              <div id="user-id-suggestions" class="suggestion-chip-row hidden"></div>
+            </div>
+          </div>
           <label>Email
-            <input type="email" name="email" placeholder="Enter your email" autocomplete="email" required>
+            <input type="email" name="email" placeholder="name@example.com" autocomplete="email" required>
           </label>
           <label>Password
             <input type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required>
-            <span class="muted small auth-inline-hint">Required for email login. Google signup can skip this after verification.</span>
+            <span class="muted small auth-inline-hint">Required for email login. If Google verification succeeds, this becomes optional.</span>
           </label>
-          <button type="submit" class="primary auth-primary-button">Create Account</button>
+          <button type="submit" class="primary auth-primary-button auth-split-submit">Create Account</button>
         </form>
-        <div class="auth-switch">
-          <span class="muted small">Already have an account?</span>
-          <a class="button-link ghost auth-secondary-button" href="/login">Back to Login</a>
+
+        <div class="auth-split-footer-row">
+          <p id="signup-hint" class="muted small auth-helper auth-split-helper"></p>
+          <div class="auth-switch auth-split-switch">
+            <span class="muted small">Already have an account?</span>
+            <a class="button-link ghost auth-secondary-button" href="/login">Back to login</a>
+          </div>
         </div>
-        <p id="signup-hint" class="muted small auth-helper"></p>
       </div>
+
+      <aside class="auth-split-card auth-google-panel auth-google-panel-signup">
+        <div class="auth-google-panel-art" aria-hidden="true">
+          <div class="auth-google-orb auth-google-orb-blue"></div>
+          <div class="auth-google-orb auth-google-orb-red"></div>
+          <div class="auth-google-orb auth-google-orb-yellow"></div>
+          <div class="auth-google-logo-wrap">
+            <svg viewBox="0 0 64 64" class="auth-google-logo" role="img" aria-label="Google logo">
+              <path fill="#4285F4" d="M59.64 32.31c0-1.81-.16-3.55-.46-5.23H32v9.91h15.52c-.67 3.61-2.7 6.67-5.75 8.71v7.22h9.29c5.44-5.01 8.58-12.39 8.58-20.61z"/>
+              <path fill="#34A853" d="M32 60c7.78 0 14.31-2.58 19.08-6.98l-9.29-7.22c-2.58 1.73-5.88 2.75-9.79 2.75-7.52 0-13.89-5.08-16.17-11.91H6.24v7.45A28 28 0 0 0 32 60z"/>
+              <path fill="#FBBC05" d="M15.83 36.64A16.81 16.81 0 0 1 14.93 31c0-1.96.34-3.86.9-5.64V17.9H6.24A28 28 0 0 0 4 31c0 4.52 1.08 8.79 2.99 12.55l8.84-6.91z"/>
+              <path fill="#EA4335" d="M32 13.45c4.23 0 8.03 1.46 11.01 4.31l8.25-8.25C46.3 4.91 39.77 2 32 2A28 28 0 0 0 6.24 17.9l9.59 7.46C18.11 18.53 24.48 13.45 32 13.45z"/>
+            </svg>
+          </div>
+        </div>
+        <div class="auth-google-copy">
+          <p class="auth-split-kicker">Google signup</p>
+          <h2>Fill verified profile details faster</h2>
+          <p class="muted">After you choose the basics of your account, Google can pull your verified name and email so signup feels lighter without overwhelming the page.</p>
+        </div>
+        <button id="google-signup-btn" type="button" class="auth-provider-button auth-google-button">
+          <span class="auth-google-button-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="auth-google-button-svg">
+              <path fill="#4285F4" d="M21.81 12.23c0-.72-.06-1.25-.19-1.81H12.2v3.4h5.53c-.11.85-.72 2.12-2.08 2.98l-.02.11 3.03 2.35.21.02c1.93-1.78 3.04-4.4 3.04-7.05z"/>
+              <path fill="#34A853" d="M12.2 22c2.71 0 4.98-.9 6.64-2.44l-3.22-2.48c-.86.6-2.01 1.02-3.42 1.02-2.65 0-4.91-1.74-5.71-4.16l-.1.01-3.15 2.44-.03.1A10.03 10.03 0 0 0 12.2 22z"/>
+              <path fill="#FBBC05" d="M6.49 13.94A6.2 6.2 0 0 1 6.16 12c0-.67.12-1.32.32-1.94l-.01-.13-3.18-2.48-.1.05A10 10 0 0 0 2.14 12c0 1.61.38 3.13 1.05 4.5l3.3-2.56z"/>
+              <path fill="#EA4335" d="M12.2 5.9c1.77 0 2.97.76 3.65 1.39l2.66-2.59C17.17 3.46 14.91 2 12.2 2 8.28 2 4.88 4.24 3.19 7.5l3.29 2.56c.81-2.42 3.07-4.16 5.72-4.16z"/>
+            </svg>
+          </span>
+          <span>Continue with Google</span>
+        </button>
+        <p id="google-signup-hint" class="muted small auth-inline-hint auth-google-hint">We use Google only for your verified name and email.</p>
+      </aside>
     </section>
   </main>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
