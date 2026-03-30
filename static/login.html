@@ -30,40 +30,60 @@
 
 <body>
   <main class="shell-main">
-    <section class="panel active auth-panel auth-panel-premium">
-      <div class="auth-header">
+    <section class="panel active auth-panel auth-panel-premium auth-shell-grid">
+      <aside class="auth-hero-panel">
         <span class="auth-eyebrow">League Ledger</span>
-        <h2>Sign In</h2>
-        <p class="muted">Access your league workspace, match history, and stats dashboard with your personal account.</p>
-      </div>
-
-      <div class="auth-subtle-grid">
-        <div class="auth-note-card">
-          <strong>Private Access</strong>
-          <span class="muted small">Every user signs in with their own account instead of shared credentials.</span>
+        <h1>Jump back into your leagues with the right role and the right context.</h1>
+        <p class="muted">Sign in with your username and password, or continue with Google if your account is already linked.</p>
+        <div class="auth-hero-stack">
+          <div class="auth-note-card auth-note-card-hero">
+            <strong>Role-Based League Access</strong>
+            <span class="muted small">Each league keeps its own admin and read permissions without cross-league bleed.</span>
+          </div>
+          <div class="auth-note-card auth-note-card-hero">
+            <strong>Cleaner Session Security</strong>
+            <span class="muted small">Shorter token validity keeps sign-in modern and safer for a shared app.</span>
+          </div>
         </div>
-        <div class="auth-note-card">
-          <strong>League Membership</strong>
-          <span class="muted small">Your access follows the league role assigned after approval.</span>
-        </div>
-      </div>
+      </aside>
 
-      <form id="login-form" class="stack auth-form">
-        <label>User ID
-          <input name="user_id" placeholder="Enter your user ID" autocomplete="username" required>
-        </label>
-        <label>Password
-          <input type="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
-        </label>
-        <button type="submit" class="primary auth-primary-button">Sign In to League</button>
-      </form>
-      <div class="auth-switch">
-        <span class="muted small">New here?</span>
-        <a class="button-link ghost auth-secondary-button" href="/signup">Create Account</a>
+      <div class="auth-form-panel">
+        <div class="auth-header">
+          <span class="auth-eyebrow">Welcome Back</span>
+          <h2>Sign In</h2>
+          <p class="muted">Access your workspace, league stats, and match history with your personal identity.</p>
+        </div>
+
+        <div class="auth-provider-card">
+          <button id="google-login-btn" type="button" class="auth-provider-button">
+            <span class="auth-provider-mark">G</span>
+            <span>Continue With Google</span>
+          </button>
+          <p id="google-login-hint" class="muted small auth-inline-hint">Use this only if your account has already been linked during signup.</p>
+        </div>
+
+        <div class="auth-divider">
+          <span>or continue with your username</span>
+        </div>
+
+        <form id="login-form" class="stack auth-form">
+          <label>Username
+            <input name="user_id" placeholder="Enter your username" autocomplete="username" required>
+          </label>
+          <label>Password
+            <input type="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+          </label>
+          <button type="submit" class="primary auth-primary-button">Sign In to League</button>
+        </form>
+        <div class="auth-switch">
+          <span class="muted small">New here?</span>
+          <a class="button-link ghost auth-secondary-button" href="/signup">Create Account</a>
+        </div>
+        <p id="login-hint" class="muted small auth-helper"></p>
       </div>
-      <p id="login-hint" class="muted small auth-helper"></p>
     </section>
   </main>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="/static/login.js"></script>
 </body>
 

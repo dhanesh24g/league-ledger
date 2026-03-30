@@ -30,51 +30,79 @@
 
 <body>
   <main class="shell-main">
-    <section class="panel active auth-panel auth-panel-premium">
-      <div class="auth-header">
+    <section class="panel active auth-panel auth-panel-premium auth-shell-grid">
+      <aside class="auth-hero-panel">
         <span class="auth-eyebrow">Get Started</span>
-        <h2>Create Your Account</h2>
-        <p class="muted">Set up your personal identity once, then create the first league or request access to an existing one.</p>
-      </div>
+        <h1>Build your league identity once, then move across leagues smoothly.</h1>
+        <p class="muted">Create your account, claim a clean username, and join or launch leagues without shared credentials.</p>
+        <div class="auth-hero-stack">
+          <div class="auth-note-card auth-note-card-hero">
+            <strong>4 Hour Secure Session</strong>
+            <span class="muted small">Short-lived JWT sessions keep access safer while still feeling frictionless.</span>
+          </div>
+          <div class="auth-note-card auth-note-card-hero">
+            <strong>Google Assisted Signup</strong>
+            <span class="muted small">Pull verified name and email from Google, then choose your own username.</span>
+          </div>
+          <div class="auth-note-card auth-note-card-hero">
+            <strong>League-Based Access</strong>
+            <span class="muted small">Roles stay scoped per league, so your permissions do not bleed across groups.</span>
+          </div>
+        </div>
+      </aside>
 
-      <div class="auth-subtle-grid">
-        <div class="auth-note-card">
-          <strong>Secure Password Storage</strong>
-          <span class="muted small">Passwords are stored as hashes, not plain text.</span>
+      <div class="auth-form-panel">
+        <div class="auth-header">
+          <span class="auth-eyebrow">Create Account</span>
+          <h2>Sign Up</h2>
+          <p class="muted">Use Google to fill your verified profile faster, or enter everything manually and continue with password login.</p>
         </div>
-        <div class="auth-note-card">
-          <strong>Fast Onboarding</strong>
-          <span class="muted small">Sign up, then either create the league or send a join request.</span>
-        </div>
-      </div>
 
-      <form id="signup-form" class="stack auth-form">
-        <div class="grid auth-grid">
-          <label>First Name
-            <input name="first_name" placeholder="Enter first name" autocomplete="given-name" required>
-          </label>
-          <label>Last Name
-            <input name="last_name" placeholder="Enter last name" autocomplete="family-name" required>
-          </label>
+        <div class="auth-provider-card">
+          <button id="google-signup-btn" type="button" class="auth-provider-button">
+            <span class="auth-provider-mark">G</span>
+            <span>Continue With Google</span>
+          </button>
+          <p id="google-signup-hint" class="muted small auth-inline-hint">We use Google only for your verified name and email.</p>
         </div>
-        <label>User ID
-          <input name="user_id" placeholder="Choose a user ID" autocomplete="username" required>
-        </label>
-        <label>Email
-          <input type="email" name="email" placeholder="Enter your email" autocomplete="email" required>
-        </label>
-        <label>Password
-          <input type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required>
-        </label>
-        <button type="submit" class="primary auth-primary-button">Create Account</button>
-      </form>
-      <div class="auth-switch">
-        <span class="muted small">Already have an account?</span>
-        <a class="button-link ghost auth-secondary-button" href="/login">Back to Login</a>
+
+        <div class="auth-divider">
+          <span>or continue with your details</span>
+        </div>
+
+        <form id="signup-form" class="stack auth-form">
+          <input type="hidden" name="google_token">
+          <div class="grid auth-grid">
+            <label>First Name
+              <input name="first_name" placeholder="Enter first name" autocomplete="given-name" required>
+            </label>
+            <label>Last Name
+              <input name="last_name" placeholder="Enter last name" autocomplete="family-name" required>
+            </label>
+          </div>
+          <label>Username
+            <input name="user_id" placeholder="Choose a username" autocomplete="username" required>
+            <span id="user-id-status" class="muted small auth-inline-hint"></span>
+          </label>
+          <div id="user-id-suggestions" class="suggestion-chip-row hidden"></div>
+          <label>Email
+            <input type="email" name="email" placeholder="Enter your email" autocomplete="email" required>
+          </label>
+          <label>Password
+            <input type="password" name="password" placeholder="At least 8 characters" autocomplete="new-password" required>
+            <span class="muted small auth-inline-hint">Required for email login. Google signup can skip this after verification.</span>
+          </label>
+          <button type="submit" class="primary auth-primary-button">Create Account</button>
+        </form>
+        <div class="auth-switch">
+          <span class="muted small">Already have an account?</span>
+          <a class="button-link ghost auth-secondary-button" href="/login">Back to Login</a>
+        </div>
+        <p id="signup-hint" class="muted small auth-helper"></p>
       </div>
-      <p id="signup-hint" class="muted small auth-helper"></p>
     </section>
   </main>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="/static/signup.js"></script>
 </body>
 

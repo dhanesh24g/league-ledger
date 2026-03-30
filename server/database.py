@@ -570,11 +570,17 @@ def init_sqlite_db() -> None:
                 last_name TEXT NOT NULL,
                 user_id TEXT NOT NULL UNIQUE,
                 email TEXT NOT NULL UNIQUE,
+                google_sub TEXT UNIQUE,
                 password_hash TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        try:
+            connection.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+        except sqlite3.OperationalError:
+            pass
+        connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub)")
 
         if _has_legacy_tables(connection):
             _recover_interrupted_migration(connection)

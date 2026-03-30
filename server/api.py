@@ -6,12 +6,16 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from .auth import (
     approve_join_request,
+    authenticate_google,
     auth_config,
     authenticate,
     create_join_request,
     create_token,
     current_user,
     get_league_by_invite_code,
+    suggest_user_ids,
+    user_id_availability,
+    verify_google_token,
     list_league_members,
     list_join_requests,
     require_active_member,
@@ -19,7 +23,7 @@ from .auth import (
     signup_user,
     update_membership_role,
 )
-from .schemas import JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, SignupPayload, WinnersPayload
+from .schemas import GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, SignupPayload, WinnersPayload
 from .service import (
     add_match,
     add_player,
@@ -89,6 +93,21 @@ def auth_settings() -> dict[str, Any]:
     return auth_config()
 
 
+@router.get("/auth/user-id-check")
+def auth_user_id_check(user_id: str) -> dict[str, Any]:
+    return user_id_availability(user_id)
+
+
+@router.get("/auth/user-id-suggestions")
+def auth_user_id_suggestions(first_name: str = "", last_name: str = "") -> dict[str, Any]:
+    return suggest_user_ids(first_name, last_name)
+
+
+@router.post("/auth/google/profile")
+def auth_google_profile(payload: GoogleTokenPayload) -> dict[str, Any]:
+    return {"profile": verify_google_token(payload.credential)}
+
+
 @router.post("/auth/signup")
 def signup(payload: SignupPayload) -> dict[str, Any]:
     user = signup_user(
@@ -97,6 +116,7 @@ def signup(payload: SignupPayload) -> dict[str, Any]:
         payload.user_id,
         payload.email,
         payload.password,
+        payload.google_token,
     )
     token = create_token(user)
     return {"token": token, "user": user}
@@ -108,6 +128,14 @@ def login(payload: LoginPayload, x_league_id: str | None = None) -> dict[str, An
     user = authenticate(payload.user_id.strip(), payload.password, requested_league_id=requested_league_id)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid user ID or password")
+    token = create_token(user)
+    return {"token": token, "user": user}
+
+
+@router.post("/auth/google")
+def google_login(payload: GoogleTokenPayload, x_league_id: str | None = None) -> dict[str, Any]:
+    requested_league_id = int(x_league_id) if x_league_id and x_league_id.isdigit() else None
+    user = authenticate_google(payload.credential, requested_league_id=requested_league_id)
     token = create_token(user)
     return {"token": token, "user": user}
 
