@@ -307,6 +307,113 @@ body.modal-open {
   margin-top: 14px;
 }
 
+.welcome-actions {
+  margin-top: 8px;
+}
+
+.welcome-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.welcome-choice-card {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.welcome-choice-card:hover,
+.welcome-choice-card:focus-visible {
+  transform: translateY(-2px);
+  border-color: rgba(92, 125, 255, 0.5);
+  box-shadow: 0 16px 36px rgba(8, 15, 40, 0.18);
+}
+
+.welcome-choice-card strong {
+  font-size: 18px;
+  font-family: "Space Grotesk", "Manrope", sans-serif;
+}
+
+.welcome-choice-card.is-disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.welcome-choice-card.is-disabled:hover,
+.welcome-choice-card.is-disabled:focus-visible {
+  transform: none;
+  border-color: var(--border);
+}
+
+.welcome-choice-eyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.welcome-choice-eyebrow.create {
+  background: rgba(91, 190, 127, 0.12);
+  color: #83e2a4;
+  border-color: rgba(131, 226, 164, 0.24);
+}
+
+.welcome-choice-eyebrow.join {
+  background: rgba(92, 125, 255, 0.14);
+  color: #9fb6ff;
+  border-color: rgba(159, 182, 255, 0.24);
+}
+
+.welcome-choice-cta {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.welcome-step-header,
+.welcome-meta-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.welcome-inline-action {
+  min-height: 40px;
+}
+
+.welcome-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.welcome-card {
+  gap: 14px;
+}
+
 .info-card {
   border: 1px solid var(--border);
   border-radius: 18px;

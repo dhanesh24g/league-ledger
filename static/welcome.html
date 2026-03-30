@@ -10,6 +10,9 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
     rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/favicon.png">
   <link rel="stylesheet" href="/static/styles.css">
   <script>
     (function () {
@@ -53,10 +56,25 @@
   </header>
 
   <main class="shell-main">
-    <section class="panel active auth-panel">
-      <h2 id="welcome-title">Loading your league access...</h2>
-      <p id="welcome-copy" class="muted">Checking whether you should create the league or request to join it.</p>
-      <div id="welcome-actions" class="stack"></div>
+    <section class="panel active auth-panel auth-panel-premium">
+      <div class="auth-header">
+        <span class="auth-eyebrow">League Access</span>
+        <h2 id="welcome-title">Loading your league access...</h2>
+        <p id="welcome-copy" class="muted">Checking whether you should create the league or request to join it.</p>
+      </div>
+
+      <div class="auth-subtle-grid">
+        <div class="auth-note-card">
+          <strong>Clean Onboarding</strong>
+          <span class="muted small">Create the first league or request access without sharing credentials.</span>
+        </div>
+        <div class="auth-note-card">
+          <strong>Role-Based Access</strong>
+          <span class="muted small">League admins manage setup and approvals. Members enter once approved.</span>
+        </div>
+      </div>
+
+      <div id="welcome-actions" class="stack welcome-actions"></div>
       <div id="join-requests-panel" class="stack hidden"></div>
     </section>
   </main>
