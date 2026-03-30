@@ -58,8 +58,8 @@
 body {
   margin: 0;
   font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
-  font-size: 15px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--text);
   background:
     radial-gradient(circle at 20% 20%, var(--bg-radial-1), transparent 35%),
@@ -206,14 +206,14 @@ body.modal-open {
 }
 
 .brand-name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
   letter-spacing: 0.02em;
 }
 
 .app-name {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
   font-weight: 500;
 }
@@ -674,14 +674,14 @@ body.modal-open {
 .shell-header {
   max-width: 1220px;
   margin: 0 auto;
-  padding: 20px 24px 12px;
+  padding: 18px 24px 10px;
 }
 
 .shell-header p {
   margin: 0;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .shell-main {
@@ -704,8 +704,8 @@ body.modal-open {
   color: var(--text);
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
   border-radius: 12px;
-  padding: 13px 24px 13px 20px;
-  font-size: 16px;
+  padding: 12px 22px 12px 18px;
+  font-size: 14px;
   cursor: pointer;
   font-weight: 700;
   position: relative;
@@ -776,7 +776,7 @@ body.modal-open {
   background: linear-gradient(180deg, var(--panel), var(--panel-2));
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 24px;
+  padding: 22px;
 }
 
 .panel.active {
@@ -785,16 +785,20 @@ body.modal-open {
 
 h2 {
   margin-top: 0;
-  font-size: 30px;
-  font-family: "Space Grotesk", "Manrope", sans-serif;
-  letter-spacing: 0.01em;
+  font-size: 24px;
+  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
 }
 
 h3 {
   margin: 0;
-  font-size: 19px;
-  font-family: "Space Grotesk", "Manrope", sans-serif;
-  letter-spacing: 0.01em;
+  font-size: 17px;
+  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .grid {
@@ -953,9 +957,10 @@ h3 {
 
 label {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   color: var(--muted);
-  font-size: 16px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 input,
@@ -966,7 +971,7 @@ textarea {
   padding: 0.875rem;
   border: 1px solid var(--input-border);
   border-radius: 12px;
-  font-size: 15px;
+  font-size: 14px;
   background: var(--input-bg);
   color: var(--text);
   transition: all 0.3s ease;
@@ -995,8 +1000,8 @@ button,
   padding: 0.875rem 1.5rem;
   border: none;
   border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.3s ease;
   backdrop-filter: blur(10px);
@@ -1213,9 +1218,10 @@ button.ghost:hover,
 
 .summary-chip strong,
 .match-summary-card strong {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
-  font-family: "Space Grotesk", "Manrope", sans-serif;
+  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  font-weight: 800;
 }
 
 .spotlight-card {
@@ -1248,13 +1254,14 @@ button.ghost:hover,
 }
 
 .spotlight-card strong {
-  font-size: 20px;
-  font-family: "Space Grotesk", "Manrope", sans-serif;
+  font-size: 17px;
+  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  font-weight: 800;
 }
 
 .spotlight-metric {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -1333,8 +1340,9 @@ button.ghost:hover,
 .player-spotlight h3,
 .player-breakdown-card h4 {
   margin: 0;
-  font-family: "Space Grotesk", "Manrope", sans-serif;
-  font-size: 20px;
+  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .match-spotlight-meta,
@@ -1446,8 +1454,9 @@ button.ghost:hover,
 
 .chart-header h3 {
   margin: 0 0 6px;
-  font-family: "Space Grotesk", "Manrope", sans-serif;
-  font-size: 20px;
+  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .chart-legend {
@@ -1560,8 +1569,9 @@ button.ghost:hover,
 }
 
 .player-metric-card strong {
-  font-size: 24px;
+  font-size: 20px;
   line-height: 1;
+  font-weight: 800;
 }
 
 .accent-gold {
@@ -1653,7 +1663,7 @@ button.ghost:hover,
 
 .dashboard-modal-head h2 {
   margin: 0 0 6px;
-  font-size: 24px;
+  font-size: 20px;
 }
 
 .dashboard-modal-body {
@@ -1748,7 +1758,8 @@ button.ghost:hover,
 .rank-card h4 {
   margin: 0 0 10px;
   color: var(--text);
-  font-size: 21px;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .rank-select-row {
@@ -1768,7 +1779,7 @@ button.ghost:hover,
 }
 
 .small {
-  font-size: 15px;
+  font-size: 12px;
 }
 
 .flow-controls {
@@ -1791,7 +1802,7 @@ table {
 th,
 td {
   padding: 12px 10px;
-  font-size: 16px;
+  font-size: 14px;
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
@@ -1799,7 +1810,8 @@ td {
 th {
   color: var(--muted);
   text-transform: uppercase;
-  font-size: 13px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
 }
 
 .pos {

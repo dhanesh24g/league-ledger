@@ -92,6 +92,7 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
     return {
         "league": {
             "id": int(league["id"]),
+            "sport": league["sport"] or "Cricket",
             "name": league["name"],
             "tournament": league["tournament"],
             "entry_fee": league["entry_fee"],
@@ -124,10 +125,11 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
         if create_new or not payload.league_id:
             cursor = c.execute(
                 """
-                INSERT INTO league (name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json, invite_code)
-                VALUES (?, ?, ?, ?, ?, ?, ?, '')
+                INSERT INTO league (sport, name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json, invite_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, '')
                 """,
                 (
+                    payload.sport.strip(),
                     payload.name.strip(),
                     payload.tournament.strip(),
                     payload.entry_fee,
@@ -164,10 +166,11 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
         c.execute(
             """
             UPDATE league
-            SET name = ?, tournament = ?, entry_fee = ?, active_player_count = ?, default_winner_count = ?, payouts_json = ?
+            SET sport = ?, name = ?, tournament = ?, entry_fee = ?, active_player_count = ?, default_winner_count = ?, payouts_json = ?
             WHERE id = ?
             """,
             (
+                payload.sport.strip(),
                 payload.name.strip(),
                 payload.tournament.strip(),
                 payload.entry_fee,

@@ -268,6 +268,7 @@ def decode_token(token: str) -> dict[str, Any]:
 def _shape_league_summary(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": int(row["id"]),
+        "sport": str(row.get("sport") or "Cricket"),
         "name": str(row["name"]),
         "tournament": str(row["tournament"]),
         "invite_code": str(row["invite_code"]),

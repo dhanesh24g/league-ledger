@@ -70,6 +70,7 @@ def get_state() -> dict[str, Any]:
 
     return {
         "league": {
+            "sport": league.get("sport") or "Cricket",
             "name": league["name"],
             "tournament": league["tournament"],
             "entry_fee": league["entry_fee"],
@@ -99,6 +100,7 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any]) -> dict[str, str
     payouts_json = json.dumps(payload.payouts)
     
     values = {
+        "sport": payload.sport.strip(),
         "name": payload.name.strip(),
         "tournament": payload.tournament.strip(),
         "entry_fee": payload.entry_fee,
