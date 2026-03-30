@@ -5,16 +5,20 @@ import hashlib
 import hmac
 import json
 import os
+import random
 import secrets
 import time
 from typing import Any
 
+import httpx
 from fastapi import Depends, Header, HTTPException
 
 from .database import DatabaseManager, get_supabase_client
 
-TOKEN_TTL_SECONDS = 60 * 60 * 24
+TOKEN_TTL_SECONDS = 60 * 60 * 4
 PBKDF2_ITERATIONS = 120_000
+USER_ID_CACHE_TTL_SECONDS = 60
+_USER_ID_CACHE: dict[str, Any] = {"loaded_at": 0.0, "values": set()}
 
 
 def _secret() -> bytes:
@@ -35,6 +39,10 @@ def _normalize_email(value: str) -> str:
 
 def _normalize_invite_code(value: str) -> str:
     return "".join(char for char in value.strip().lower() if char.isalnum() or char == "-")
+
+
+def _google_client_id() -> str:
+    return os.getenv("GOOGLE_CLIENT_ID", "").strip()
 
 
 def hash_password(password: str) -> str:
@@ -70,6 +78,143 @@ def verify_password(password: str, stored_hash: str) -> bool:
     )
     expected = base64.b64encode(derived).decode("utf-8")
     return hmac.compare_digest(expected, encoded_hash)
+
+
+def _reserved_usernames() -> set[str]:
+    return {
+        "admin",
+        "root",
+        "support",
+        "help",
+        "owner",
+        "league",
+        "system",
+        "me",
+        "api",
+        "login",
+        "signup",
+        "welcome",
+    }
+
+
+def _load_existing_user_ids(force_refresh: bool = False) -> set[str]:
+    now = time.time()
+    cached_values = _USER_ID_CACHE.get("values")
+    loaded_at = float(_USER_ID_CACHE.get("loaded_at") or 0.0)
+    if not force_refresh and isinstance(cached_values, set) and (now - loaded_at) < USER_ID_CACHE_TTL_SECONDS:
+        return set(cached_values)
+
+    user_ids: set[str] = set()
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        response = supabase.table("users").select("user_id").execute()
+        user_ids = {str(row.get("user_id") or "") for row in (response.data or []) if row.get("user_id")}
+    else:
+        with DatabaseManager() as connection:
+            rows = connection.execute("SELECT user_id FROM users").fetchall()
+        user_ids = {str(row["user_id"]) for row in rows if row["user_id"]}
+
+    _USER_ID_CACHE["values"] = set(user_ids)
+    _USER_ID_CACHE["loaded_at"] = now
+    return user_ids
+
+
+def _invalidate_user_id_cache() -> None:
+    _USER_ID_CACHE["loaded_at"] = 0.0
+    _USER_ID_CACHE["values"] = set()
+
+
+def _is_user_id_taken(normalized_user_id: str) -> bool:
+    return normalized_user_id in _load_existing_user_ids()
+
+
+def user_id_availability(user_id_value: str) -> dict[str, Any]:
+    normalized_user_id = _normalize_user_id(user_id_value)
+    if len(normalized_user_id) < 3:
+        return {"available": False, "normalized": normalized_user_id, "reason": "User ID must be at least 3 characters"}
+    if normalized_user_id in _reserved_usernames():
+        return {"available": False, "normalized": normalized_user_id, "reason": "That username is reserved"}
+    return {"available": not _is_user_id_taken(normalized_user_id), "normalized": normalized_user_id}
+
+
+def suggest_user_ids(first_name: str, last_name: str) -> dict[str, Any]:
+    first = _normalize_user_id(first_name)[:24]
+    last = _normalize_user_id(last_name)[:24]
+    if not first:
+        return {"suggestions": []}
+
+    existing_user_ids = _load_existing_user_ids()
+    reserved = _reserved_usernames()
+    base_seeds = [
+        f"{first}{last}" if last else first,
+        f"{first}.{last}" if last else f"{first}.league",
+        f"{first}_{last}" if last else f"{first}_play",
+        f"{first}{last[:1]}" if last else f"{first}x",
+        f"{first}-{last}" if last else f"{first}-fan",
+    ]
+
+    suggestions: list[str] = []
+    seen: set[str] = set()
+    rng = random.SystemRandom()
+
+    for seed in base_seeds:
+        candidate_base = _normalize_user_id(seed)[:28]
+        if len(candidate_base) < 3 or candidate_base in reserved:
+            continue
+
+        attempts = 0
+        while attempts < 24 and len(suggestions) < 4:
+            digit_count = 3 if rng.random() < 0.5 else 4
+            suffix = "".join(rng.choice("0123456789") for _ in range(digit_count))
+            candidate = _normalize_user_id(f"{candidate_base}{suffix}")[:32]
+            attempts += 1
+            if len(candidate) < 6 or candidate in seen or candidate in reserved or candidate in existing_user_ids:
+                continue
+            seen.add(candidate)
+            suggestions.append(candidate)
+            existing_user_ids.add(candidate)
+
+        if len(suggestions) >= 4:
+            break
+
+    return {"suggestions": suggestions[:4]}
+
+
+def _random_password_seed() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def verify_google_token(credential: str) -> dict[str, Any]:
+    client_id = _google_client_id()
+    if not client_id:
+        raise HTTPException(status_code=503, detail="Google sign-in is not configured")
+
+    try:
+        response = httpx.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": credential},
+            timeout=10.0,
+        )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Failed to verify Google identity") from exc
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=401, detail="Invalid Google credential")
+
+    payload = response.json()
+    if payload.get("aud") != client_id:
+        raise HTTPException(status_code=401, detail="Google credential audience mismatch")
+    if payload.get("email_verified") not in {"true", True}:
+        raise HTTPException(status_code=401, detail="Google account email is not verified")
+
+    return {
+        "google_sub": str(payload.get("sub") or ""),
+        "email": _normalize_email(str(payload.get("email") or "")),
+        "first_name": str(payload.get("given_name") or "").strip(),
+        "last_name": str(payload.get("family_name") or "").strip(),
+        "full_name": str(payload.get("name") or "").strip(),
+    }
 
 
 def _encode(payload: dict[str, Any]) -> str:
@@ -297,16 +442,38 @@ def get_user_profile_by_id(user_id_value: int, requested_league_id: int | None =
 
 
 def auth_config() -> dict[str, Any]:
-    return {"enabled": _auth_enabled(), "signup_enabled": True}
+    return {
+        "enabled": _auth_enabled(),
+        "signup_enabled": True,
+        "google_enabled": bool(_google_client_id()),
+        "google_client_id": _google_client_id() or None,
+        "session_ttl_hours": TOKEN_TTL_SECONDS // 3600,
+    }
 
 
-def signup_user(first_name: str, last_name: str, user_id_value: str, email: str, password: str) -> dict[str, Any]:
+def signup_user(
+    first_name: str,
+    last_name: str,
+    user_id_value: str,
+    email: str,
+    password: str | None,
+    google_token: str | None = None,
+) -> dict[str, Any]:
     normalized_user_id = _normalize_user_id(user_id_value)
-    normalized_email = _normalize_email(email)
-    password_hash = hash_password(password)
+    availability = user_id_availability(normalized_user_id)
+    if not availability["available"]:
+        raise HTTPException(status_code=409, detail=availability.get("reason") or "User ID already exists")
+
+    google_profile = verify_google_token(google_token) if google_token else None
+    normalized_email = google_profile["email"] if google_profile else _normalize_email(email)
+    password_hash = hash_password(password or _random_password_seed())
+    effective_first_name = google_profile["first_name"] if google_profile and google_profile["first_name"] else first_name.strip()
+    effective_last_name = google_profile["last_name"] if google_profile and google_profile["last_name"] else last_name.strip()
 
     if len(normalized_user_id) < 3:
         raise HTTPException(status_code=400, detail="User ID must be at least 3 characters")
+    if not google_profile and not password:
+        raise HTTPException(status_code=400, detail="Password is required unless you continue with Google")
 
     if get_supabase_client():
         supabase = get_supabase_client()
@@ -314,10 +481,11 @@ def signup_user(first_name: str, last_name: str, user_id_value: str, email: str,
         try:
             supabase.table("users").insert(
                 {
-                    "first_name": first_name.strip(),
-                    "last_name": last_name.strip(),
+                    "first_name": effective_first_name,
+                    "last_name": effective_last_name,
                     "user_id": normalized_user_id,
                     "email": normalized_email,
+                    "google_sub": google_profile["google_sub"] if google_profile else None,
                     "password_hash": password_hash,
                 }
             ).execute()
@@ -326,6 +494,7 @@ def signup_user(first_name: str, last_name: str, user_id_value: str, email: str,
             if "duplicate" in detail or "unique" in detail:
                 raise HTTPException(status_code=409, detail="User ID or email already exists") from exc
             raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
+        _invalidate_user_id_cache()
         user = get_user_profile_by_user_id(normalized_user_id)
         if not user:
             raise HTTPException(status_code=500, detail="Signup verification failed")
@@ -335,14 +504,15 @@ def signup_user(first_name: str, last_name: str, user_id_value: str, email: str,
         with DatabaseManager() as connection:
             connection.execute(
                 """
-                INSERT INTO users (first_name, last_name, user_id, email, password_hash)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO users (first_name, last_name, user_id, email, google_sub, password_hash)
+                VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    first_name.strip(),
-                    last_name.strip(),
+                    effective_first_name,
+                    effective_last_name,
                     normalized_user_id,
                     normalized_email,
+                    google_profile["google_sub"] if google_profile else None,
                     password_hash,
                 ),
             )
@@ -352,6 +522,7 @@ def signup_user(first_name: str, last_name: str, user_id_value: str, email: str,
             raise HTTPException(status_code=409, detail="User ID or email already exists") from exc
         raise
 
+    _invalidate_user_id_cache()
     user = get_user_profile_by_user_id(normalized_user_id)
     if not user:
         raise HTTPException(status_code=500, detail="Signup verification failed")
@@ -382,6 +553,40 @@ def authenticate(user_id_value: str, password: str, requested_league_id: int | N
         if not verify_password(password, str(user["password_hash"])):
             return None
     return get_user_profile_by_id(int(user["id"]), requested_league_id=requested_league_id)
+
+
+def authenticate_google(credential: str, requested_league_id: int | None = None) -> dict[str, Any]:
+    google_profile = verify_google_token(credential)
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        response = (
+            supabase.table("users")
+            .select("*")
+            .or_(f"google_sub.eq.{google_profile['google_sub']},email.eq.{google_profile['email']}")
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=404, detail="No account found for this Google identity. Finish signup first.")
+        user = response.data[0]
+        if not user.get("google_sub"):
+            supabase.table("users").update({"google_sub": google_profile["google_sub"]}).eq("id", int(user["id"])).execute()
+        return get_user_profile_by_id(int(user["id"]), requested_league_id=requested_league_id) or {}
+
+    with DatabaseManager() as connection:
+        user = connection.execute(
+            "SELECT * FROM users WHERE google_sub = ? OR email = ? LIMIT 1",
+            (google_profile["google_sub"], google_profile["email"]),
+        ).fetchone()
+        if not user:
+            raise HTTPException(status_code=404, detail="No account found for this Google identity. Finish signup first.")
+        if not user["google_sub"]:
+            connection.execute("UPDATE users SET google_sub = ? WHERE id = ?", (google_profile["google_sub"], int(user["id"])))
+    profile = get_user_profile_by_id(int(user["id"]), requested_league_id=requested_league_id)
+    if not profile:
+        raise HTTPException(status_code=401, detail="User not found")
+    return profile
 
 
 def get_league_by_invite_code(invite_code: str) -> dict[str, Any]:
