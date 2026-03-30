@@ -42,7 +42,16 @@ def _normalize_invite_code(value: str) -> str:
 
 
 def _google_client_id() -> str:
-    return os.getenv("GOOGLE_CLIENT_ID", "").strip()
+    for env_name in (
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_OAUTH_CLIENT_ID",
+        "NEXT_PUBLIC_GOOGLE_CLIENT_ID",
+        "GOOGLE_WEB_CLIENT_ID",
+    ):
+        value = os.getenv(env_name, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def hash_password(password: str) -> str:
