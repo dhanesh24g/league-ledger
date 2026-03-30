@@ -51,7 +51,7 @@ function renderMembershipCards(user) {
             <button type="button" class="request-row welcome-membership-row" data-enter-league="${membership.league_id}">
               <div>
                 <strong>${membership.league.name}</strong>
-                <p class="muted">${membership.league.tournament} • ${membership.role}</p>
+                <p class="muted">${membership.league.sport || 'Cricket'} • ${membership.league.tournament} • ${membership.role}</p>
               </div>
               <span class="welcome-choice-cta">Open League</span>
             </button>
@@ -155,6 +155,7 @@ async function renderInvitePreview(user, inviteCode) {
         <h3>Already Joined</h3>
         <p class="muted">You already belong to this league as ${membership.role}. Jump straight in.</p>
         <div class="welcome-meta-row">
+          <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
           <span class="welcome-meta-chip">${league.tournament}</span>
           <span class="welcome-meta-chip">Role: ${membership.role}</span>
         </div>
@@ -174,6 +175,7 @@ async function renderInvitePreview(user, inviteCode) {
         <h3>Request Pending</h3>
         <p class="muted">Your request for ${league.name} is already waiting for admin approval.</p>
         <div class="welcome-meta-row">
+          <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
           <span class="welcome-meta-chip">${league.tournament}</span>
           <span class="welcome-meta-chip">Invite code: ${league.invite_code}</span>
         </div>
@@ -187,6 +189,7 @@ async function renderInvitePreview(user, inviteCode) {
         <h3>${league.name}</h3>
       <p class="muted">After approval, you will join this league with read access by default. Admins can later promote members inside the league if needed.</p>
       <div class="welcome-meta-row">
+        <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
         <span class="welcome-meta-chip">${league.tournament}</span>
         <span class="welcome-meta-chip">Invite code: ${league.invite_code}</span>
       </div>

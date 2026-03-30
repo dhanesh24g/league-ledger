@@ -172,6 +172,7 @@ async function renderMembers() {
 
 function getDraftPayload() {
   return {
+    sport: String(leagueForm.elements.sport.value || ''),
     name: String(leagueForm.elements.name.value || ''),
     tournament: String(leagueForm.elements.tournament.value || ''),
     entry_fee: String(leagueForm.elements.entry_fee.value || ''),
@@ -197,7 +198,8 @@ function setLeagueStateText(league) {
   const inviteLink = league.invite_link
     ? `${window.location.origin}${league.invite_link}`
     : '';
-  leagueState.textContent = `${league.name} | ${league.tournament} | Entry Fee: ${league.entry_fee} | Players: ${league.active_player_count || '-'} | Winners: ${league.default_winner_count}${inviteLink ? ` | Invite: ${inviteLink}` : ''}`;
+  const sportLabel = league.sport ? `${league.sport} | ` : '';
+  leagueState.textContent = `${sportLabel}${league.name} | ${league.tournament} | Entry Fee: ${league.entry_fee} | Players: ${league.active_player_count || '-'} | Winners: ${league.default_winner_count}${inviteLink ? ` | Invite: ${inviteLink}` : ''}`;
 }
 
 function renderLeague(league) {
@@ -206,6 +208,7 @@ function renderLeague(league) {
 
   suppressDraftSync = true;
 
+  leagueForm.elements.sport.value = source?.sport || 'Cricket';
   leagueForm.elements.name.value = source?.name || '';
   leagueForm.elements.tournament.value = source?.tournament || 'IPL';
   leagueForm.elements.entry_fee.value = source?.entry_fee || 100;
@@ -237,6 +240,7 @@ leagueForm.elements.active_player_count.addEventListener('input', () => {
 });
 
 leagueForm.elements.name.addEventListener('input', persistDraft);
+leagueForm.elements.sport.addEventListener('change', persistDraft);
 leagueForm.elements.tournament.addEventListener('input', persistDraft);
 
 leagueForm.addEventListener('submit', async (event) => {
@@ -267,6 +271,7 @@ leagueForm.addEventListener('submit', async (event) => {
       method: 'POST',
       body: JSON.stringify({
         league_id: isCreateMode ? null : Number(getActiveLeagueId() || 0) || null,
+        sport: String(formData.get('sport') || 'Cricket'),
         name: String(formData.get('name') || ''),
         tournament: String(formData.get('tournament') || ''),
         entry_fee: entryFee,

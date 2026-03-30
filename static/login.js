@@ -138,6 +138,16 @@ loginForm.addEventListener('submit', async (event) => {
   }
 });
 
+['user_id', 'password'].forEach((fieldName) => {
+  const field = loginForm.elements[fieldName];
+  if (!(field instanceof HTMLElement)) return;
+  field.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    loginForm.requestSubmit();
+  });
+});
+
 initLogin().catch((err) => {
   console.error('Login initialization failed:', err);
 });

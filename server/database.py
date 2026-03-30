@@ -123,6 +123,7 @@ def _create_sqlite_tables(connection: sqlite3.Connection) -> None:
         """
         CREATE TABLE IF NOT EXISTS league (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sport TEXT NOT NULL DEFAULT 'Cricket',
             name TEXT NOT NULL,
             tournament TEXT NOT NULL,
             entry_fee REAL NOT NULL,
@@ -581,6 +582,10 @@ def init_sqlite_db() -> None:
         except sqlite3.OperationalError:
             pass
         connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub ON users(google_sub)")
+        try:
+            connection.execute("ALTER TABLE league ADD COLUMN sport TEXT NOT NULL DEFAULT 'Cricket'")
+        except sqlite3.OperationalError:
+            pass
 
         if _has_legacy_tables(connection):
             _recover_interrupted_migration(connection)

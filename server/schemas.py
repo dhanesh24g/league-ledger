@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 class LeaguePayload(BaseModel):
     league_id: int | None = None
+    sport: str = Field(default="Cricket", min_length=2, max_length=80)
     name: str = Field(min_length=2, max_length=120)
     tournament: str = Field(default="IPL")
     entry_fee: float = Field(gt=0)
