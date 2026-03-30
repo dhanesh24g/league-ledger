@@ -1986,6 +1986,50 @@ th {
     font-size: 14px;
     padding: 10px 8px;
   }
+
+  .summary-chip,
+  .match-summary-card,
+  .spotlight-card,
+  .match-spotlight,
+  .player-spotlight,
+  .chart-row-card,
+  .player-metric-card,
+  .winner-rank-card,
+  .player-breakdown-card,
+  .zoom-board-row,
+  .welcome-card,
+  .welcome-choice-card,
+  .welcome-membership-row {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .summary-chip strong,
+  .match-summary-card strong {
+    font-size: 20px;
+  }
+
+  .spotlight-metric {
+    font-size: 24px;
+  }
+
+  .chart-player-avatar,
+  .player-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 14px;
+    font-size: 16px;
+  }
+
+  .rank-badge,
+  .zoom-board-rank {
+    font-size: 24px;
+  }
+
+  .chart-lane,
+  .rank-distribution-row {
+    gap: 8px;
+  }
 }
 
 .autocomplete {
@@ -2685,8 +2729,111 @@ th {
 }
 
 @media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .theme-toggle {
+    min-width: 108px;
+    height: 36px;
+    padding: 3px;
+    top: 0.65rem;
+    right: 0.65rem;
+  }
+
+  .theme-option {
+    gap: 4px;
+  }
+
+  .theme-option-glyph,
+  .theme-option-label {
+    font-size: 11px;
+  }
+
+  .theme-toggle::before {
+    top: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    height: calc(100% - 6px);
+  }
+
+  .shell-header {
+    padding: 14px 12px 6px;
+  }
+
+  .shell-header p {
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .shell-main {
+    padding: 8px 12px 22px;
+  }
+
+  .panel {
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  h2 {
+    font-size: 22px;
+    line-height: 1.05;
+  }
+
+  h3 {
+    font-size: 16px;
+  }
+
+  .stats-overview,
+  .stats-summary-strip,
+  .match-summary-strip,
+  .player-metric-grid,
+  .winner-rank-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-chip strong,
+  .match-summary-card strong,
+  .player-metric-card strong {
+    font-size: 18px;
+  }
+
+  .spotlight-card strong,
+  .match-spotlight h3,
+  .player-spotlight h3,
+  .player-breakdown-card h4,
+  .chart-header h3,
+  .dashboard-modal-head h2 {
+    font-size: 18px;
+  }
+
+  .spotlight-metric {
+    font-size: 22px;
+  }
+
+  .top-earner-row {
+    grid-template-columns: auto 1fr;
+  }
+
+  .top-earner-amount {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .chart-lane,
+  .rank-distribution-row,
+  .zoom-board-lane {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .chart-bar-track,
+  .rank-distribution-bar {
+    height: 12px;
+  }
+
   .auth-split-shell-wrap {
-    padding: 12px 10px;
+    padding: 58px 10px 12px;
   }
 
   .auth-split-shell {
@@ -2701,6 +2848,32 @@ th {
 
   .auth-split-header h1 {
     font-size: 24px;
+  }
+
+  .auth-split-header,
+  .auth-split-form,
+  .auth-signup-form,
+  .auth-split-footer-row {
+    max-width: 100%;
+  }
+
+  .auth-google-copy h2 {
+    font-size: 17px;
+  }
+
+  .auth-split-shell .auth-form input {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .auth-split-shell .auth-primary-button,
+  .auth-split-shell .auth-secondary-button,
+  .auth-split-shell .auth-provider-button {
+    width: 100%;
+  }
+
+  .auth-split-submit {
+    min-width: 0;
   }
 
   .auth-google-panel-art {
@@ -2720,5 +2893,57 @@ th {
   .auth-signup-name-row,
   .auth-signup-username-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .header-content {
+    padding: 0 12px;
+  }
+
+  .brand-name {
+    font-size: 14px;
+  }
+
+  .app-name,
+  .auth-split-kicker,
+  .spotlight-label,
+  th {
+    font-size: 11px;
+  }
+
+  .theme-toggle {
+    min-width: 96px;
+    height: 34px;
+  }
+
+  .theme-option-label {
+    font-size: 10px;
+  }
+
+  .summary-chip,
+  .match-summary-card,
+  .spotlight-card,
+  .match-spotlight,
+  .player-spotlight,
+  .chart-row-card,
+  .player-metric-card,
+  .winner-rank-card,
+  .player-breakdown-card,
+  .zoom-board-row,
+  .panel,
+  .dashboard-modal-panel {
+    padding: 12px;
+  }
+
+  .winner-pill,
+  .status-chip,
+  .player-tag,
+  .rank-tie,
+  .winner-amount,
+  .meta-chip,
+  .participant-pill {
+    font-size: 11px;
+    padding: 6px 9px;
   }
 }
