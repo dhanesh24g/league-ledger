@@ -19,6 +19,7 @@
       try {
         var token = localStorage.getItem("league-ledger-token");
         if (!token) {
+          localStorage.setItem("league-ledger-post-auth-path", window.location.pathname + window.location.search);
           window.location.replace("/login");
           return;
         }

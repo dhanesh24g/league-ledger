@@ -1,6 +1,9 @@
 import {
   callApi,
+  clearAuthStorage,
+  getActiveLeagueId,
   initThemeToggle,
+  setActiveLeagueId,
   showError,
 } from '/static/workflow-common.js';
 
@@ -259,12 +262,32 @@ function setupHeader() {
   });
 
   logoutBtn.addEventListener('click', () => {
-    localStorage.removeItem('league-ledger-token');
-    localStorage.removeItem('league-ledger-user-role');
-    localStorage.removeItem('league-ledger-username');
-    localStorage.removeItem('league-ledger-full-name');
+    clearAuthStorage();
     window.location.replace('/login');
   });
+}
+
+function ensureLeagueSwitcher(user) {
+  const headerActions = document.querySelector('.header-actions');
+  if (!headerActions || !Array.isArray(user.memberships) || !user.memberships.length) return;
+  const existing = document.getElementById('league-switcher');
+  if (existing) existing.remove();
+  const select = document.createElement('select');
+  select.id = 'league-switcher';
+  user.memberships.forEach((membership) => {
+    const option = document.createElement('option');
+    option.value = String(membership.league_id);
+    option.textContent = membership.league.name;
+    if (String(membership.league_id) === String(user.active_league_id || getActiveLeagueId() || '')) {
+      option.selected = true;
+    }
+    select.appendChild(option);
+  });
+  select.addEventListener('change', () => {
+    setActiveLeagueId(select.value);
+    window.location.reload();
+  });
+  headerActions.insertBefore(select, topNav);
 }
 
 function setupModal() {
@@ -519,11 +542,15 @@ async function init() {
     window.location.replace('/welcome');
     return;
   }
-  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'viewer';
+  if (user.active_league_id) {
+    setActiveLeagueId(user.active_league_id);
+  }
+  const effectiveRole = user.league_role === 'admin' ? 'admin' : 'read';
   localStorage.setItem('league-ledger-user-role', effectiveRole);
   localStorage.setItem('league-ledger-username', user.user_id);
   localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
   authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
+  ensureLeagueSwitcher(user);
   stats = await callApi('/api/stats');
   renderOverview();
   renderEarnersModal();

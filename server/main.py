@@ -35,6 +35,11 @@ def welcome_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "welcome.html")
 
 
+@app.get("/join/{invite_code}")
+def join_page(invite_code: str) -> FileResponse:
+    return FileResponse(STATIC_DIR / "welcome.html")
+
+
 @app.get("/players")
 def players_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "players.html")

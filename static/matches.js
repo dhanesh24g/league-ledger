@@ -21,7 +21,7 @@ const participantPicker = document.getElementById('participant-picker');
 const participantCount = document.getElementById('participant-count');
 const selectAllParticipantsBtn = document.getElementById('select-all-participants');
 
-let authUser = { username: '', role: 'viewer' };
+let authUser = { username: '', role: 'read' };
 let suppressDraftSync = false;
 let currentLeague = null;
 let currentPlayers = [];

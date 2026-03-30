@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 
 
 class LeaguePayload(BaseModel):
+    league_id: int | None = None
     name: str = Field(min_length=2, max_length=120)
     tournament: str = Field(default="IPL")
     entry_fee: float = Field(gt=0)
@@ -44,3 +45,12 @@ class SignupPayload(BaseModel):
     user_id: str = Field(min_length=3, max_length=80)
     email: str = Field(min_length=5, max_length=160)
     password: str = Field(min_length=8, max_length=200)
+
+
+class JoinRequestPayload(BaseModel):
+    league_id: int | None = None
+    invite_code: str | None = Field(default=None, max_length=160)
+
+
+class MembershipRolePayload(BaseModel):
+    role: str = Field(default="read", min_length=4, max_length=16)

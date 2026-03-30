@@ -202,6 +202,10 @@ body.modal-open {
   min-width: 180px;
 }
 
+#league-switcher {
+  min-width: 200px;
+}
+
 .auth-panel {
   max-width: 520px;
   margin: 8vh auto 0;
@@ -342,6 +346,15 @@ body.modal-open {
   font-family: "Space Grotesk", "Manrope", sans-serif;
 }
 
+.welcome-choice-card.welcome-choice-static {
+  cursor: default;
+}
+
+.welcome-choice-card.welcome-choice-static:hover,
+.welcome-choice-card.welcome-choice-static:focus-visible {
+  transform: none;
+}
+
 .welcome-choice-card.is-disabled {
   opacity: 0.7;
   cursor: not-allowed;
@@ -414,6 +427,18 @@ body.modal-open {
   gap: 14px;
 }
 
+.welcome-membership-row {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.welcome-membership-row:hover,
+.welcome-membership-row:focus-visible {
+  border-color: rgba(92, 125, 255, 0.4);
+}
+
 .info-card {
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -447,6 +472,17 @@ body.modal-open {
 
 .request-row p {
   margin: 4px 0 0;
+}
+
+.member-role-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.member-role-select {
+  min-width: 120px;
 }
 
 .shell-header {

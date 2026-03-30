@@ -143,7 +143,7 @@ def _create_sqlite_tables(connection: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
             league_id INTEGER NOT NULL,
-            role TEXT NOT NULL DEFAULT 'viewer',
+            role TEXT NOT NULL DEFAULT 'read',
             status TEXT NOT NULL DEFAULT 'active',
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, league_id),
@@ -222,6 +222,7 @@ def _copy_table(connection: sqlite3.Connection, source: str, target: str, column
 
 
 def _migrate_single_league_schema(connection: sqlite3.Connection) -> None:
+    connection.execute("PRAGMA foreign_keys = OFF")
     for table_name in [
         "league",
         "league_memberships",
@@ -385,15 +386,157 @@ def _migrate_single_league_schema(connection: sqlite3.Connection) -> None:
             )
 
     for table_name in [
-        "league_legacy",
-        "league_memberships_legacy",
-        "league_join_requests_legacy",
-        "players_legacy",
-        "matches_legacy",
         "winner_entries_legacy",
+        "matches_legacy",
+        "players_legacy",
+        "league_join_requests_legacy",
+        "league_memberships_legacy",
+        "league_legacy",
     ]:
         if _table_exists(connection, table_name):
             connection.execute(f"DROP TABLE {table_name}")
+    connection.execute("PRAGMA foreign_keys = ON")
+
+
+def _has_legacy_tables(connection: sqlite3.Connection) -> bool:
+    return any(
+        _table_exists(connection, table_name)
+        for table_name in [
+            "league_legacy",
+            "league_memberships_legacy",
+            "league_join_requests_legacy",
+            "players_legacy",
+            "matches_legacy",
+            "winner_entries_legacy",
+        ]
+    )
+
+
+def _recover_interrupted_migration(connection: sqlite3.Connection) -> None:
+    if not _has_legacy_tables(connection):
+        return
+
+    connection.execute("PRAGMA foreign_keys = OFF")
+    for table_name in ["winner_entries", "matches", "players", "league_join_requests", "league_memberships", "league"]:
+        if _table_exists(connection, table_name):
+            connection.execute(f"DROP TABLE {table_name}")
+
+    _create_sqlite_tables(connection)
+
+    existing_codes: set[str] = set()
+    if _table_exists(connection, "league_legacy"):
+        leagues = connection.execute(
+            """
+            SELECT id, name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json
+            FROM league_legacy
+            ORDER BY id ASC
+            """
+        ).fetchall()
+        for row in leagues:
+            invite_code = _build_invite_code(existing_codes, str(row["name"]), int(row["id"]))
+            connection.execute(
+                """
+                INSERT INTO league (
+                    id, name, tournament, entry_fee, active_player_count, owner_user_id, default_winner_count, payouts_json, invite_code
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(row["id"]),
+                    row["name"],
+                    row["tournament"],
+                    row["entry_fee"],
+                    row["active_player_count"],
+                    row["owner_user_id"],
+                    row["default_winner_count"],
+                    row["payouts_json"],
+                    invite_code,
+                ),
+            )
+
+    legacy_league_id = 1 if _table_exists(connection, "league_legacy") else None
+
+    if _table_exists(connection, "league_memberships_legacy") and legacy_league_id is not None:
+        rows = connection.execute("SELECT user_id, role, status, created_at FROM league_memberships_legacy").fetchall()
+        for row in rows:
+            connection.execute(
+                """
+                INSERT INTO league_memberships (user_id, league_id, role, status, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (row["user_id"], legacy_league_id, row["role"], row["status"], row["created_at"]),
+            )
+
+    if _table_exists(connection, "league_join_requests_legacy") and legacy_league_id is not None:
+        rows = connection.execute(
+            "SELECT user_id, status, created_at, reviewed_at FROM league_join_requests_legacy"
+        ).fetchall()
+        for row in rows:
+            connection.execute(
+                """
+                INSERT INTO league_join_requests (user_id, league_id, status, created_at, reviewed_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (row["user_id"], legacy_league_id, row["status"], row["created_at"], row["reviewed_at"]),
+            )
+
+    if _table_exists(connection, "players_legacy") and legacy_league_id is not None:
+        rows = connection.execute("SELECT id, name FROM players_legacy ORDER BY id ASC").fetchall()
+        for row in rows:
+            connection.execute(
+                "INSERT INTO players (id, league_id, name) VALUES (?, ?, ?)",
+                (int(row["id"]), legacy_league_id, row["name"]),
+            )
+
+    if _table_exists(connection, "matches_legacy") and legacy_league_id is not None:
+        rows = connection.execute(
+            """
+            SELECT id, title, match_date, winner_count, payouts_json, participant_ids_json, status
+            FROM matches_legacy
+            ORDER BY id ASC
+            """
+        ).fetchall()
+        for row in rows:
+            connection.execute(
+                """
+                INSERT INTO matches (
+                    id, league_id, title, match_date, winner_count, payouts_json, participant_ids_json, status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(row["id"]),
+                    legacy_league_id,
+                    row["title"],
+                    row["match_date"],
+                    row["winner_count"],
+                    row["payouts_json"],
+                    row["participant_ids_json"],
+                    row["status"],
+                ),
+            )
+
+    if _table_exists(connection, "winner_entries_legacy"):
+        rows = connection.execute(
+            "SELECT id, match_id, rank, player_id, amount FROM winner_entries_legacy ORDER BY id ASC"
+        ).fetchall()
+        for row in rows:
+            connection.execute(
+                "INSERT INTO winner_entries (id, match_id, rank, player_id, amount) VALUES (?, ?, ?, ?, ?)",
+                (int(row["id"]), int(row["match_id"]), int(row["rank"]), int(row["player_id"]), float(row["amount"])),
+            )
+
+    for table_name in [
+        "winner_entries_legacy",
+        "matches_legacy",
+        "players_legacy",
+        "league_join_requests_legacy",
+        "league_memberships_legacy",
+        "league_legacy",
+    ]:
+        if _table_exists(connection, table_name):
+            connection.execute(f"DROP TABLE {table_name}")
+    connection.execute("PRAGMA foreign_keys = ON")
 
 
 def _needs_multileague_migration(connection: sqlite3.Connection) -> bool:
@@ -433,7 +576,9 @@ def init_sqlite_db() -> None:
             """
         )
 
-        if _needs_multileague_migration(connection):
+        if _has_legacy_tables(connection):
+            _recover_interrupted_migration(connection)
+        elif _needs_multileague_migration(connection):
             _migrate_single_league_schema(connection)
         else:
             _create_sqlite_tables(connection)
