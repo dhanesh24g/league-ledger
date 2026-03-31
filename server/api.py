@@ -37,6 +37,8 @@ from .service import (
     get_stats,
     get_state,
     save_winners,
+)
+from .supabase_service import (
     upsert_league,
 )
 
