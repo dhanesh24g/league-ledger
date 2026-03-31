@@ -92,7 +92,7 @@ def get_state() -> dict[str, Any]:
     }
 
 
-def upsert_league(payload: LeaguePayload, user: dict[str, Any]) -> dict[str, str]:
+def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool = False) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
@@ -113,13 +113,13 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any]) -> dict[str, str
     try:
         existing_response = supabase.table("league").select("*").limit(1).execute()
 
-        if existing_response.data:
+        if existing_response.data and not create_new:
             if user["league_role"] != "admin":
                 raise HTTPException(status_code=403, detail="Admin role required")
             existing_owner = existing_response.data[0].get("owner_user_id")
             values["owner_user_id"] = existing_owner or int(user["id"])
             supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
-        else:
+        elif not existing_response.data or create_new:
             supabase.table("league").insert(values).execute()
             supabase.table("league_memberships").upsert({
                 "user_id": int(user["id"]),
