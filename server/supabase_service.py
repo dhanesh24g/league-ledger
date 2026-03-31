@@ -7,9 +7,14 @@ import math
 from typing import Any
 
 from fastapi import HTTPException
-from postgrest import APIError
 
-from .auth import get_supabase_client, parse_participant_ids, parse_payouts
+try:
+    from postgrest import APIError
+except ImportError:
+    APIError = None
+
+from .auth import get_supabase_client
+from .database import parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
 
