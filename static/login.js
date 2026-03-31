@@ -103,7 +103,12 @@ function initGoogleLogin() {
   });
 }
 
-async function initLogin() {
+async function init() {
+  const storedRole = localStorage.getItem('dhaneshlabs-login-role-hint');
+  if (storedRole === 'read') {
+    document.body.classList.add('login-read-mode');
+  }
+
   initThemeToggle();
   const token = localStorage.getItem('league-ledger-token');
   if (token) {

@@ -589,6 +589,7 @@ async function init() {
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
   document.body.classList.toggle('welcome-read-mode', user.league_role !== 'admin');
+  localStorage.setItem('dhaneshlabs-login-role-hint', user.league_role === 'admin' ? 'admin' : 'read');
   authRole.textContent = `${user.user_id}`;
   clearPostAuthPath();
 
