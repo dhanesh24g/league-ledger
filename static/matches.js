@@ -4,9 +4,11 @@ import {
   getMatchDraft,
   initWorkflowShell,
   navigateTo,
+  queueToast,
   setMatchDraft,
   setSelectedMatchId,
   showError,
+  showLoading,
 } from '/static/workflow-common.js';
 import { createPayoutController } from '/static/payouts.js';
 
@@ -159,8 +161,8 @@ function renderMatches(matches) {
     const payoutMode = match.payouts && Object.keys(match.payouts).length ? 'Custom payout' : 'Default payout';
     const participantNames = Array.isArray(match.participant_ids)
       ? currentPlayers
-          .filter((player) => match.participant_ids.includes(Number(player.id)))
-          .map((player) => player.name)
+        .filter((player) => match.participant_ids.includes(Number(player.id)))
+        .map((player) => player.name)
       : [];
 
     const feedItem = document.createElement('div');
@@ -229,7 +231,9 @@ matchForm.addEventListener('submit', async (event) => {
     return;
   }
 
+  let closeLoading = null;
   try {
+    closeLoading = showLoading('Saving match...');
     const participantIds = getSelectedParticipantIds();
     if (participantIds.length < 2) {
       showError('Select at least two participants for this match.');
@@ -279,9 +283,12 @@ matchForm.addEventListener('submit', async (event) => {
     if (state.matches.length) {
       setSelectedMatchId(state.matches[0].id);
     }
+    queueToast('Match saved successfully.');
     navigateTo('/winners');
   } catch (error) {
     showError(error);
+  } finally {
+    if (closeLoading) closeLoading();
   }
 });
 

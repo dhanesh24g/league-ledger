@@ -9,7 +9,9 @@ const STORAGE_KEYS = {
   postAuthPath: 'league-ledger-post-auth-path',
 };
 
-const WORKFLOW_ROUTES = ['/setup', '/players', '/matches', '/winners', '/ledger'];
+const FLASH_TOAST_KEY = 'league-ledger-flash-toast';
+
+const WORKFLOW_ROUTES = ['/setup', '/players', '/matches', '/winners', '/ledger', '/league-settings'];
 
 const DEFAULT_WORKFLOW_STATE = {
   currentPage: '/setup',
@@ -143,6 +145,23 @@ export function clearWinnerDraft(matchId) {
   });
 }
 
+function setAdminNavigationVisibility(isAdmin) {
+  const headerCenter = document.querySelector('.header-center');
+  if (headerCenter) {
+    headerCenter.classList.toggle('hidden', !isAdmin);
+  }
+
+  const stepNav = document.querySelector('.step-nav');
+  if (stepNav) {
+    stepNav.classList.toggle('hidden', !isAdmin);
+  }
+
+  document.querySelectorAll('[data-workflow-link]').forEach((link) => {
+    if (isAdmin) return;
+    link.classList.add('hidden');
+  });
+}
+
 export function getToken() {
   return localStorage.getItem(STORAGE_KEYS.token) || '';
 }
@@ -214,7 +233,95 @@ export async function callApi(url, options = {}) {
 
 export function showError(error) {
   const message = error instanceof Error ? error.message : String(error);
-  window.alert(message);
+  showToast(message, 'error');
+}
+
+function ensureToastHost() {
+  let host = document.getElementById('app-toast-host');
+  if (host) return host;
+
+  host = document.createElement('div');
+  host.id = 'app-toast-host';
+  host.className = 'toast-host';
+  document.body.appendChild(host);
+  return host;
+}
+
+function dismissToast(toast) {
+  if (!toast || !toast.parentElement) return;
+  toast.classList.remove('toast-visible');
+  window.setTimeout(() => {
+    if (toast.parentElement) toast.remove();
+  }, 180);
+}
+
+export function showToast(message, type = 'success', durationMs = 2800) {
+  const host = ensureToastHost();
+  const toast = document.createElement('div');
+  const safeType = ['success', 'error', 'info'].includes(type) ? type : 'info';
+  toast.className = `toast toast-${safeType}`;
+  toast.textContent = String(message || '').trim() || 'Action completed';
+  host.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('toast-visible');
+  });
+
+  window.setTimeout(() => {
+    dismissToast(toast);
+  }, Math.max(1200, Number(durationMs) || 2800));
+}
+
+export function showLoading(message = 'Saving...') {
+  const host = ensureToastHost();
+  const toast = document.createElement('div');
+  toast.className = 'toast toast-info toast-loading';
+
+  const spinner = document.createElement('span');
+  spinner.className = 'toast-spinner';
+  spinner.setAttribute('aria-hidden', 'true');
+
+  const label = document.createElement('span');
+  label.className = 'toast-label';
+  label.textContent = String(message || 'Saving...');
+
+  toast.appendChild(spinner);
+  toast.appendChild(label);
+  host.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.classList.add('toast-visible');
+  });
+
+  return () => dismissToast(toast);
+}
+
+export function showSuccess(message, durationMs = 2400) {
+  showToast(message, 'success', durationMs);
+}
+
+export function queueToast(message, type = 'success') {
+  try {
+    sessionStorage.setItem(
+      FLASH_TOAST_KEY,
+      JSON.stringify({ message: String(message || ''), type, ts: Date.now() })
+    );
+  } catch (_) {
+    // no-op
+  }
+}
+
+function flushQueuedToast() {
+  try {
+    const raw = sessionStorage.getItem(FLASH_TOAST_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(FLASH_TOAST_KEY);
+    const data = JSON.parse(raw);
+    if (!data?.message) return;
+    showToast(data.message, data.type || 'success');
+  } catch (_) {
+    // no-op
+  }
 }
 
 export function getSavedTheme() {
@@ -350,6 +457,7 @@ export async function initWorkflowShell(currentPath) {
   initTopNav(currentPath);
   initStepNav(currentPath);
   initLogout();
+  flushQueuedToast();
 
   if (!getToken()) {
     window.location.replace('/login');
@@ -369,6 +477,13 @@ export async function initWorkflowShell(currentPath) {
   const createMode = currentPath === '/setup' && new URLSearchParams(window.location.search).get('mode') === 'create';
   const canCreateFirstLeague = currentPath === '/setup' && createMode;
   if (user.membership_status !== 'active' && !canCreateFirstLeague) {
+    window.location.replace('/welcome');
+    return null;
+  }
+
+  const isAdmin = effectiveRole === 'admin';
+  setAdminNavigationVisibility(isAdmin);
+  if (!isAdmin && !canCreateFirstLeague) {
     window.location.replace('/welcome');
     return null;
   }

@@ -5,6 +5,8 @@ import {
   initWorkflowShell,
   setPlayerDraft,
   showError,
+  showLoading,
+  showSuccess,
 } from '/static/workflow-common.js';
 
 const playerForm = document.getElementById('player-form');
@@ -53,12 +55,17 @@ function renderPlayers(players) {
         return;
       }
 
+      let closeLoading = null;
       try {
+        closeLoading = showLoading('Removing player...');
         await callApi(`/api/players/${player.id}`, { method: 'DELETE' });
         const state = await callApi('/api/state');
         renderPlayers(state.players);
+        showSuccess('Player removed successfully.');
       } catch (error) {
         showError(error);
+      } finally {
+        if (closeLoading) closeLoading();
       }
     });
 
@@ -77,7 +84,9 @@ playerForm.addEventListener('submit', async (event) => {
     return;
   }
 
+  let closeLoading = null;
   try {
+    closeLoading = showLoading('Saving player...');
     const formData = new FormData(playerForm);
     await callApi('/api/players', {
       method: 'POST',
@@ -88,8 +97,11 @@ playerForm.addEventListener('submit', async (event) => {
     clearPlayerDraft();
     const state = await callApi('/api/state');
     renderPlayers(state.players);
+    showSuccess('Player saved successfully.');
   } catch (error) {
     showError(error);
+  } finally {
+    if (closeLoading) closeLoading();
   }
 });
 

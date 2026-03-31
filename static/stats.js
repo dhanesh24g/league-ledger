@@ -32,6 +32,10 @@ let stats = {
   players: [],
 };
 
+function setPlainHeaderMode() {
+  document.querySelector('.header-center')?.classList.add('hidden');
+}
+
 const RANK_VISUALS = {
   0: { icon: '🌧️', label: 'Washout / Refund' },
   1: { icon: '🥇', label: 'Champion' },
@@ -529,6 +533,12 @@ async function init() {
   localStorage.setItem('league-ledger-username', user.user_id);
   localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
   authRole.textContent = `${user.user_id}`;
+  if (effectiveRole !== 'admin') {
+    setPlainHeaderMode();
+    window.location.replace('/welcome');
+    return;
+  }
+
   stats = await callApi('/api/stats');
   renderOverview();
   renderEarnersModal();

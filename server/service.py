@@ -79,6 +79,9 @@ def _generate_invite_code(name: str, league_id: int) -> str:
 
 
 def get_state(user: dict[str, Any]) -> dict[str, Any]:
+    if user.get("league_role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_get_state(user)
 
@@ -344,6 +347,9 @@ def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
 
 
 def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
+    if user.get("league_role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_get_ledger(user)
 
@@ -391,6 +397,9 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_stats(user: dict[str, Any]) -> dict[str, Any]:
+    if user.get("league_role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
+
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_get_stats(user)
 

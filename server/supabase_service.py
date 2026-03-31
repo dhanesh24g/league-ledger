@@ -46,10 +46,13 @@ def _rank_label(rank: int, status: str, has_result: bool) -> str:
     return "Played" if has_result else status.title()
 
 
-def get_state() -> dict[str, Any]:
+def get_state(user: dict[str, Any]) -> dict[str, Any]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    if user.get("league_role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     try:
         # Get league data
@@ -323,10 +326,13 @@ def cancel_match(match_id: int) -> dict[str, str]:
     return {"message": "Match marked as canceled and refund distributed equally"}
 
 
-def get_ledger() -> dict[str, Any]:
+def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    if user.get("league_role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
     
     # Get league data
     league_response = supabase.table("league").select("*").limit(1).execute()
@@ -383,10 +389,13 @@ def get_ledger() -> dict[str, Any]:
     }
 
 
-def get_stats() -> dict[str, Any]:
+def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    if user.get("league_role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin role required")
 
     players_response = supabase.table("players").select("id, name").order("name").execute()
     players = players_response.data

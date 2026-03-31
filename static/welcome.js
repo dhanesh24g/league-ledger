@@ -45,6 +45,12 @@ function parseInviteInput(value) {
   return raw.replace(/^\/join\//, '').trim();
 }
 
+function getSelectedLeagueIdFromQuery() {
+  const value = new URLSearchParams(window.location.search).get('league_id');
+  if (!value) return '';
+  return String(value);
+}
+
 function renderMembershipCards(user) {
   if (!Array.isArray(user.memberships) || !user.memberships.length) {
     return '';
@@ -54,8 +60,8 @@ function renderMembershipCards(user) {
       <h3>Your Leagues</h3>
       <div class="request-list">
         ${user.memberships
-          .map(
-            (membership) => `
+      .map(
+        (membership) => `
             <button type="button" class="request-row welcome-membership-row" data-enter-league="${membership.league_id}">
               <div>
                 <strong>${membership.league.name}</strong>
@@ -64,8 +70,8 @@ function renderMembershipCards(user) {
               <span class="welcome-choice-cta">Open League</span>
             </button>
           `
-          )
-          .join('')}
+      )
+      .join('')}
       </div>
     </div>
   `;
@@ -78,10 +84,40 @@ function bindMembershipCards(user) {
       if (!leagueId) return;
       setActiveLeagueId(leagueId);
       const membership = user.memberships.find((item) => String(item.league_id) === String(leagueId));
-      const target = membership?.role === 'admin' ? '/setup' : getCurrentWorkflowPage() || '/stats';
+      const target = membership?.role === 'admin' ? '/setup' : `/welcome?league_id=${encodeURIComponent(String(leagueId))}`;
       window.location.href = target;
     });
   });
+}
+
+function renderReadLeagueContext(user, membership) {
+  const league = membership?.league;
+  if (!league) {
+    renderHome(user);
+    return;
+  }
+
+  welcomeTitle.textContent = `${league.name} · Read Access`;
+  welcomeCopy.textContent = 'Your access is intentionally limited to league overview on this home screen.';
+  welcomeActions.innerHTML = `
+    <div class="info-card welcome-card">
+      <h3>League Context Selected</h3>
+      <p class="muted">You are currently inside <strong>${league.name}</strong> with read-only access. Workflow and stats dashboards are restricted to admins.</p>
+      <div class="welcome-meta-row">
+        <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
+        <span class="welcome-meta-chip">${league.tournament || 'League'}</span>
+        <span class="welcome-meta-chip">Role: Read</span>
+      </div>
+      <button id="back-to-leagues" type="button" class="ghost welcome-inline-action">Back To My Leagues</button>
+    </div>
+  `;
+
+  document.getElementById('back-to-leagues')?.addEventListener('click', () => {
+    window.history.replaceState({}, '', '/welcome');
+    renderHome(user);
+  });
+
+  bindJoinModal(user);
 }
 
 async function renderJoinRequests(user) {
@@ -105,24 +141,21 @@ async function renderJoinRequests(user) {
         <h3>Pending Join Requests</h3>
         <div class="request-list">
           ${result.requests
-            .map(
-              (request) => `
+        .map(
+          (request) => `
             <div class="request-row">
               <div>
                 <strong>${request.first_name} ${request.last_name}</strong>
                 <p class="muted">${request.user_id_label} • ${request.email}</p>
               </div>
               <div class="member-role-actions">
-                <select class="member-role-select" data-request-role="${request.request_id}">
-                  <option value="read">Read</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <span class="status-chip">Will be approved as Read</span>
                 <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
               </div>
             </div>
           `
-            )
-            .join('')}
+        )
+        .join('')}
         </div>
       </div>
     `;
@@ -131,10 +164,9 @@ async function renderJoinRequests(user) {
       button.addEventListener('click', async () => {
         try {
           button.disabled = true;
-          const select = joinRequestsPanel.querySelector(`[data-request-role="${button.dataset.requestId}"]`);
           await callApi(`/api/league/requests/${button.dataset.requestId}/approve`, {
             method: 'POST',
-            body: JSON.stringify({ role: select?.value || 'read' }),
+            body: JSON.stringify({ role: 'read' }),
           });
           await renderJoinRequests(user);
         } catch (error) {
@@ -172,7 +204,9 @@ async function renderInvitePreview(user, inviteCode) {
     `;
     document.getElementById('enter-invite-league')?.addEventListener('click', () => {
       setActiveLeagueId(league.id);
-      window.location.href = membership.role === 'admin' ? '/setup' : '/stats';
+      window.location.href = membership.role === 'admin'
+        ? '/setup'
+        : `/welcome?league_id=${encodeURIComponent(String(league.id))}`;
     });
     return;
   }
@@ -344,7 +378,7 @@ async function init() {
 
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
-  authRole.textContent = `${user.full_name} • ${user.user_id}`;
+  authRole.textContent = `${user.user_id}`;
   clearPostAuthPath();
 
   logoutBtn.addEventListener('click', () => {
@@ -353,8 +387,21 @@ async function init() {
   });
 
   const inviteCode = getInviteCodeFromLocation();
+  const selectedLeagueId = getSelectedLeagueIdFromQuery();
   if (inviteCode) {
     await renderInvitePreview(user, inviteCode);
+  } else if (selectedLeagueId) {
+    const membership = (user.memberships || []).find((item) => String(item.league_id) === String(selectedLeagueId));
+    if (membership?.league_id) {
+      setActiveLeagueId(membership.league_id);
+      if (membership.role === 'admin') {
+        window.location.replace('/setup');
+        return;
+      }
+      renderReadLeagueContext(user, membership);
+    } else {
+      renderHome(user);
+    }
   } else {
     if (user.active_league_id) {
       setActiveLeagueId(user.active_league_id);

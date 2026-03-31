@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>League Ledger Stats</title>
+  <title>League Settings</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -47,15 +47,15 @@
         <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
         <div class="brand-text">
           <span class="brand-name">Dhanesh Labs</span>
-          <span class="app-name">Stats Dashboard</span>
+          <span class="app-name">League Settings</span>
         </div>
       </a>
 
       <div class="header-center">
         <select id="top-nav" aria-label="Quick navigation">
-          <option value="/stats">Stats Dashboard</option>
-          <option value="/setup">League Workflow</option>
           <option value="/league-settings">League Settings</option>
+          <option value="/setup">League Workflow</option>
+          <option value="/stats">Stats Dashboard</option>
         </select>
       </div>
 
@@ -81,54 +81,33 @@
     </div>
   </header>
 
+  <header class="shell-header">
+    <p>Centralized governance for membership access, role policy, and compliance controls.</p>
+  </header>
+
   <main class="shell-main">
     <section class="panel active">
-      <h2>League Pulse</h2>
-      <p class="muted">A quick read on the current leaders, money table, and how the season is unfolding.</p>
-      <div id="stats-summary-strip" class="stats-summary-strip"></div>
-      <div id="stats-overview" class="stats-overview"></div>
-    </section>
+      <h2>Governance Overview</h2>
+      <p class="muted">This section is admin-only and is the designated home for league access controls.</p>
 
-    <section class="panel active">
-      <h2>Match Winners</h2>
-      <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
-      <div class="inline-form">
-        <select id="match-filter"></select>
-      </div>
-      <div id="match-winners-card" class="feed"></div>
+      <div id="league-settings-summary" class="settings-grid"></div>
     </section>
 
     <section class="panel active" style="margin-top: 16px;">
-      <h2>League Ladder</h2>
-      <p class="muted">Compare the entire table side by side across wins and winnings.</p>
-      <div id="leaderboard-chart" class="leaderboard-chart"></div>
+      <h2>Member Access</h2>
+      <p class="muted">Current roles are visible for auditability. Inline role edits are intentionally disabled in this release.</p>
+      <div id="league-settings-members" class="feed"></div>
     </section>
 
     <section class="panel active" style="margin-top: 16px;">
-      <h2>Player Performance</h2>
-      <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
-      <div class="inline-form">
-        <select id="player-filter"></select>
+      <h2>Roadmap</h2>
+      <div class="feed-item">
+        <strong>Coming next:</strong> controlled role updates, approval workflows, and role-change activity history in one place.
       </div>
-      <div id="player-stats-card" class="feed"></div>
     </section>
   </main>
 
-  <div id="earners-modal" class="dashboard-modal hidden" aria-hidden="true">
-    <div class="dashboard-modal-backdrop" data-close-earners></div>
-    <section class="dashboard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="earners-modal-title">
-      <div class="dashboard-modal-head">
-        <div>
-          <h2 id="earners-modal-title">Earnings Deep Dive</h2>
-          <p class="muted">A zoomed-in look at every player and their winnings table.</p>
-        </div>
-        <button id="close-earners-modal" type="button" class="ghost">Close</button>
-      </div>
-      <div id="earners-modal-body" class="dashboard-modal-body"></div>
-    </section>
-  </div>
-
-  <script type="module" src="/static/stats.js"></script>
+  <script type="module" src="/static/league-settings.js"></script>
 </body>
 
 </html>

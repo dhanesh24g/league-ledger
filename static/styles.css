@@ -59,6 +59,78 @@
   display: none !important;
 }
 
+.toast-host {
+  position: fixed;
+  top: 84px;
+  right: 20px;
+  z-index: 3200;
+  display: grid;
+  gap: 10px;
+  width: min(420px, calc(100vw - 24px));
+}
+
+.toast {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  color: var(--text);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(10px);
+  padding: 11px 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.toast-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.toast-label {
+  min-width: 0;
+}
+
+.toast-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--accent-solid) 30%, transparent);
+  border-top-color: var(--accent-solid);
+  animation: toast-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes toast-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-success {
+  border-color: color-mix(in srgb, var(--good) 55%, var(--border));
+}
+
+.toast-error {
+  border-color: color-mix(in srgb, var(--bad) 55%, var(--border));
+}
+
+.toast-info {
+  border-color: color-mix(in srgb, var(--accent-solid) 55%, var(--border));
+}
+
 body {
   margin: 0;
   font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
@@ -270,6 +342,39 @@ body.modal-open {
 .auth-panel {
   max-width: 520px;
   margin: 8vh auto 0;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.settings-card {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.settings-card strong {
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.settings-member-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-member-meta {
+  display: grid;
+  justify-items: end;
+  gap: 4px;
 }
 
 .auth-panel-premium {
@@ -2050,6 +2155,12 @@ th {
 }
 
 @media (max-width: 760px) {
+  .toast-host {
+    top: 72px;
+    right: 12px;
+    width: calc(100vw - 24px);
+  }
+
   .header-actions {
     width: 100%;
     justify-content: flex-end;

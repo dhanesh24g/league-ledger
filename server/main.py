@@ -75,6 +75,11 @@ def stats_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "stats.html")
 
 
+@app.get("/league-settings")
+def league_settings_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "league-settings.html")
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     """Health check endpoint for debugging"""

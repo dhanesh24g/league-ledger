@@ -5,10 +5,13 @@ import {
   getWinnerDraft,
   initWorkflowShell,
   navigateTo,
+  queueToast,
   setCurrentWorkflowPage,
   setSelectedMatchId,
   setWinnerDraft,
   showError,
+  showLoading,
+  showSuccess,
 } from '/static/workflow-common.js';
 import { rankIcon } from '/static/payouts.js';
 
@@ -480,6 +483,8 @@ function renderWinnerForm(matchId) {
     const saved = await saveWinners(match, { showSuccess: true });
     if (!saved) return;
 
+    showSuccess('Winners saved successfully.');
+
     setWinnerFeedback(
       'success',
       `<strong>Saved beautifully.</strong> Winners for <strong>${match.title}</strong> are now recorded and ready for the ledger.`
@@ -489,7 +494,9 @@ function renderWinnerForm(matchId) {
 
 async function saveWinners(match, options = {}) {
   const { showSuccess = false } = options;
+  let closeLoading = null;
   try {
+    closeLoading = showLoading('Saving winners...');
     if (saveWinnersBtn) {
       saveWinnersBtn.disabled = true;
       saveWinnersBtn.textContent = 'Saving...';
@@ -516,6 +523,7 @@ async function saveWinners(match, options = {}) {
     showError(error);
     return false;
   } finally {
+    if (closeLoading) closeLoading();
     if (saveWinnersBtn) {
       saveWinnersBtn.disabled = false;
       saveWinnersBtn.textContent = 'Save Winners';
@@ -556,13 +564,18 @@ cancelMatchBtn.addEventListener('click', async () => {
   const proceed = window.confirm('Mark this match as washout/cancelled and refund equally to all players?');
   if (!proceed) return;
 
+  let closeLoading = null;
   try {
+    closeLoading = showLoading('Cancelling match...');
     await callApi(`/api/matches/${matchSelect.value}/cancel`, { method: 'POST' });
     clearWinnerDraft(matchSelect.value);
     winnersForm.innerHTML = '<p class="muted">Match marked as washout/cancelled. Refund distributed equally.</p>';
     clearWinnerFeedback();
+    showSuccess('Match cancelled and refund distributed.');
   } catch (error) {
     showError(error);
+  } finally {
+    if (closeLoading) closeLoading();
   }
 });
 
@@ -581,6 +594,7 @@ continueLedgerBtn.addEventListener('click', async () => {
   const saved = await saveWinners(match);
   if (!saved) return;
 
+  queueToast('Winners saved successfully.');
   setCurrentWorkflowPage('/ledger');
   navigateTo('/ledger');
 });
