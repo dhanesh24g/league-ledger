@@ -78,7 +78,11 @@ def _sync_active_members_to_players(supabase: Any, league_id: int) -> list[dict[
 
     missing_names = [name for name in desired_names if name not in existing_names]
     for player_name in missing_names:
-        supabase.table("players").insert({"league_id": league_id, "name": player_name}).execute()
+        try:
+            supabase.table("players").insert({"league_id": league_id, "name": player_name}).execute()
+        except Exception as exc:
+            logger.error(f"Failed to insert player {player_name} for league {league_id}: {str(exc)}", exc_info=True)
+            raise
 
     players_response = (
         supabase.table("players")
@@ -253,20 +257,23 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
                 raise HTTPException(status_code=403, detail="Admin role required")
             existing_owner = existing_response.data[0].get("owner_user_id")
             values["owner_user_id"] = existing_owner or int(user["id"])
-            supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
+            update_result = supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
+            if not update_result.data:
+                raise HTTPException(status_code=500, detail="League update failed")
             league_id = int(existing_response.data[0]["id"])
             invite_code = str(existing_response.data[0].get("invite_code") or "")
         else:
             insert_values = {**values, "invite_code": _generate_invite_code(payload.name)}
             inserted = supabase.table("league").insert(insert_values).execute()
-            if inserted.data:
-                league_id = int(inserted.data[0]["id"])
-                invite_code = str(inserted.data[0].get("invite_code") or "")
+            if not inserted.data:
+                raise HTTPException(status_code=500, detail="League insert failed")
+            league_id = int(inserted.data[0]["id"])
+            invite_code = str(inserted.data[0].get("invite_code") or "")
 
         if not league_id:
             raise HTTPException(status_code=500, detail="League save verification failed")
 
-        supabase.table("league_memberships").upsert(
+        membership_result = supabase.table("league_memberships").upsert(
             {
                 "user_id": int(user["id"]),
                 "league_id": league_id,
@@ -275,7 +282,12 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
             },
             on_conflict="user_id,league_id",
         ).execute()
-        supabase.table("league_join_requests").delete().eq("user_id", int(user["id"])).eq("league_id", league_id).execute()
+        if not membership_result.data:
+            logger.error(f"Failed to upsert membership for user {user['id']}, league {league_id}")
+
+        delete_result = supabase.table("league_join_requests").delete().eq("user_id", int(user["id"])).eq("league_id", league_id).execute()
+        logger.info(f"Deleted {len(delete_result.data or [])} join requests for user {user['id']}, league {league_id}")
+        
         _sync_active_members_to_players(supabase, league_id)
 
         if not invite_code:
@@ -285,7 +297,7 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
     except HTTPException:
         raise
     except Exception as exc:
-        logger.exception("Supabase league upsert failed")
+        logger.error(f"Supabase league upsert failed. Values: {values}. User: {user.get('id')}. Error: {str(exc)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
 
     return {"message": "League settings saved", "league_id": league_id, "invite_code": invite_code}
