@@ -12,6 +12,9 @@ from .auth import (
     create_join_request,
     create_token,
     current_user,
+    reject_join_request,
+    request_password_reset,
+    reset_password,
     get_league_by_invite_code,
     suggest_user_ids,
     user_id_availability,
@@ -24,7 +27,7 @@ from .auth import (
     signup_user,
     update_membership_role,
 )
-from .schemas import GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, SignupPayload, WinnersPayload
+from .schemas import ForgotPasswordPayload, GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, ResetPasswordPayload, SignupPayload, WinnersPayload
 from .service import (
     add_match,
     add_player,
@@ -141,6 +144,16 @@ def google_login(payload: GoogleTokenPayload, x_league_id: str | None = None) ->
     return {"token": token, "user": user}
 
 
+@router.post("/auth/forgot-password")
+def forgot_password(payload: ForgotPasswordPayload) -> dict[str, Any]:
+    return request_password_reset(payload.identifier)
+
+
+@router.post("/auth/reset-password")
+def password_reset(payload: ResetPasswordPayload) -> dict[str, str]:
+    return reset_password(payload.token, payload.new_password)
+
+
 @router.get("/auth/me")
 def auth_me(user: dict[str, Any] = Depends(current_user)) -> dict[str, Any]:
     return {"user": user}
@@ -168,6 +181,11 @@ def approve_request(
     user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, str]:
     return approve_join_request(request_id, user, role="read")
+
+
+@router.post("/league/requests/{request_id}/reject")
+def reject_request(request_id: int, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
+    return reject_join_request(request_id, user)
 
 
 @router.get("/league/members")

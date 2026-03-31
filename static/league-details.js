@@ -5,6 +5,7 @@ import {
   setActiveLeagueId,
   showError,
 } from '/static/workflow-common.js';
+import { initNotifications } from '/static/notifications.js';
 
 const topNav = document.getElementById('top-nav');
 const authRole = document.getElementById('auth-role');
@@ -201,6 +202,7 @@ function renderMatches(matches, statsMatches) {
 }
 
 async function init() {
+  initNotifications();
   initThemeToggle();
 
   const profile = await callApi('/api/auth/me');

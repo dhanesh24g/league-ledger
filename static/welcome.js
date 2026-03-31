@@ -7,11 +7,13 @@ import {
   initThemeToggle,
   setActiveLeagueId,
 } from '/static/workflow-common.js';
+import { initNotifications } from '/static/notifications.js';
 
 const welcomeTitle = document.getElementById('welcome-title');
 const welcomeCopy = document.getElementById('welcome-copy');
 const welcomeActions = document.getElementById('welcome-actions');
 const joinRequestsPanel = document.getElementById('join-requests-panel');
+const requestHistoryPanel = document.getElementById('request-history-panel');
 const authRole = document.getElementById('auth-role');
 const logoutBtn = document.getElementById('logout-btn');
 const joinModal = document.getElementById('join-modal');
@@ -292,6 +294,7 @@ async function renderJoinRequests(user) {
               <div class="member-role-actions">
                 <span class="status-chip">Will be approved as Read</span>
                 <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
+                <button type="button" class="ghost reject-request" data-request-id="${request.request_id}">Reject</button>
               </div>
             </div>
           `
@@ -316,9 +319,72 @@ async function renderJoinRequests(user) {
         }
       });
     });
+
+    joinRequestsPanel.querySelectorAll('.reject-request').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const confirmed = window.confirm('Reject this join request?');
+        if (!confirmed) return;
+        try {
+          button.disabled = true;
+          await callApi(`/api/league/requests/${button.dataset.requestId}/reject`, {
+            method: 'POST',
+          });
+          await renderJoinRequests(user);
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : String(error));
+          button.disabled = false;
+        }
+      });
+    });
   } catch (error) {
     joinRequestsPanel.classList.add('hidden');
   }
+}
+
+
+function formatRequestStatus(status) {
+  const normalized = String(status || 'pending').toLowerCase();
+  if (normalized === 'approved') return 'Approved';
+  if (normalized === 'rejected') return 'Rejected';
+  return 'Pending';
+}
+
+function renderRequestHistory(user) {
+  if (!requestHistoryPanel) return;
+  const rows = Array.isArray(user.request_history) ? user.request_history : [];
+
+  if (!rows.length) {
+    requestHistoryPanel.classList.add('hidden');
+    requestHistoryPanel.innerHTML = '';
+    return;
+  }
+
+  requestHistoryPanel.classList.remove('hidden');
+  requestHistoryPanel.innerHTML = `
+    <div class="info-card">
+      <h3>Your Request History</h3>
+      <div class="request-list">
+        ${rows.map((row) => {
+    const status = String(row.status || 'pending').toLowerCase();
+    const statusClass = status === 'approved' ? 'is-approved' : status === 'rejected' ? 'is-rejected' : '';
+    const reviewedLabel = row.reviewed_at ? `Reviewed: ${new Date(row.reviewed_at).toLocaleString()}` : 'Awaiting review';
+    return `
+            <div class="request-row">
+              <div>
+                <strong>${row.league?.name || 'League'}</strong>
+                <p class="muted">${row.league?.sport || 'Cricket'} • ${row.league?.tournament || ''}</p>
+                <p class="muted small">Requested: ${row.created_at ? new Date(row.created_at).toLocaleString() : '-'}</p>
+                <p class="muted small">${reviewedLabel}</p>
+              </div>
+              <div class="member-role-actions">
+                <span class="status-chip ${statusClass}">${formatRequestStatus(status)}</span>
+              </div>
+            </div>
+          `;
+  }).join('')}
+      </div>
+    </div>
+  `;
 }
 
 async function renderInvitePreview(user, inviteCode) {
@@ -359,8 +425,13 @@ async function renderInvitePreview(user, inviteCode) {
           <span class="welcome-meta-chip">${league.tournament}</span>
           <span class="welcome-meta-chip">Invite code: ${league.invite_code}</span>
         </div>
+        <button id="pending-back-home" type="button" class="ghost welcome-inline-action">Back</button>
       </div>
     `;
+    document.getElementById('pending-back-home')?.addEventListener('click', () => {
+      window.history.replaceState({}, '', '/welcome');
+      renderHome(user);
+    });
     return;
   }
 
@@ -508,6 +579,7 @@ function renderHome(user) {
 
 async function init() {
   initThemeToggle();
+  initNotifications();
 
   if (!getToken()) {
     window.location.replace('/login');
@@ -516,6 +588,8 @@ async function init() {
 
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
+  document.body.classList.toggle('welcome-read-mode', user.league_role !== 'admin');
+  localStorage.setItem('dhaneshlabs-login-role-hint', user.league_role === 'admin' ? 'admin' : 'read');
   authRole.textContent = `${user.user_id}`;
   clearPostAuthPath();
 
@@ -535,6 +609,7 @@ async function init() {
   }
 
   await renderJoinRequests(user);
+  renderRequestHistory(user);
 }
 
 init().catch((error) => {

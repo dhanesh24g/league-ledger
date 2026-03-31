@@ -65,6 +65,16 @@ def login_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "login.html")
 
 
+@app.get("/forgot-password")
+def forgot_password_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "forgot-password.html")
+
+
+@app.get("/reset-password")
+def reset_password_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "reset-password.html")
+
+
 @app.get("/signup")
 def signup_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "signup.html")

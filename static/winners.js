@@ -13,6 +13,7 @@ import {
   showLoading,
   showSuccess,
 } from '/static/workflow-common.js';
+import { initNotifications } from '/static/notifications.js';
 import { rankIcon } from '/static/payouts.js';
 
 const matchSelect = document.getElementById('match-select');
@@ -600,6 +601,7 @@ continueLedgerBtn.addEventListener('click', async () => {
 });
 
 async function init() {
+  initNotifications();
   authUser = await initWorkflowShell('/winners');
   if (!authUser) return;
   applyRoleBasedUI();

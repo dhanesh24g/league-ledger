@@ -166,6 +166,7 @@ async function renderJoinRequests() {
               <div class="member-role-actions">
                 <span class="status-chip">Will be approved as Read</span>
                 <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
+                <button type="button" class="ghost reject-request" data-request-id="${request.request_id}">Reject</button>
               </div>
             </div>
           `).join('')}
@@ -200,6 +201,30 @@ async function renderJoinRequests() {
 
           await renderJoinRequests();
           await renderMembers();
+        } catch (error) {
+          showError(error);
+          button.disabled = false;
+        } finally {
+          if (closeLoading) closeLoading();
+        }
+      });
+    });
+
+    joinRequestsZone.querySelectorAll('.reject-request').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const confirmed = window.confirm('Reject this join request?');
+        if (!confirmed) return;
+
+        let closeLoading = null;
+        try {
+          button.disabled = true;
+          closeLoading = showLoading('Rejecting request...');
+          await callApi(`/api/league/requests/${button.dataset.requestId}/reject`, {
+            method: 'POST',
+          });
+
+          showSuccess('Join request rejected.');
+          await renderJoinRequests();
         } catch (error) {
           showError(error);
           button.disabled = false;

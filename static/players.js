@@ -5,6 +5,7 @@ import {
   showLoading,
   showSuccess,
 } from '/static/workflow-common.js';
+import { initNotifications } from '/static/notifications.js';
 
 const playersList = document.getElementById('players-list');
 
@@ -61,6 +62,7 @@ function renderPlayers(members) {
 }
 
 async function init() {
+  initNotifications();
   authUser = await initWorkflowShell('/players');
   if (!authUser) return;
   const result = await callApi('/api/league/members');

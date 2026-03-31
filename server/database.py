@@ -212,6 +212,20 @@ def _create_sqlite_tables(connection: sqlite3.Connection) -> None:
         """
     )
 
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            expires_at TEXT NOT NULL,
+            used_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES users(id)
+        )
+        """
+    )
+
 
 def _copy_table(connection: sqlite3.Connection, source: str, target: str, columns: list[str]) -> None:
     if not _table_exists(connection, source):
