@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
@@ -18,6 +19,7 @@ from .database import DatabaseManager, get_supabase_client
 TOKEN_TTL_SECONDS = 60 * 60 * 4
 PBKDF2_ITERATIONS = 120_000
 USER_ID_CACHE_TTL_SECONDS = 60
+PASSWORD_RESET_TOKEN_TTL_SECONDS = 60 * 30
 _USER_ID_CACHE: dict[str, Any] = {"loaded_at": 0.0, "values": set()}
 
 
@@ -53,7 +55,7 @@ def _member_player_name(member: dict[str, Any]) -> str:
     return f"member-{int(member.get('user_id') or 0)}"
 
 
-def _ensure_member_player_entry(league_id: int, member: dict[str, Any]) -> None:
+def _ensure_member_player_entry(league_id: int, member: dict[str, Any], connection: Any | None = None) -> None:
     player_name = _member_player_name(member)
     if not player_name:
         return
@@ -74,7 +76,7 @@ def _ensure_member_player_entry(league_id: int, member: dict[str, Any]) -> None:
         supabase.table("players").insert({"league_id": int(league_id), "name": player_name}).execute()
         return
 
-    with DatabaseManager() as connection:
+    if connection is not None:
         existing = connection.execute(
             "SELECT id FROM players WHERE league_id = ? AND name = ? LIMIT 1",
             (int(league_id), player_name),
@@ -82,6 +84,19 @@ def _ensure_member_player_entry(league_id: int, member: dict[str, Any]) -> None:
         if existing:
             return
         connection.execute(
+            "INSERT INTO players (league_id, name) VALUES (?, ?)",
+            (int(league_id), player_name),
+        )
+        return
+
+    with DatabaseManager() as db_connection:
+        existing = db_connection.execute(
+            "SELECT id FROM players WHERE league_id = ? AND name = ? LIMIT 1",
+            (int(league_id), player_name),
+        ).fetchone()
+        if existing:
+            return
+        db_connection.execute(
             "INSERT INTO players (league_id, name) VALUES (?, ?)",
             (int(league_id), player_name),
         )
@@ -240,6 +255,160 @@ def _random_password_seed() -> str:
     return secrets.token_urlsafe(24)
 
 
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _utc_iso(value: datetime) -> str:
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def _hash_reset_token(token: str) -> str:
+    return hmac.new(_secret(), token.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _find_user_for_password_reset(identifier: str) -> dict[str, Any] | None:
+    normalized_identifier = str(identifier or "").strip()
+    if not normalized_identifier:
+        return None
+
+    normalized_email = _normalize_email(normalized_identifier)
+    normalized_user_id = _normalize_user_id(normalized_identifier)
+
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        response = (
+            supabase.table("users")
+            .select("id, user_id, email")
+            .or_(f"email.eq.{normalized_email},user_id.eq.{normalized_user_id}")
+            .limit(1)
+            .execute()
+        )
+        if not response.data:
+            return None
+        return response.data[0]
+
+    with DatabaseManager() as connection:
+        row = connection.execute(
+            "SELECT id, user_id, email FROM users WHERE email = ? OR user_id = ? LIMIT 1",
+            (normalized_email, normalized_user_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def request_password_reset(identifier: str) -> dict[str, Any]:
+    generic_message = "If an account exists for that email/username, reset instructions have been generated."
+    user = _find_user_for_password_reset(identifier)
+    if not user:
+        return {"message": generic_message}
+
+    token = secrets.token_urlsafe(32)
+    token_hash = _hash_reset_token(token)
+    expires_at = _utc_iso(_utc_now() + timedelta(seconds=PASSWORD_RESET_TOKEN_TTL_SECONDS))
+
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        supabase.table("password_reset_tokens").insert(
+            {
+                "user_id": int(user["id"]),
+                "token_hash": token_hash,
+                "expires_at": expires_at,
+            }
+        ).execute()
+    else:
+        with DatabaseManager() as connection:
+            connection.execute(
+                """
+                INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+                VALUES (?, ?, ?)
+                """,
+                (int(user["id"]), token_hash, expires_at),
+            )
+
+    reset_link = f"/reset-password?token={token}"
+    include_link = os.getenv("APP_ENV", "development").lower() != "production"
+    return {
+        "message": generic_message,
+        **({"reset_link": reset_link} if include_link else {}),
+    }
+
+
+def reset_password(token: str, new_password: str) -> dict[str, str]:
+    raw_token = str(token or "").strip()
+    if not raw_token:
+        raise HTTPException(status_code=400, detail="Reset token is required")
+    if len(str(new_password or "")) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    token_hash = _hash_reset_token(raw_token)
+    now_utc = _utc_now()
+
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        token_rows = (
+            supabase.table("password_reset_tokens")
+            .select("id, user_id, expires_at, used_at")
+            .eq("token_hash", token_hash)
+            .order("id", desc=True)
+            .limit(1)
+            .execute()
+            .data
+            or []
+        )
+        if not token_rows:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+        token_row = token_rows[0]
+        if token_row.get("used_at"):
+            raise HTTPException(status_code=400, detail="Reset token has already been used")
+        expires_raw = str(token_row.get("expires_at") or "")
+        try:
+            expires_at = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token") from exc
+        if expires_at < now_utc:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+        supabase.table("users").update({"password_hash": hash_password(new_password)}).eq("id", int(token_row["user_id"])).execute()
+        supabase.table("password_reset_tokens").update({"used_at": _utc_iso(now_utc)}).eq("id", int(token_row["id"])).execute()
+        return {"message": "Password reset successful"}
+
+    with DatabaseManager() as connection:
+        token_row = connection.execute(
+            """
+            SELECT id, user_id, expires_at, used_at
+            FROM password_reset_tokens
+            WHERE token_hash = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (token_hash,),
+        ).fetchone()
+        if not token_row:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+        if token_row["used_at"]:
+            raise HTTPException(status_code=400, detail="Reset token has already been used")
+        try:
+            expires_at = datetime.fromisoformat(str(token_row["expires_at"]).replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token") from exc
+        if expires_at < now_utc:
+            raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+        connection.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), int(token_row["user_id"])),
+        )
+        connection.execute(
+            "UPDATE password_reset_tokens SET used_at = ? WHERE id = ?",
+            (_utc_iso(now_utc), int(token_row["id"])),
+        )
+    return {"message": "Password reset successful"}
+
+
 def verify_google_token(credential: str) -> dict[str, Any]:
     client_id = _google_client_id()
     if not client_id:
@@ -384,6 +553,7 @@ def _build_profile(
         )
 
     pending_payload = []
+    request_history_payload = []
     for row in pending_requests:
         league = leagues_by_id.get(int(row["league_id"]))
         if not league:
@@ -393,6 +563,21 @@ def _build_profile(
                 "request_id": int(row["id"]),
                 "league_id": int(row["league_id"]),
                 "status": str(row.get("status", "pending")).lower(),
+                "league": _shape_league_summary(league),
+            }
+        )
+
+    for row in requests:
+        league = leagues_by_id.get(int(row["league_id"]))
+        if not league:
+            continue
+        request_history_payload.append(
+            {
+                "request_id": int(row["id"]),
+                "league_id": int(row["league_id"]),
+                "status": str(row.get("status", "pending")).lower(),
+                "created_at": row.get("created_at"),
+                "reviewed_at": row.get("reviewed_at"),
                 "league": _shape_league_summary(league),
             }
         )
@@ -412,6 +597,7 @@ def _build_profile(
         "league": _shape_league_summary(current_league) if current_league else None,
         "memberships": memberships_payload,
         "pending_requests": pending_payload,
+        "request_history": request_history_payload,
         "available_leagues": [],
     }
 
@@ -862,8 +1048,51 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
                     "last_name": str(joined_user["last_name"]),
                     "user_id_label": str(joined_user["user_id"]),
                 },
+                connection=connection,
             )
     return {"message": "Join request approved"}
+
+
+def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]:
+    if user["league_role"] != "admin" or not user.get("active_league_id"):
+        raise HTTPException(status_code=403, detail="Admin role required")
+
+    league_id = int(user["active_league_id"])
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        request_response = (
+            supabase.table("league_join_requests")
+            .select("id")
+            .eq("id", int(request_id))
+            .eq("league_id", league_id)
+            .eq("status", "pending")
+            .limit(1)
+            .execute()
+        )
+        if not request_response.data:
+            raise HTTPException(status_code=404, detail="Join request not found")
+
+        supabase.table("league_join_requests").update(
+            {
+                "status": "rejected",
+                "reviewed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        ).eq("id", int(request_id)).execute()
+        return {"message": "Join request rejected"}
+
+    with DatabaseManager() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE league_join_requests
+            SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND league_id = ? AND status = 'pending'
+            """,
+            (int(request_id), league_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Join request not found")
+    return {"message": "Join request rejected"}
 
 
 def list_league_members(user: dict[str, Any]) -> dict[str, Any]:

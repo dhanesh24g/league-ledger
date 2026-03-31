@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
+import secrets
 from typing import Any
 
 from fastapi import HTTPException
@@ -27,6 +29,13 @@ def _member_player_name(member: dict[str, Any]) -> str:
     last = str(member.get("last_name") or "").strip()
     full = f"{first} {last}".strip()
     return full or "member"
+
+
+def _generate_invite_code(name: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-") or "league"
+    token = secrets.token_hex(2)
+    code = f"{base}-{token}"
+    return code[:120]
 
 
 def _sync_active_members_to_players(supabase: Any, league_id: int) -> list[dict[str, Any]]:
@@ -188,6 +197,8 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
             "active_player_count": league["active_player_count"],
             "default_winner_count": league["default_winner_count"],
             "payouts": parse_payouts(league["payouts_json"]),
+            "invite_code": league.get("invite_code"),
+            "invite_link": f"/join/{league['invite_code']}" if league.get("invite_code") else None,
         }
         if league
         else None,
@@ -235,6 +246,7 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
             )
 
         league_id: int | None = None
+        invite_code: str | None = None
 
         if existing_response and existing_response.data and not create_new:
             if user["league_role"] != "admin":
@@ -243,10 +255,13 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
             values["owner_user_id"] = existing_owner or int(user["id"])
             supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
             league_id = int(existing_response.data[0]["id"])
+            invite_code = str(existing_response.data[0].get("invite_code") or "")
         else:
-            inserted = supabase.table("league").insert(values).execute()
+            insert_values = {**values, "invite_code": _generate_invite_code(payload.name)}
+            inserted = supabase.table("league").insert(insert_values).execute()
             if inserted.data:
                 league_id = int(inserted.data[0]["id"])
+                invite_code = str(inserted.data[0].get("invite_code") or "")
 
         if not league_id:
             raise HTTPException(status_code=500, detail="League save verification failed")
@@ -262,13 +277,18 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
         ).execute()
         supabase.table("league_join_requests").delete().eq("user_id", int(user["id"])).eq("league_id", league_id).execute()
         _sync_active_members_to_players(supabase, league_id)
+
+        if not invite_code:
+            lookup = supabase.table("league").select("invite_code").eq("id", league_id).limit(1).execute()
+            if lookup.data:
+                invite_code = str(lookup.data[0].get("invite_code") or "")
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Supabase league upsert failed")
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
-    
-    return {"message": "League settings saved"}
+
+    return {"message": "League settings saved", "league_id": league_id, "invite_code": invite_code}
 
 
 def add_player(payload: PlayerPayload, user: dict[str, Any]) -> dict[str, str]:

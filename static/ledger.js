@@ -3,6 +3,7 @@ import {
   initWorkflowShell,
   showError,
 } from '/static/workflow-common.js';
+import { initNotifications } from '/static/notifications.js';
 
 const ledgerBody = document.getElementById('ledger-body');
 const ledgerSummary = document.getElementById('ledger-summary');
@@ -29,6 +30,7 @@ function renderLedgerRows(data) {
 }
 
 async function init() {
+  initNotifications();
   const user = await initWorkflowShell('/ledger');
   if (!user) return;
 

@@ -56,6 +56,21 @@
       </div>
 
       <div class="header-actions">
+        <div class="notification-wrapper">
+          <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
+            <span class="notification-icon">🔔</span>
+            <span id="notification-badge" class="notification-badge hidden">0</span>
+          </button>
+          <div id="notification-dropdown" class="notification-dropdown hidden">
+            <div class="notification-header">
+              <h3>Notifications</h3>
+              <button id="clear-notifications" class="ghost small" type="button">Clear All</button>
+            </div>
+            <div id="notification-list" class="notification-list">
+              <p class="muted small">No new notifications</p>
+            </div>
+          </div>
+        </div>
         <span id="auth-role" class="auth-pill muted small"></span>
         <button id="logout-btn" type="button" class="ghost">Logout</button>
       </div>

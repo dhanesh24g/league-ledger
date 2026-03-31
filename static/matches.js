@@ -11,6 +11,7 @@ import {
   showLoading,
 } from '/static/workflow-common.js';
 import { createPayoutController } from '/static/payouts.js';
+import { initNotifications } from '/static/notifications.js';
 
 const matchForm = document.getElementById('match-form');
 const matchFeed = document.getElementById('match-feed');
@@ -324,6 +325,7 @@ matchForm.addEventListener('submit', async (event) => {
 });
 
 async function init() {
+  initNotifications();
   authUser = await initWorkflowShell('/matches');
   if (!authUser) return;
   applyRoleBasedUI();

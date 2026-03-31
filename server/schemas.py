@@ -60,3 +60,12 @@ class JoinRequestPayload(BaseModel):
 
 class MembershipRolePayload(BaseModel):
     role: str = Field(default="read", min_length=4, max_length=16)
+
+
+class ForgotPasswordPayload(BaseModel):
+    identifier: str = Field(min_length=3, max_length=160)
+
+
+class ResetPasswordPayload(BaseModel):
+    token: str = Field(min_length=16, max_length=512)
+    new_password: str = Field(min_length=8, max_length=200)
