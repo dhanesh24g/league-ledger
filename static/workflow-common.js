@@ -307,8 +307,6 @@ function initLogout() {
 }
 
 function ensureLeagueSwitcher(user) {
-  const headerActions = document.querySelector('.header-actions');
-  if (!headerActions) return;
   const memberships = Array.isArray(user.memberships) ? user.memberships : [];
   const existing = document.getElementById('league-switcher');
   if (existing) existing.remove();
@@ -334,10 +332,15 @@ function ensureLeagueSwitcher(user) {
   });
 
   const topNav = document.getElementById('top-nav');
-  if (topNav) {
-    headerActions.insertBefore(select, topNav);
-  } else {
-    headerActions.prepend(select);
+  const fallbackParent =
+    document.querySelector('.header-center') ||
+    document.querySelector('.header-actions') ||
+    document.querySelector('.header-content');
+
+  if (topNav && topNav.parentElement) {
+    topNav.parentElement.insertBefore(select, topNav);
+  } else if (fallbackParent) {
+    fallbackParent.insertBefore(select, fallbackParent.firstChild);
   }
 }
 
@@ -372,10 +375,10 @@ export async function initWorkflowShell(currentPath) {
 
   const authRole = document.getElementById('auth-role');
   if (authRole) {
-    authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
+    authRole.textContent = `${user.user_id}`;
   }
 
-  ensureLeagueSwitcher(user);
+  // League switcher intentionally disabled in header UI.
 
   return user;
 }

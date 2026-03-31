@@ -35,25 +35,46 @@
 
 <body>
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
-    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span class="theme-option-label">Light</span></span>
-    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span class="theme-option-label">Dark</span></span>
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span
+        class="theme-option-label">Light</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span
+        class="theme-option-label">Dark</span></span>
   </button>
 
   <header class="app-header">
     <div class="header-content">
-      <div class="brand">
+      <a href="/welcome" class="brand brand-home-link" aria-label="Go to home">
         <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
         <div class="brand-text">
           <span class="brand-name">Dhanesh Labs</span>
           <span class="app-name">Stats Dashboard</span>
         </div>
-      </div>
-      <div class="header-actions">
+      </a>
+
+      <div class="header-center">
         <select id="top-nav" aria-label="Quick navigation">
           <option value="/stats">Stats Dashboard</option>
-          <option value="/">League Workflow</option>
+          <option value="/setup">League Workflow</option>
         </select>
-        <span id="auth-role" class="muted small"></span>
+      </div>
+
+      <div class="header-actions">
+        <div class="notification-wrapper">
+          <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
+            <span class="notification-icon">🔔</span>
+            <span id="notification-badge" class="notification-badge hidden">0</span>
+          </button>
+          <div id="notification-dropdown" class="notification-dropdown hidden">
+            <div class="notification-header">
+              <h3>Notifications</h3>
+              <button id="clear-notifications" class="ghost small">Clear All</button>
+            </div>
+            <div id="notification-list" class="notification-list">
+              <p class="muted small">No new notifications</p>
+            </div>
+          </div>
+        </div>
+        <span id="auth-role" class="auth-pill muted small"></span>
         <button id="logout-btn" type="button" class="ghost">Logout</button>
       </div>
     </div>

@@ -14,6 +14,14 @@ const welcomeActions = document.getElementById('welcome-actions');
 const joinRequestsPanel = document.getElementById('join-requests-panel');
 const authRole = document.getElementById('auth-role');
 const logoutBtn = document.getElementById('logout-btn');
+const joinModal = document.getElementById('join-modal');
+const joinInviteInput = document.getElementById('join-invite-input');
+const submitJoinModalBtn = document.getElementById('submit-join-modal');
+const closeJoinModalBtn = document.getElementById('close-join-modal');
+const cancelJoinModalBtn = document.getElementById('cancel-join-modal');
+
+let previousFocus = null;
+let joinModalBindingsReady = false;
 
 function renderButtonLink(label, href, kind = 'primary') {
   return `<a class="button-link ${kind} auth-primary-button" href="${href}">${label}</a>`;
@@ -226,18 +234,79 @@ async function renderInvitePreview(user, inviteCode) {
   });
 }
 
-function renderJoinInput(user) {
-  return `
-    <div class="info-card welcome-card">
-      <h3>Join By Invite Link</h3>
-      <p class="muted">Paste a full invite link or just the invite code to request access to a league.</p>
-      <div class="stack">
-        <input id="invite-code-input" placeholder="Paste /join/... link or invite code">
-        <button id="preview-invite-btn" type="button" class="primary auth-primary-button">Open Invite</button>
-      </div>
-    </div>
-    ${renderMembershipCards(user)}
-  `;
+function closeJoinModal() {
+  if (!joinModal) return;
+  joinModal.classList.add('hidden');
+  joinModal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+  if (previousFocus instanceof HTMLElement) {
+    previousFocus.focus();
+  }
+}
+
+function openJoinModal() {
+  if (!joinModal) return;
+  previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  joinModal.classList.remove('hidden');
+  joinModal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
+  window.setTimeout(() => {
+    joinInviteInput?.focus();
+    joinInviteInput?.select();
+  }, 40);
+}
+
+function submitJoinModal(user) {
+  const inviteCode = parseInviteInput(joinInviteInput?.value || '');
+  if (!inviteCode) {
+    window.alert('Paste a valid invite link or invite code.');
+    joinInviteInput?.focus();
+    return;
+  }
+  closeJoinModal();
+  window.history.replaceState({}, '', `/join/${inviteCode}`);
+  renderInvitePreview(user, inviteCode).catch((error) => {
+    window.alert(error instanceof Error ? error.message : String(error));
+  });
+}
+
+function bindJoinModal(user) {
+  if (!joinModal) return;
+
+  document.querySelectorAll('[data-open-join-modal]').forEach((button) => {
+    button.addEventListener('click', () => openJoinModal());
+  });
+
+  if (joinModalBindingsReady) {
+    return;
+  }
+  joinModalBindingsReady = true;
+
+  closeJoinModalBtn?.addEventListener('click', () => closeJoinModal());
+  cancelJoinModalBtn?.addEventListener('click', () => closeJoinModal());
+  submitJoinModalBtn?.addEventListener('click', () => submitJoinModal(user));
+  joinInviteInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitJoinModal(user);
+    }
+  });
+
+  joinModal.querySelectorAll('[data-close-join-modal]').forEach((node) => {
+    node.addEventListener('click', () => closeJoinModal());
+  });
+
+  joinModal.addEventListener('click', (event) => {
+    if (event.target === joinModal) {
+      closeJoinModal();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !joinModal.classList.contains('hidden')) {
+      closeJoinModal();
+    }
+  });
 }
 
 function renderHome(user) {
@@ -251,30 +320,18 @@ function renderHome(user) {
         <p class="muted">Start a new league, become its admin, and share the invite link with your friends.</p>
         <span class="welcome-choice-cta">Launch setup</span>
       </a>
-      <div class="welcome-choice-card welcome-choice-static">
+      <button type="button" class="welcome-choice-card welcome-choice-join-card" data-open-join-modal>
         <span class="welcome-choice-eyebrow join">Join</span>
         <strong>Join With Invite Link</strong>
         <p class="muted">Use a league invite link or code. Requests stay tied to that specific league.</p>
-        <span class="welcome-choice-cta">Paste invite below</span>
-      </div>
+        <span class="welcome-choice-cta">Click for invite access</span>
+      </button>
     </div>
-    ${renderJoinInput(user)}
+    ${renderMembershipCards(user)}
   `;
 
-  document.getElementById('preview-invite-btn')?.addEventListener('click', () => {
-    const input = document.getElementById('invite-code-input');
-    const inviteCode = parseInviteInput(input?.value || '');
-    if (!inviteCode) {
-      window.alert('Paste a valid invite link or invite code.');
-      return;
-    }
-    window.history.replaceState({}, '', `/join/${inviteCode}`);
-    renderInvitePreview(user, inviteCode).catch((error) => {
-      window.alert(error instanceof Error ? error.message : String(error));
-    });
-  });
-
   bindMembershipCards(user);
+  bindJoinModal(user);
 }
 
 async function init() {

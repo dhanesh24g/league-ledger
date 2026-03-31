@@ -79,6 +79,29 @@
       <div id="join-requests-panel" class="stack hidden"></div>
     </section>
   </main>
+
+  <div id="join-modal" class="welcome-modal hidden" aria-hidden="true">
+    <div class="welcome-modal-backdrop" data-close-join-modal></div>
+    <section class="welcome-modal-panel" role="dialog" aria-modal="true" aria-labelledby="join-modal-title">
+      <div class="welcome-modal-handle" aria-hidden="true"></div>
+      <div class="welcome-modal-head">
+        <div>
+          <span class="welcome-choice-eyebrow join">Join</span>
+          <h3 id="join-modal-title">Join With Invite Link</h3>
+          <p class="muted">Paste a full invite link or just the invite code to preview the league before sending your request.</p>
+        </div>
+        <button id="close-join-modal" type="button" class="ghost welcome-modal-close" aria-label="Close join dialog">Close</button>
+      </div>
+      <div class="welcome-modal-body">
+        <label for="join-invite-input">Invite Link Or Code</label>
+        <input id="join-invite-input" type="text" placeholder="Paste /join/... link or invite code" autocomplete="off">
+        <div class="welcome-modal-actions">
+          <button id="submit-join-modal" type="button" class="primary auth-primary-button">Continue</button>
+          <button id="cancel-join-modal" type="button" class="ghost">Cancel</button>
+        </div>
+      </div>
+    </section>
+  </div>
   <script type="module" src="/static/welcome.js"></script>
 </body>
 

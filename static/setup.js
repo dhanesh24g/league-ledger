@@ -10,12 +10,13 @@ import {
   showError,
 } from '/static/workflow-common.js';
 import { createPayoutController } from '/static/payouts.js';
+import { initNotifications } from '/static/notifications.js';
 
 const leagueForm = document.getElementById('league-form');
 const leagueState = document.getElementById('league-state');
 const defaultPayouts = document.getElementById('default-payouts');
 const defaultPayoutTotal = document.getElementById('default-payout-total');
-const addDefaultPayoutBtn = document.getElementById('add-default-payout');
+const addDefaultPayoutBtn = document.getElementById('add-default-payout-bottom');
 const inviteZone = document.getElementById('invite-zone');
 const joinRequestsZone = document.getElementById('join-requests-zone');
 const membersZone = document.getElementById('members-zone');
@@ -181,6 +182,19 @@ async function renderJoinRequests() {
             method: 'POST',
             body: JSON.stringify({ role: select?.value || 'read' }),
           });
+
+          // Show notification to admin
+          if (window.notificationManager) {
+            const request = result.requests.find(r => r.request_id === parseInt(button.dataset.requestId));
+            if (request) {
+              window.notificationManager.addNotification({
+                title: 'Join Request Approved',
+                message: `${request.first_name} ${request.last_name} has been approved and added to the league`,
+                icon: '✅'
+              });
+            }
+          }
+
           await renderJoinRequests();
           await renderMembers();
         } catch (error) {
@@ -380,6 +394,9 @@ leagueForm.addEventListener('submit', async (event) => {
 });
 
 async function init() {
+  // Initialize notification system
+  initNotifications();
+
   authUser = await initWorkflowShell('/setup');
   if (!authUser) return;
   applyRoleBasedUI();
