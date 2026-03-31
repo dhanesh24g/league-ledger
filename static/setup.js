@@ -5,17 +5,21 @@ import {
   getActiveLeagueId,
   initWorkflowShell,
   navigateTo,
+  queueToast,
   setActiveLeagueId,
   setSetupDraft,
   showError,
+  showLoading,
+  showSuccess,
 } from '/static/workflow-common.js';
 import { createPayoutController } from '/static/payouts.js';
+import { initNotifications } from '/static/notifications.js';
 
 const leagueForm = document.getElementById('league-form');
 const leagueState = document.getElementById('league-state');
 const defaultPayouts = document.getElementById('default-payouts');
 const defaultPayoutTotal = document.getElementById('default-payout-total');
-const addDefaultPayoutBtn = document.getElementById('add-default-payout');
+const addDefaultPayoutBtn = document.getElementById('add-default-payout-bottom');
 const inviteZone = document.getElementById('invite-zone');
 const joinRequestsZone = document.getElementById('join-requests-zone');
 const membersZone = document.getElementById('members-zone');
@@ -160,10 +164,7 @@ async function renderJoinRequests() {
                 <p class="muted">${request.user_id_label} • ${request.email}</p>
               </div>
               <div class="member-role-actions">
-                <select class="member-role-select" data-request-role="${request.request_id}">
-                  <option value="read">Read</option>
-                  <option value="admin">Admin</option>
-                </select>
+                <span class="status-chip">Will be approved as Read</span>
                 <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
               </div>
             </div>
@@ -174,18 +175,36 @@ async function renderJoinRequests() {
 
     joinRequestsZone.querySelectorAll('.approve-request').forEach((button) => {
       button.addEventListener('click', async () => {
+        let closeLoading = null;
         try {
           button.disabled = true;
-          const select = joinRequestsZone.querySelector(`[data-request-role="${button.dataset.requestId}"]`);
+          closeLoading = showLoading('Approving request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/approve`, {
             method: 'POST',
-            body: JSON.stringify({ role: select?.value || 'read' }),
+            body: JSON.stringify({ role: 'read' }),
           });
+
+          // Show notification to admin
+          if (window.notificationManager) {
+            const request = result.requests.find(r => r.request_id === parseInt(button.dataset.requestId));
+            if (request) {
+              window.notificationManager.addNotification({
+                title: 'Join Request Approved',
+                message: `${request.first_name} ${request.last_name} has been approved and added to the league`,
+                icon: '✅'
+              });
+            }
+          }
+
+          showSuccess('Join request approved successfully.');
+
           await renderJoinRequests();
           await renderMembers();
         } catch (error) {
           showError(error);
           button.disabled = false;
+        } finally {
+          if (closeLoading) closeLoading();
         }
       });
     });
@@ -222,34 +241,13 @@ async function renderMembers() {
                 <p class="muted">${member.user_id_label} • ${member.email}</p>
               </div>
               <div class="member-role-actions">
-                <select class="member-role-select" data-member-role="${member.user_id}">
-                  <option value="read" ${member.role === 'read' ? 'selected' : ''}>Read</option>
-                  <option value="admin" ${member.role === 'admin' ? 'selected' : ''}>Admin</option>
-                </select>
-                <button type="button" class="ghost save-member-role" data-member-id="${member.user_id}">Save Role</button>
+                <span class="status-chip">Role: ${member.role === 'admin' ? 'Admin' : 'Read'}</span>
               </div>
             </div>
           `).join('')}
         </div>
       </div>
     `;
-
-    membersZone.querySelectorAll('.save-member-role').forEach((button) => {
-      button.addEventListener('click', async () => {
-        try {
-          button.disabled = true;
-          const select = membersZone.querySelector(`[data-member-role="${button.dataset.memberId}"]`);
-          await callApi(`/api/league/members/${button.dataset.memberId}/role`, {
-            method: 'PATCH',
-            body: JSON.stringify({ role: select?.value || 'read' }),
-          });
-          await renderMembers();
-        } catch (error) {
-          showError(error);
-          button.disabled = false;
-        }
-      });
-    });
   } catch (error) {
     membersZone.classList.add('hidden');
     membersZone.innerHTML = '';
@@ -338,7 +336,9 @@ leagueForm.addEventListener('submit', async (event) => {
     return;
   }
 
+  let closeLoading = null;
   try {
+    closeLoading = showLoading('Saving league settings...');
     const formData = new FormData(leagueForm);
     const payouts = payoutController.collectRows();
     const defaultWinnerCount = Object.keys(payouts).length;
@@ -373,13 +373,19 @@ leagueForm.addEventListener('submit', async (event) => {
       setActiveLeagueId(result.league_id);
     }
     clearSetupDraft();
+    queueToast('League settings saved successfully.');
     navigateTo('/players');
   } catch (error) {
     showError(error);
+  } finally {
+    if (closeLoading) closeLoading();
   }
 });
 
 async function init() {
+  // Initialize notification system
+  initNotifications();
+
   authUser = await initWorkflowShell('/setup');
   if (!authUser) return;
   applyRoleBasedUI();

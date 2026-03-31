@@ -6,6 +6,7 @@ import {
   setActiveLeagueId,
   showError,
 } from '/static/workflow-common.js';
+import { initNotifications } from '/static/notifications.js';
 
 const matchFilter = document.getElementById('match-filter');
 const playerFilter = document.getElementById('player-filter');
@@ -30,6 +31,10 @@ let stats = {
   matches: [],
   players: [],
 };
+
+function setPlainHeaderMode() {
+  document.querySelector('.header-center')?.classList.add('hidden');
+}
 
 const RANK_VISUALS = {
   0: { icon: '🌧️', label: 'Washout / Refund' },
@@ -265,29 +270,6 @@ function setupHeader() {
     clearAuthStorage();
     window.location.replace('/login');
   });
-}
-
-function ensureLeagueSwitcher(user) {
-  const headerActions = document.querySelector('.header-actions');
-  if (!headerActions || !Array.isArray(user.memberships) || !user.memberships.length) return;
-  const existing = document.getElementById('league-switcher');
-  if (existing) existing.remove();
-  const select = document.createElement('select');
-  select.id = 'league-switcher';
-  user.memberships.forEach((membership) => {
-    const option = document.createElement('option');
-    option.value = String(membership.league_id);
-    option.textContent = membership.league.name;
-    if (String(membership.league_id) === String(user.active_league_id || getActiveLeagueId() || '')) {
-      option.selected = true;
-    }
-    select.appendChild(option);
-  });
-  select.addEventListener('change', () => {
-    setActiveLeagueId(select.value);
-    window.location.reload();
-  });
-  headerActions.insertBefore(select, topNav);
 }
 
 function setupModal() {
@@ -534,6 +516,7 @@ function renderSelectedPlayer() {
 }
 
 async function init() {
+  initNotifications();
   setupHeader();
   setupModal();
   const profile = await callApi('/api/auth/me');
@@ -549,8 +532,13 @@ async function init() {
   localStorage.setItem('league-ledger-user-role', effectiveRole);
   localStorage.setItem('league-ledger-username', user.user_id);
   localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
-  authRole.textContent = `${user.full_name} • ${user.user_id} (${effectiveRole})`;
-  ensureLeagueSwitcher(user);
+  authRole.textContent = `${user.user_id}`;
+  if (effectiveRole !== 'admin') {
+    setPlainHeaderMode();
+    window.location.replace('/welcome');
+    return;
+  }
+
   stats = await callApi('/api/stats');
   renderOverview();
   renderEarnersModal();

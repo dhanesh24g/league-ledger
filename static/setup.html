@@ -35,25 +35,47 @@
 
 <body>
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
-    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span class="theme-option-label">Light</span></span>
-    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span class="theme-option-label">Dark</span></span>
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span
+        class="theme-option-label">Light</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span
+        class="theme-option-label">Dark</span></span>
   </button>
 
   <header class="app-header">
     <div class="header-content">
-      <div class="brand">
+      <a href="/welcome" class="brand brand-home-link" aria-label="Go to home">
         <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
         <div class="brand-text">
           <span class="brand-name">Dhanesh Labs</span>
           <span class="app-name">League Setup</span>
         </div>
-      </div>
-      <div class="header-actions">
+      </a>
+
+      <div class="header-center">
         <select id="top-nav" aria-label="Quick navigation">
           <option value="/setup">League Workflow</option>
           <option value="/stats">Stats Dashboard</option>
+          <option value="/league-settings">League Settings</option>
         </select>
-        <span id="auth-role" class="muted small"></span>
+      </div>
+
+      <div class="header-actions">
+        <div class="notification-wrapper">
+          <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
+            <span class="notification-icon">🔔</span>
+            <span id="notification-badge" class="notification-badge hidden">0</span>
+          </button>
+          <div id="notification-dropdown" class="notification-dropdown hidden">
+            <div class="notification-header">
+              <h3>Notifications</h3>
+              <button id="clear-notifications" class="ghost small">Clear All</button>
+            </div>
+            <div id="notification-list" class="notification-list">
+              <p class="muted small">No new notifications</p>
+            </div>
+          </div>
+        </div>
+        <span id="auth-role" class="auth-pill muted small"></span>
         <button id="logout-btn" type="button" class="ghost">Logout</button>
       </div>
     </div>
@@ -74,7 +96,8 @@
 
     <section class="panel active">
       <h2>League Setup</h2>
-      <p class="muted">Define your default rules once. Refreshing this page keeps your draft instead of resetting the workflow.</p>
+      <p class="muted">Define your default rules once. Refreshing this page keeps your draft instead of resetting the
+        workflow.</p>
 
       <form id="league-form" class="grid">
         <label>Sport
@@ -105,9 +128,9 @@
         <div class="full">
           <div class="line-head">
             <h3>Default Winner Payouts</h3>
-            <button type="button" id="add-default-payout" class="ghost">+ Add Winner</button>
           </div>
           <div id="default-payouts" class="stack"></div>
+          <button type="button" id="add-default-payout-bottom" class="ghost full">+ Add Winner</button>
           <p id="default-payout-total" class="payout-total muted small"></p>
         </div>
 
@@ -120,6 +143,7 @@
       <div id="join-requests-zone" class="stack hidden"></div>
       <div id="members-zone" class="stack hidden"></div>
       <div class="flow-controls">
+        <a class="button-link ghost" href="/welcome">← Back to Welcome</a>
         <a class="button-link primary" data-workflow-link href="/players">Continue to Players</a>
       </div>
     </section>

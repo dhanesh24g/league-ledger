@@ -27,12 +27,12 @@ export function createPayoutController({
     if (typeof getPrizePool === 'function') {
       const prizePool = Number(getPrizePool()) || 0;
       const delta = Math.abs(prizePool - total);
-      const status = delta < 0.01 ? 'Matched' : `Difference: ${(total - prizePool).toFixed(2)}`;
-      totalTarget.textContent = `Total payout: ${total.toFixed(2)} | Prize pool: ${prizePool.toFixed(2)} | ${status}`;
+      const status = delta < 0.01 ? '✓ Fully Allocated' : `Unallocated: ${(prizePool - total).toFixed(2)}`;
+      totalTarget.textContent = `Total Prizes: ${total.toFixed(2)} | Prize Pool: ${prizePool.toFixed(2)} | ${status}`;
       totalTarget.classList.toggle('payout-match', delta < 0.01);
       totalTarget.classList.toggle('payout-mismatch', delta >= 0.01);
     } else {
-      totalTarget.textContent = `Total payout: ${total.toFixed(2)} across ${winners} winner${winners === 1 ? '' : 's'}`;
+      totalTarget.textContent = `Total Prizes: ${total.toFixed(2)} across ${winners} winner${winners === 1 ? '' : 's'}`;
       totalTarget.classList.remove('payout-match', 'payout-mismatch');
     }
   }

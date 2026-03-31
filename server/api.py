@@ -166,7 +166,7 @@ def approve_request(
     payload: MembershipRolePayload,
     user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, str]:
-    return approve_join_request(request_id, user, role=payload.role)
+    return approve_join_request(request_id, user, role="read")
 
 
 @router.get("/league/members")
