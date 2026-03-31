@@ -307,7 +307,7 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
                 "role": "admin",
                 "status": "active",
             },
-            on_conflict="league_memberships_user_league_unique",
+            on_conflict="user_id,league_id",
         ).execute()
         if not membership_result.data:
             logger.error(f"Failed to upsert membership for user {user['id']}, league {league_id}")
