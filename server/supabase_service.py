@@ -240,7 +240,19 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
 
     _validate_league_payouts(payload)
     
-    payouts_json = json.dumps(payload.payouts)
+    # Ensure payouts_json is always a valid JSON object for the constraint
+    if payload.payouts and isinstance(payload.payouts, dict):
+        payouts_json = json.dumps(payload.payouts)
+    else:
+        payouts_json = "{}"
+    
+    # Double-check it's valid JSON object
+    try:
+        parsed = json.loads(payouts_json)
+        if not isinstance(parsed, dict):
+            payouts_json = "{}"
+    except (json.JSONDecodeError, TypeError):
+        payouts_json = "{}"
     
     values = {
         "sport": payload.sport.strip(),
