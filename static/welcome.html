@@ -36,8 +36,10 @@
 
 <body>
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
-    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span class="theme-option-label">Light</span></span>
-    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span class="theme-option-label">Dark</span></span>
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span
+        class="theme-option-label">Light</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span
+        class="theme-option-label">Dark</span></span>
   </button>
 
   <header class="app-header">
@@ -88,9 +90,11 @@
         <div>
           <span class="welcome-choice-eyebrow join">Join</span>
           <h3 id="join-modal-title">Join With Invite Link</h3>
-          <p class="muted">Paste a full invite link or just the invite code to preview the league before sending your request.</p>
+          <p class="muted">Paste a full invite link or just the invite code to preview the league before sending your
+            request.</p>
         </div>
-        <button id="close-join-modal" type="button" class="ghost welcome-modal-close" aria-label="Close join dialog">Close</button>
+        <button id="close-join-modal" type="button" class="ghost welcome-modal-close"
+          aria-label="Close join dialog">Close</button>
       </div>
       <div class="welcome-modal-body">
         <label for="join-invite-input">Invite Link Or Code</label>
@@ -99,6 +103,25 @@
           <button id="submit-join-modal" type="button" class="primary auth-primary-button">Continue</button>
           <button id="cancel-join-modal" type="button" class="ghost">Cancel</button>
         </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="route-choice-modal" class="welcome-modal hidden" aria-hidden="true">
+    <div class="welcome-modal-backdrop" data-close-route-choice></div>
+    <section class="welcome-modal-panel" role="dialog" aria-modal="true" aria-labelledby="route-choice-title">
+      <div class="welcome-modal-handle" aria-hidden="true"></div>
+      <div class="welcome-modal-head">
+        <div>
+          <span class="welcome-choice-eyebrow create">Navigate</span>
+          <h3 id="route-choice-title">Open League</h3>
+          <p id="route-choice-copy" class="muted">Choose where to continue for this league.</p>
+        </div>
+        <button id="close-route-choice" type="button" class="ghost welcome-modal-close"
+          aria-label="Close navigation dialog">Close</button>
+      </div>
+      <div class="welcome-modal-body">
+        <div id="route-choice-actions" class="welcome-modal-actions"></div>
       </div>
     </section>
   </div>

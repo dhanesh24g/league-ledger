@@ -69,7 +69,7 @@ export function createPayoutController({
 
     const amountInput = document.createElement('input');
     amountInput.type = 'number';
-    amountInput.min = '0';
+    amountInput.min = '0.01';
     amountInput.step = '0.01';
     amountInput.placeholder = 'Winning amount';
     amountInput.className = 'payout-amount';
@@ -120,7 +120,7 @@ export function createPayoutController({
     rows.forEach((row, index) => {
       const rank = index + 1;
       const amount = Number(row.querySelector('.payout-amount')?.value);
-      if (!Number.isFinite(amount) || amount < 0) return;
+      if (!Number.isFinite(amount) || amount <= 0) return;
       map[rank] = amount;
     });
 

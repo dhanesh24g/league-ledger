@@ -19,9 +19,15 @@ const joinInviteInput = document.getElementById('join-invite-input');
 const submitJoinModalBtn = document.getElementById('submit-join-modal');
 const closeJoinModalBtn = document.getElementById('close-join-modal');
 const cancelJoinModalBtn = document.getElementById('cancel-join-modal');
+const routeChoiceModal = document.getElementById('route-choice-modal');
+const routeChoiceCopy = document.getElementById('route-choice-copy');
+const routeChoiceActions = document.getElementById('route-choice-actions');
+const closeRouteChoiceBtn = document.getElementById('close-route-choice');
+const LAST_LEAGUE_ROUTE_KEY = 'league-ledger-last-route-by-league';
 
 let previousFocus = null;
 let joinModalBindingsReady = false;
+let routeChoiceBindingsReady = false;
 
 function renderButtonLink(label, href, kind = 'primary') {
   return `<a class="button-link ${kind} auth-primary-button" href="${href}">${label}</a>`;
@@ -43,12 +49,6 @@ function parseInviteInput(value) {
     return raw.replace(/^\/join\//, '').trim();
   }
   return raw.replace(/^\/join\//, '').trim();
-}
-
-function getSelectedLeagueIdFromQuery() {
-  const value = new URLSearchParams(window.location.search).get('league_id');
-  if (!value) return '';
-  return String(value);
 }
 
 function renderMembershipCards(user) {
@@ -82,42 +82,183 @@ function bindMembershipCards(user) {
     button.addEventListener('click', () => {
       const leagueId = button.getAttribute('data-enter-league');
       if (!leagueId) return;
-      setActiveLeagueId(leagueId);
       const membership = user.memberships.find((item) => String(item.league_id) === String(leagueId));
-      const target = membership?.role === 'admin' ? '/setup' : `/welcome?league_id=${encodeURIComponent(String(leagueId))}`;
-      window.location.href = target;
+      if (!membership) return;
+      openRouteChoiceModal(membership);
     });
   });
 }
 
-function renderReadLeagueContext(user, membership) {
-  const league = membership?.league;
-  if (!league) {
-    renderHome(user);
-    return;
+function closeRouteChoiceModal() {
+  if (!routeChoiceModal) return;
+  routeChoiceModal.classList.add('hidden');
+  routeChoiceModal.setAttribute('aria-hidden', 'true');
+  document.body.classList.remove('modal-open');
+}
+
+function readLastRouteMap() {
+  try {
+    const raw = localStorage.getItem(LAST_LEAGUE_ROUTE_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function getLastRouteForLeague(leagueId) {
+  const map = readLastRouteMap();
+  return map[String(leagueId)] || '';
+}
+
+function setLastRouteForLeague(leagueId, route) {
+  try {
+    const map = readLastRouteMap();
+    map[String(leagueId)] = String(route || '');
+    localStorage.setItem(LAST_LEAGUE_ROUTE_KEY, JSON.stringify(map));
+  } catch (_) {
+    // no-op
+  }
+}
+
+function createRouteCard({
+  title,
+  description,
+  route,
+  variant = 'ghost',
+  badge = '',
+  recommended = false,
+  leagueId,
+}) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `route-choice-card ${variant} ${recommended ? 'recommended' : ''}`.trim();
+  button.innerHTML = `
+    <span class="route-choice-title-row">
+      <strong>${title}</strong>
+      ${badge ? `<span class="route-choice-badge">${badge}</span>` : ''}
+    </span>
+    <span class="route-choice-description muted">${description}</span>
+  `;
+  button.addEventListener('click', () => {
+    setActiveLeagueId(leagueId);
+    setLastRouteForLeague(leagueId, route);
+    closeRouteChoiceModal();
+    window.location.href = route;
+  });
+  return button;
+}
+
+function openRouteChoiceModal(membership) {
+  if (!routeChoiceModal || !routeChoiceActions || !routeChoiceCopy) return;
+
+  const league = membership.league || {};
+  routeChoiceCopy.textContent = `Choose destination for ${league.name || 'this league'} (${membership.role === 'admin' ? 'Admin' : 'Read'} access).`;
+
+  routeChoiceActions.innerHTML = '';
+  routeChoiceActions.classList.add('route-choice-grid');
+
+  const leagueId = membership.league_id;
+  const isAdmin = membership.role === 'admin';
+  const allowedRoutes = isAdmin
+    ? ['/stats', '/league-details', '/setup', '/league-settings']
+    : ['/stats', '/league-details'];
+  const lastRoute = getLastRouteForLeague(leagueId);
+
+  if (allowedRoutes.includes(lastRoute)) {
+    const lastLabel = lastRoute === '/setup'
+      ? 'League Setup'
+      : lastRoute === '/league-settings'
+        ? 'League Settings'
+        : lastRoute === '/league-details'
+          ? 'League Details'
+          : 'Stats Dashboard';
+
+    routeChoiceActions.appendChild(
+      createRouteCard({
+        title: `Continue to ${lastLabel}`,
+        description: 'Recommended based on your last destination for this league.',
+        route: lastRoute,
+        variant: 'primary',
+        badge: 'Last Used',
+        recommended: true,
+        leagueId,
+      })
+    );
   }
 
-  welcomeTitle.textContent = `${league.name} · Read Access`;
-  welcomeCopy.textContent = 'Your access is intentionally limited to league overview on this home screen.';
-  welcomeActions.innerHTML = `
-    <div class="info-card welcome-card">
-      <h3>League Context Selected</h3>
-      <p class="muted">You are currently inside <strong>${league.name}</strong> with read-only access. Workflow and stats dashboards are restricted to admins.</p>
-      <div class="welcome-meta-row">
-        <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
-        <span class="welcome-meta-chip">${league.tournament || 'League'}</span>
-        <span class="welcome-meta-chip">Role: Read</span>
-      </div>
-      <button id="back-to-leagues" type="button" class="ghost welcome-inline-action">Back To My Leagues</button>
-    </div>
-  `;
+  routeChoiceActions.appendChild(
+    createRouteCard({
+      title: 'Open Stats Dashboard',
+      description: 'Performance analytics, leaderboard, match and player insights.',
+      route: '/stats',
+      variant: 'ghost',
+      leagueId,
+    })
+  );
 
-  document.getElementById('back-to-leagues')?.addEventListener('click', () => {
-    window.history.replaceState({}, '', '/welcome');
-    renderHome(user);
-  });
+  routeChoiceActions.appendChild(
+    createRouteCard({
+      title: 'Open League Details',
+      description: 'League rules, players, matches, winner amounts and payout settings.',
+      route: '/league-details',
+      variant: 'ghost',
+      leagueId,
+    })
+  );
 
-  bindJoinModal(user);
+  if (isAdmin) {
+    routeChoiceActions.appendChild(
+      createRouteCard({
+        title: 'Open League Setup',
+        description: 'Manage league workflow: players, matches, winners and ledger.',
+        route: '/setup',
+        variant: 'ghost',
+        leagueId,
+      })
+    );
+
+    routeChoiceActions.appendChild(
+      createRouteCard({
+        title: 'Open League Settings',
+        description: 'Governance controls, roles policy and admin-level management.',
+        route: '/league-settings',
+        variant: 'ghost',
+        leagueId,
+      })
+    );
+  }
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.className = 'ghost';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => closeRouteChoiceModal());
+  routeChoiceActions.appendChild(cancelBtn);
+
+  if (!routeChoiceBindingsReady) {
+    routeChoiceBindingsReady = true;
+    closeRouteChoiceBtn?.addEventListener('click', () => closeRouteChoiceModal());
+    routeChoiceModal.querySelectorAll('[data-close-route-choice]').forEach((node) => {
+      node.addEventListener('click', () => closeRouteChoiceModal());
+    });
+    routeChoiceModal.addEventListener('click', (event) => {
+      if (event.target === routeChoiceModal) {
+        closeRouteChoiceModal();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !routeChoiceModal.classList.contains('hidden')) {
+        closeRouteChoiceModal();
+      }
+    });
+  }
+
+  previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  routeChoiceModal.classList.remove('hidden');
+  routeChoiceModal.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('modal-open');
 }
 
 async function renderJoinRequests(user) {
@@ -203,10 +344,7 @@ async function renderInvitePreview(user, inviteCode) {
       </div>
     `;
     document.getElementById('enter-invite-league')?.addEventListener('click', () => {
-      setActiveLeagueId(league.id);
-      window.location.href = membership.role === 'admin'
-        ? '/setup'
-        : `/welcome?league_id=${encodeURIComponent(String(league.id))}`;
+      openRouteChoiceModal(membership);
     });
     return;
   }
@@ -387,21 +525,8 @@ async function init() {
   });
 
   const inviteCode = getInviteCodeFromLocation();
-  const selectedLeagueId = getSelectedLeagueIdFromQuery();
   if (inviteCode) {
     await renderInvitePreview(user, inviteCode);
-  } else if (selectedLeagueId) {
-    const membership = (user.memberships || []).find((item) => String(item.league_id) === String(selectedLeagueId));
-    if (membership?.league_id) {
-      setActiveLeagueId(membership.league_id);
-      if (membership.role === 'admin') {
-        window.location.replace('/setup');
-        return;
-      }
-      renderReadLeagueContext(user, membership);
-    } else {
-      renderHome(user);
-    }
   } else {
     if (user.active_league_id) {
       setActiveLeagueId(user.active_league_id);

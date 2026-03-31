@@ -41,6 +41,52 @@ def _normalize_invite_code(value: str) -> str:
     return "".join(char for char in value.strip().lower() if char.isalnum() or char == "-")
 
 
+def _member_player_name(member: dict[str, Any]) -> str:
+    user_id_label = str(member.get("user_id_label") or "").strip()
+    if user_id_label:
+        return user_id_label
+    first = str(member.get("first_name") or "").strip()
+    last = str(member.get("last_name") or "").strip()
+    full_name = f"{first} {last}".strip()
+    if full_name:
+        return full_name
+    return f"member-{int(member.get('user_id') or 0)}"
+
+
+def _ensure_member_player_entry(league_id: int, member: dict[str, Any]) -> None:
+    player_name = _member_player_name(member)
+    if not player_name:
+        return
+
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        existing = (
+            supabase.table("players")
+            .select("id")
+            .eq("league_id", int(league_id))
+            .eq("name", player_name)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            return
+        supabase.table("players").insert({"league_id": int(league_id), "name": player_name}).execute()
+        return
+
+    with DatabaseManager() as connection:
+        existing = connection.execute(
+            "SELECT id FROM players WHERE league_id = ? AND name = ? LIMIT 1",
+            (int(league_id), player_name),
+        ).fetchone()
+        if existing:
+            return
+        connection.execute(
+            "INSERT INTO players (league_id, name) VALUES (?, ?)",
+            (int(league_id), player_name),
+        )
+
+
 def _google_client_id() -> str:
     for env_name in (
         "GOOGLE_CLIENT_ID",
@@ -762,6 +808,25 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
                 "reviewed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             }
         ).eq("id", int(request_id)).execute()
+
+        joined_user = (
+            supabase.table("users")
+            .select("id, first_name, last_name, user_id")
+            .eq("id", int(request_row["user_id"]))
+            .limit(1)
+            .execute()
+        )
+        if joined_user.data:
+            user_row = joined_user.data[0]
+            _ensure_member_player_entry(
+                league_id,
+                {
+                    "user_id": int(user_row["id"]),
+                    "first_name": str(user_row.get("first_name") or ""),
+                    "last_name": str(user_row.get("last_name") or ""),
+                    "user_id_label": str(user_row.get("user_id") or ""),
+                },
+            )
         return {"message": "Join request approved"}
 
     with DatabaseManager() as connection:
@@ -783,12 +848,27 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
             "UPDATE league_join_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP WHERE id = ?",
             (int(request_id),),
         )
+
+        joined_user = connection.execute(
+            "SELECT id, first_name, last_name, user_id FROM users WHERE id = ? LIMIT 1",
+            (int(request_row["user_id"]),),
+        ).fetchone()
+        if joined_user:
+            _ensure_member_player_entry(
+                league_id,
+                {
+                    "user_id": int(joined_user["id"]),
+                    "first_name": str(joined_user["first_name"]),
+                    "last_name": str(joined_user["last_name"]),
+                    "user_id_label": str(joined_user["user_id"]),
+                },
+            )
     return {"message": "Join request approved"}
 
 
 def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
-    if user["league_role"] != "admin" or not user.get("active_league_id"):
-        raise HTTPException(status_code=403, detail="Admin role required")
+    if user["membership_status"] != "active" or not user.get("active_league_id"):
+        raise HTTPException(status_code=403, detail="Active league membership required")
 
     league_id = int(user["active_league_id"])
     if get_supabase_client():
@@ -841,6 +921,48 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
             (league_id,),
         ).fetchall()
     return {"members": [{**dict(row), "role": _normalize_membership_role(dict(row)["role"])} for row in rows]}
+
+
+def remove_league_member(member_user_id: int, user: dict[str, Any]) -> dict[str, str]:
+    if user["league_role"] != "admin" or not user.get("active_league_id"):
+        raise HTTPException(status_code=403, detail="Admin role required")
+
+    league_id = int(user["active_league_id"])
+    target_user_id = int(member_user_id)
+    if int(user.get("id") or 0) == target_user_id:
+        raise HTTPException(status_code=400, detail="You cannot remove yourself from the league")
+
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        existing = (
+            supabase.table("league_memberships")
+            .select("id")
+            .eq("league_id", league_id)
+            .eq("user_id", target_user_id)
+            .eq("status", "active")
+            .limit(1)
+            .execute()
+        )
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="League member not found")
+
+        supabase.table("league_memberships").delete().eq("league_id", league_id).eq("user_id", target_user_id).execute()
+        supabase.table("league_join_requests").delete().eq("league_id", league_id).eq("user_id", target_user_id).execute()
+        return {"message": "League member removed"}
+
+    with DatabaseManager() as connection:
+        cursor = connection.execute(
+            "DELETE FROM league_memberships WHERE league_id = ? AND user_id = ? AND status = 'active'",
+            (league_id, target_user_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="League member not found")
+        connection.execute(
+            "DELETE FROM league_join_requests WHERE league_id = ? AND user_id = ?",
+            (league_id, target_user_id),
+        )
+    return {"message": "League member removed"}
 
 
 def update_membership_role(member_user_id: int, role: str, user: dict[str, Any]) -> dict[str, str]:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import Any
 
 from fastapi import HTTPException
@@ -9,6 +10,117 @@ from fastapi import HTTPException
 from .database import get_supabase_client, parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
+
+
+def _league_id_from_user(user: dict[str, Any]) -> int:
+    league_id = user.get("active_league_id")
+    if not league_id:
+        raise HTTPException(status_code=400, detail="Select a league first")
+    return int(league_id)
+
+
+def _member_player_name(member: dict[str, Any]) -> str:
+    user_id_label = str(member.get("user_id") or "").strip()
+    if user_id_label:
+        return user_id_label
+    first = str(member.get("first_name") or "").strip()
+    last = str(member.get("last_name") or "").strip()
+    full = f"{first} {last}".strip()
+    return full or "member"
+
+
+def _sync_active_members_to_players(supabase: Any, league_id: int) -> list[dict[str, Any]]:
+    memberships_response = (
+        supabase.table("league_memberships")
+        .select("user_id")
+        .eq("league_id", league_id)
+        .eq("status", "active")
+        .execute()
+    )
+    membership_user_ids = sorted({int(row["user_id"]) for row in (memberships_response.data or [])})
+    if not membership_user_ids:
+        return []
+
+    users_response = supabase.table("users").select("id, first_name, last_name, user_id").execute()
+    users_by_id = {int(row["id"]): row for row in (users_response.data or [])}
+
+    desired_names: list[str] = []
+    seen_names: set[str] = set()
+    for user_id in membership_user_ids:
+        row = users_by_id.get(user_id)
+        if not row:
+            continue
+        player_name = _member_player_name(row)
+        if not player_name or player_name in seen_names:
+            continue
+        seen_names.add(player_name)
+        desired_names.append(player_name)
+
+    if not desired_names:
+        return []
+
+    existing_players_response = (
+        supabase.table("players")
+        .select("id, name")
+        .eq("league_id", league_id)
+        .execute()
+    )
+    existing_names = {str(row.get("name") or "") for row in (existing_players_response.data or [])}
+
+    missing_names = [name for name in desired_names if name not in existing_names]
+    for player_name in missing_names:
+        supabase.table("players").insert({"league_id": league_id, "name": player_name}).execute()
+
+    players_response = (
+        supabase.table("players")
+        .select("id, name")
+        .eq("league_id", league_id)
+        .order("name")
+        .execute()
+    )
+    desired_set = set(desired_names)
+    return [row for row in (players_response.data or []) if str(row.get("name") or "") in desired_set]
+
+
+def _validate_league_payouts(payload: LeaguePayload) -> None:
+    payouts = payload.payouts or {}
+    if not payouts:
+        raise HTTPException(status_code=400, detail="Add at least one winner payout")
+
+    normalized: list[tuple[int, float]] = []
+    for rank, amount in payouts.items():
+        try:
+            rank_num = int(rank)
+            amount_num = float(amount)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Winner payouts contain invalid rank or amount")
+
+        if rank_num < 1:
+            raise HTTPException(status_code=400, detail="Winner payout ranks must start from 1")
+        if not math.isfinite(amount_num) or amount_num <= 0:
+            raise HTTPException(status_code=400, detail=f"Winner payout for rank {rank_num} must be greater than 0")
+
+        normalized.append((rank_num, round(amount_num, 2)))
+
+    normalized.sort(key=lambda item: item[0])
+    actual_ranks = [rank for rank, _ in normalized]
+    expected_ranks = list(range(1, len(normalized) + 1))
+    if actual_ranks != expected_ranks:
+        raise HTTPException(status_code=400, detail="Winner payout ranks must be continuous: 1, 2, 3...")
+
+    winner_count = len(normalized)
+    if winner_count != int(payload.default_winner_count):
+        raise HTTPException(status_code=400, detail="Default winner count must match the number of payout rows")
+    if winner_count > int(payload.active_player_count):
+        raise HTTPException(status_code=400, detail="Winner count cannot exceed active league players")
+
+    payout_total = round(sum(amount for _, amount in normalized), 2)
+    prize_pool = round(float(payload.entry_fee) * int(payload.active_player_count), 2)
+    if abs(payout_total - prize_pool) >= 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Winner payout total ({payout_total:.2f}) must match prize pool ({prize_pool:.2f})",
+        )
 
 
 def _normalize_participant_ids(raw_ids: list[int] | tuple[int, ...] | None) -> list[int]:
@@ -50,21 +162,17 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
-
-    if user.get("league_role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
+    league_id = _league_id_from_user(user)
     
     try:
         # Get league data
-        league_response = supabase.table("league").select("*").limit(1).execute()
+        league_response = supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
         league = league_response.data[0] if league_response.data else None
-        
-        # Get players
-        players_response = supabase.table("players").select("*").order("name").execute()
-        players = players_response.data
+
+        players = _sync_active_members_to_players(supabase, league_id)
         
         # Get matches
-        matches_response = supabase.table("matches").select("*").order("id", desc=True).execute()
+        matches_response = supabase.table("matches").select("*").eq("league_id", league_id).order("id", desc=True).execute()
         matches = matches_response.data
         
     except Exception as e:
@@ -99,6 +207,8 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    _validate_league_payouts(payload)
     
     payouts_json = json.dumps(payload.payouts)
     
@@ -114,26 +224,44 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
     }
 
     try:
-        existing_response = supabase.table("league").select("*").limit(1).execute()
+        existing_response = None
+        if not create_new and user.get("active_league_id"):
+            existing_response = (
+                supabase.table("league")
+                .select("*")
+                .eq("id", int(user["active_league_id"]))
+                .limit(1)
+                .execute()
+            )
 
-        if existing_response.data and not create_new:
+        league_id: int | None = None
+
+        if existing_response and existing_response.data and not create_new:
             if user["league_role"] != "admin":
                 raise HTTPException(status_code=403, detail="Admin role required")
             existing_owner = existing_response.data[0].get("owner_user_id")
             values["owner_user_id"] = existing_owner or int(user["id"])
             supabase.table("league").update(values).eq("id", existing_response.data[0]["id"]).execute()
-        elif not existing_response.data or create_new:
-            supabase.table("league").insert(values).execute()
-            supabase.table("league_memberships").upsert({
+            league_id = int(existing_response.data[0]["id"])
+        else:
+            inserted = supabase.table("league").insert(values).execute()
+            if inserted.data:
+                league_id = int(inserted.data[0]["id"])
+
+        if not league_id:
+            raise HTTPException(status_code=500, detail="League save verification failed")
+
+        supabase.table("league_memberships").upsert(
+            {
                 "user_id": int(user["id"]),
+                "league_id": league_id,
                 "role": "admin",
                 "status": "active",
-            }, on_conflict="user_id").execute()
-            supabase.table("league_join_requests").delete().eq("user_id", int(user["id"])).execute()
-
-        verify = supabase.table("league").select("*").limit(1).execute()
-        if not verify.data:
-            raise HTTPException(status_code=500, detail="League save verification failed")
+            },
+            on_conflict="user_id,league_id",
+        ).execute()
+        supabase.table("league_join_requests").delete().eq("user_id", int(user["id"])).eq("league_id", league_id).execute()
+        _sync_active_members_to_players(supabase, league_id)
     except HTTPException:
         raise
     except Exception as exc:
@@ -143,17 +271,19 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
     return {"message": "League settings saved"}
 
 
-def add_player(payload: PlayerPayload) -> dict[str, str]:
+def add_player(payload: PlayerPayload, user: dict[str, Any]) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
     
     player_name = payload.name.strip()
     try:
         supabase.table("players").insert({
+            "league_id": league_id,
             "name": player_name
         }).execute()
-        verify = supabase.table("players").select("id").eq("name", player_name).limit(1).execute()
+        verify = supabase.table("players").select("id").eq("league_id", league_id).eq("name", player_name).limit(1).execute()
         if not verify.data:
             raise HTTPException(status_code=500, detail="Player insert verification failed")
     except Exception as exc:
@@ -167,36 +297,39 @@ def add_player(payload: PlayerPayload) -> dict[str, str]:
     return {"message": "Player added"}
 
 
-def delete_player(player_id: int) -> dict[str, str]:
+def delete_player(player_id: int, user: dict[str, Any]) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
     
-    supabase.table("players").delete().eq("id", player_id).execute()
+    supabase.table("players").delete().eq("id", player_id).eq("league_id", league_id).execute()
     return {"message": "Player removed"}
 
 
-def add_match(payload: MatchPayload) -> dict[str, str]:
+def add_match(payload: MatchPayload, user: dict[str, Any]) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
     
     payouts_json = json.dumps(payload.payouts) if payload.payouts else None
 
-    players_response = supabase.table("players").select("id").order("id").execute()
-    valid_player_ids = {int(player["id"]) for player in players_response.data}
+    players = _sync_active_members_to_players(supabase, league_id)
+    valid_player_ids = {int(player["id"]) for player in players}
     participant_ids = _normalize_participant_ids(payload.participant_ids)
     if participant_ids:
         invalid_ids = [player_id for player_id in participant_ids if player_id not in valid_player_ids]
         if invalid_ids:
             raise HTTPException(status_code=400, detail="Match participants include unknown players")
     else:
-        participant_ids = [int(player["id"]) for player in players_response.data]
+        participant_ids = [int(player["id"]) for player in players]
 
     if len(participant_ids) < 2:
         raise HTTPException(status_code=400, detail="Select at least two match participants")
 
     values = {
+        "league_id": league_id,
         "title": payload.title.strip(),
         "match_date": payload.match_date.strip(),
         "winner_count": payload.winner_count,
@@ -223,14 +356,15 @@ def add_match(payload: MatchPayload) -> dict[str, str]:
     return {"message": "Match added"}
 
 
-def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
+def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
     
     # Get match and league data
-    match_response = supabase.table("matches").select("*").eq("id", match_id).execute()
-    league_response = supabase.table("league").select("*").limit(1).execute()
+    match_response = supabase.table("matches").select("*").eq("id", match_id).eq("league_id", league_id).execute()
+    league_response = supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
     
     if not match_response.data or not league_response.data:
         raise HTTPException(status_code=404, detail="League or match not found")
@@ -240,7 +374,7 @@ def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
     
     payouts = parse_payouts(match["payouts_json"]) or parse_payouts(league["payouts_json"])
     winner_limit = int(match["winner_count"] or league["default_winner_count"])
-    participant_ids = parse_participant_ids(match.get("participant_ids_json")) or [int(player["id"]) for player in supabase.table("players").select("id").order("id").execute().data]
+    participant_ids = parse_participant_ids(match.get("participant_ids_json")) or [int(player["id"]) for player in _sync_active_members_to_players(supabase, league_id)]
     
     rank_to_players = {row.rank: [pid for pid in row.player_ids] for row in payload.ranks}
     
@@ -285,22 +419,22 @@ def save_winners(match_id: int, payload: WinnersPayload) -> dict[str, str]:
     return {"message": "Winners saved"}
 
 
-def cancel_match(match_id: int) -> dict[str, str]:
+def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
     
     # Get match and league data
-    match_response = supabase.table("matches").select("*").eq("id", match_id).execute()
-    league_response = supabase.table("league").select("*").limit(1).execute()
-    players_response = supabase.table("players").select("id").order("id").execute()
+    match_response = supabase.table("matches").select("*").eq("id", match_id).eq("league_id", league_id).execute()
+    league_response = supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
+    players = _sync_active_members_to_players(supabase, league_id)
     
     if not match_response.data or not league_response.data:
         raise HTTPException(status_code=404, detail="League or match not found")
     
     match = match_response.data[0]
     league = league_response.data[0]
-    players = players_response.data
     participant_ids = parse_participant_ids(match.get("participant_ids_json")) or [int(player["id"]) for player in players]
     
     # Delete existing winner entries
@@ -333,25 +467,30 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
 
     if user.get("league_role") != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
+    league_id = _league_id_from_user(user)
     
     # Get league data
-    league_response = supabase.table("league").select("*").limit(1).execute()
+    league_response = supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
     if not league_response.data:
         return {"rows": [], "completed_matches": 0, "entry_fee": 0}
     
     league = league_response.data[0]
     
     # Get completed matches count
-    matches_response = supabase.table("matches").select("id, participant_ids_json").in_("status", ["completed", "canceled"]).order("id", desc=True).execute()
+    matches_response = supabase.table("matches").select("id, participant_ids_json").eq("league_id", league_id).in_("status", ["completed", "canceled"]).order("id", desc=True).execute()
     matches = matches_response.data
     completed_matches = len(matches)
     
     # Get players
-    players_response = supabase.table("players").select("id, name").order("name").execute()
-    players = players_response.data
+    players = _sync_active_members_to_players(supabase, league_id)
     
     # Get winnings
-    winnings_response = supabase.table("winner_entries").select("player_id, amount").execute()
+    winnings_response = (
+        supabase.table("winner_entries")
+        .select("player_id, amount, match_id")
+        .in_("match_id", [int(match["id"]) for match in matches] if matches else [-1])
+        .execute()
+    )
     winnings = winnings_response.data
     
     winnings_map = {}
@@ -393,17 +532,21 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     supabase = get_supabase_client()
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
 
-    if user.get("league_role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
+    players = _sync_active_members_to_players(supabase, league_id)
 
-    players_response = supabase.table("players").select("id, name").order("name").execute()
-    players = players_response.data
-
-    matches_response = supabase.table("matches").select("id, title, match_date, status, participant_ids_json").order("id", desc=True).execute()
+    matches_response = supabase.table("matches").select("id, title, match_date, status, participant_ids_json").eq("league_id", league_id).order("id", desc=True).execute()
     matches = matches_response.data
 
-    winners_response = supabase.table("winner_entries").select("match_id, rank, player_id, amount").order("match_id", desc=True).order("rank").execute()
+    winners_response = (
+        supabase.table("winner_entries")
+        .select("match_id, rank, player_id, amount")
+        .in_("match_id", [int(match["id"]) for match in matches] if matches else [-1])
+        .order("match_id", desc=True)
+        .order("rank")
+        .execute()
+    )
     winners = winners_response.data
 
     player_name_by_id = {int(p["id"]): str(p["name"]) for p in players}
