@@ -1,15 +1,15 @@
-from __future__ import annotations
-
-import json
+import time
 import logging
-import math
 import re
 import secrets
+import json
+import math
 from typing import Any
 
 from fastapi import HTTPException
+from postgrest import APIError
 
-from .database import get_supabase_client, parse_participant_ids, parse_payouts
+from .auth import get_supabase_client, parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
 
@@ -39,13 +39,23 @@ def _generate_invite_code(name: str) -> str:
 
 
 def _sync_active_members_to_players(supabase: Any, league_id: int) -> list[dict[str, Any]]:
-    memberships_response = (
-        supabase.table("league_memberships")
-        .select("user_id")
-        .eq("league_id", league_id)
-        .eq("status", "active")
-        .execute()
-    )
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            memberships_response = (
+                supabase.table("league_memberships")
+                .select("user_id")
+                .eq("league_id", league_id)
+                .eq("status", "active")
+                .execute()
+            )
+            break
+        except Exception as exc:
+            if attempt == max_retries - 1:
+                logger.error(f"Failed to fetch memberships after {max_retries} attempts: {str(exc)}")
+                raise
+            logger.warning(f"Retry {attempt + 1}/{max_retries} for memberships query: {str(exc)}")
+            time.sleep(0.5 * (attempt + 1))
     membership_user_ids = sorted({int(row["user_id"]) for row in (memberships_response.data or [])})
     if not membership_user_ids:
         return []

@@ -88,6 +88,11 @@
   transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
+[data-theme="light"] .toast {
+  background: rgba(248, 250, 252, 0.98);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
 .toast-loading {
   display: flex;
   align-items: center;
