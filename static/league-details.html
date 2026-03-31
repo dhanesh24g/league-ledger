@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Details</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/favicon.png">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem('league-ledger-token');
+        if (!token) {
+          window.location.replace('/login');
+          return;
+        }
+        var key = 'dhaneshlabs-theme';
+        var stored = localStorage.getItem(key);
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+        document.documentElement.setAttribute('data-theme', theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body>
+  <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span
+        class="theme-option-label">Light</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span
+        class="theme-option-label">Dark</span></span>
+  </button>
+
+  <header class="app-header">
+    <div class="header-content">
+      <a href="/welcome" class="brand brand-home-link" aria-label="Go to home">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">League Details</span>
+        </div>
+      </a>
+
+      <div class="header-center">
+        <select id="top-nav" aria-label="Quick navigation"></select>
+      </div>
+
+      <div class="header-actions">
+        <span id="auth-role" class="auth-pill muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <header class="shell-header">
+    <p>Read-only league profile with settings, participants, match history, and payout outcomes.</p>
+  </header>
+
+  <main class="shell-main">
+    <section class="panel active league-details-hero">
+      <div id="league-hero" class="league-hero-content"></div>
+    </section>
+
+    <section class="panel active league-details-section">
+      <h2>League Rules</h2>
+      <div id="league-overview" class="settings-grid"></div>
+      <div id="league-payouts" class="league-payout-grid"></div>
+    </section>
+
+    <section class="panel active league-details-section">
+      <h2>Players</h2>
+      <div id="players-list" class="feed"></div>
+    </section>
+
+    <section class="panel active league-details-section">
+      <h2>Matches & Winners</h2>
+      <div id="matches-list" class="feed"></div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/league-details.js"></script>
+</body>
+
+</html>

@@ -340,13 +340,27 @@ leagueForm.addEventListener('submit', async (event) => {
   try {
     closeLoading = showLoading('Saving league settings...');
     const formData = new FormData(leagueForm);
-    const payouts = payoutController.collectRows();
-    const defaultWinnerCount = Object.keys(payouts).length;
+    const payoutRows = [...defaultPayouts.querySelectorAll('.payout-row')];
+    if (!payoutRows.length) {
+      throw new Error('Add at least one winner payout.');
+    }
+
+    const payouts = {};
+    payoutRows.forEach((row, index) => {
+      const rank = index + 1;
+      const amount = Number(row.querySelector('.payout-amount')?.value);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error(`Winner payout for W${rank} must be greater than 0.`);
+      }
+      payouts[rank] = Number(amount.toFixed(2));
+    });
+
+    const defaultWinnerCount = payoutRows.length;
     const entryFee = Number(formData.get('entry_fee'));
     const activePlayerCount = Number(formData.get('active_player_count'));
 
-    if (!defaultWinnerCount) {
-      throw new Error('Add at least one winner payout.');
+    if (defaultWinnerCount > activePlayerCount) {
+      throw new Error('Winner count cannot exceed active league players.');
     }
 
     const payoutTotal = Object.values(payouts).reduce((sum, value) => sum + Number(value), 0);

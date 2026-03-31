@@ -45,6 +45,11 @@ function setReadNavigationMode() {
   statsOption.textContent = 'League Dashboard';
   topNav.appendChild(statsOption);
 
+  const detailsOption = document.createElement('option');
+  detailsOption.value = '/league-details';
+  detailsOption.textContent = 'League Details';
+  topNav.appendChild(detailsOption);
+
   const homeOption = document.createElement('option');
   homeOption.value = '/welcome';
   homeOption.textContent = 'Home';

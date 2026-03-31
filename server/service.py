@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import Any
 
 from fastapi import HTTPException
@@ -78,17 +79,100 @@ def _generate_invite_code(name: str, league_id: int) -> str:
     return f"{base}-{league_id}"
 
 
-def get_state(user: dict[str, Any]) -> dict[str, Any]:
-    if user.get("league_role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
+def _member_player_name(user_row: dict[str, Any] | Any) -> str:
+    user_id_label = str(user_row.get("user_id_label") if isinstance(user_row, dict) else user_row["user_id_label"]).strip()
+    if user_id_label:
+        return user_id_label
+    first_name = str(user_row.get("first_name") if isinstance(user_row, dict) else user_row["first_name"]).strip()
+    last_name = str(user_row.get("last_name") if isinstance(user_row, dict) else user_row["last_name"]).strip()
+    full_name = f"{first_name} {last_name}".strip()
+    return full_name or "member"
 
+
+def _sync_active_members_to_players(connection: Any, league_id: int) -> list[Any]:
+    members = connection.execute(
+        """
+        SELECT u.user_id AS user_id_label, u.first_name, u.last_name
+        FROM league_memberships m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.league_id = ? AND m.status = 'active'
+        ORDER BY u.user_id ASC
+        """,
+        (league_id,),
+    ).fetchall()
+
+    desired_names: list[str] = []
+    seen_names: set[str] = set()
+    for member in members:
+        player_name = _member_player_name(member).strip()
+        if not player_name or player_name in seen_names:
+            continue
+        seen_names.add(player_name)
+        desired_names.append(player_name)
+        connection.execute(
+            "INSERT OR IGNORE INTO players (league_id, name) VALUES (?, ?)",
+            (league_id, player_name),
+        )
+
+    if not desired_names:
+        return []
+
+    placeholders = ",".join("?" for _ in desired_names)
+    return connection.execute(
+        f"SELECT id, name FROM players WHERE league_id = ? AND name IN ({placeholders}) ORDER BY name ASC",
+        (league_id, *desired_names),
+    ).fetchall()
+
+
+def _validate_league_payouts(payload: LeaguePayload) -> None:
+    payouts = payload.payouts or {}
+    if not payouts:
+        raise HTTPException(status_code=400, detail="Add at least one winner payout")
+
+    normalized: list[tuple[int, float]] = []
+    for rank, amount in payouts.items():
+        try:
+            rank_num = int(rank)
+            amount_num = float(amount)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Winner payouts contain invalid rank or amount")
+
+        if rank_num < 1:
+            raise HTTPException(status_code=400, detail="Winner payout ranks must start from 1")
+        if not math.isfinite(amount_num) or amount_num <= 0:
+            raise HTTPException(status_code=400, detail=f"Winner payout for rank {rank_num} must be greater than 0")
+
+        normalized.append((rank_num, round(amount_num, 2)))
+
+    normalized.sort(key=lambda item: item[0])
+    actual_ranks = [rank for rank, _ in normalized]
+    expected_ranks = list(range(1, len(normalized) + 1))
+    if actual_ranks != expected_ranks:
+        raise HTTPException(status_code=400, detail="Winner payout ranks must be continuous: 1, 2, 3...")
+
+    winner_count = len(normalized)
+    if winner_count != int(payload.default_winner_count):
+        raise HTTPException(status_code=400, detail="Default winner count must match the number of payout rows")
+    if winner_count > int(payload.active_player_count):
+        raise HTTPException(status_code=400, detail="Winner count cannot exceed active league players")
+
+    payout_total = round(sum(amount for _, amount in normalized), 2)
+    prize_pool = round(float(payload.entry_fee) * int(payload.active_player_count), 2)
+    if abs(payout_total - prize_pool) >= 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Winner payout total ({payout_total:.2f}) must match prize pool ({prize_pool:.2f})",
+        )
+
+
+def get_state(user: dict[str, Any]) -> dict[str, Any]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_get_state(user)
 
     league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
         league = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
-        players = c.execute("SELECT * FROM players WHERE league_id = ? ORDER BY name ASC", (league_id,)).fetchall()
+        players = _sync_active_members_to_players(c, league_id)
         matches = c.execute("SELECT * FROM matches WHERE league_id = ? ORDER BY id DESC", (league_id,)).fetchall()
 
     fallback_participant_ids = [int(player["id"]) for player in players]
@@ -120,6 +204,8 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
 
 
 def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool = False) -> dict[str, Any]:
+    _validate_league_payouts(payload)
+
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_upsert_league(payload, user, create_new=create_new)
 
@@ -152,6 +238,11 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
                 ON CONFLICT(user_id, league_id) DO UPDATE SET role = 'admin', status = 'active'
                 """,
                 (int(user["id"]), league_id),
+            )
+            owner_player_name = str(user.get("user_id") or "").strip() or f"member-{int(user['id'])}"
+            c.execute(
+                "INSERT OR IGNORE INTO players (league_id, name) VALUES (?, ?)",
+                (league_id, owner_player_name),
             )
             c.execute(
                 "DELETE FROM league_join_requests WHERE user_id = ? AND league_id = ?",
@@ -225,7 +316,7 @@ def add_match(payload: MatchPayload, user: dict[str, Any]) -> dict[str, str]:
     league_id = _league_id_from_user(user)
     payouts_json = json.dumps(payload.payouts) if payload.payouts else None
     with DatabaseManager() as c:
-        players = c.execute("SELECT id FROM players WHERE league_id = ? ORDER BY id ASC", (league_id,)).fetchall()
+        players = _sync_active_members_to_players(c, league_id)
         valid_player_ids = {int(player["id"]) for player in players}
         participant_ids = _normalize_participant_ids(payload.participant_ids)
         if participant_ids:
@@ -265,9 +356,10 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
     with DatabaseManager() as c:
         match_row = c.execute("SELECT * FROM matches WHERE id = ? AND league_id = ?", (match_id, league_id)).fetchone()
         league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
+        players = _sync_active_members_to_players(c, league_id)
         players_by_id = {
             int(row["id"]): dict(row)
-            for row in c.execute("SELECT id, name FROM players WHERE league_id = ? ORDER BY id ASC", (league_id,)).fetchall()
+            for row in players
         }
         if not match_row or not league_row:
             raise HTTPException(status_code=404, detail="League or match not found")
@@ -321,7 +413,7 @@ def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     with DatabaseManager() as c:
         match_row = c.execute("SELECT * FROM matches WHERE id = ? AND league_id = ?", (match_id, league_id)).fetchone()
         league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
-        players = c.execute("SELECT id FROM players WHERE league_id = ? ORDER BY id ASC", (league_id,)).fetchall()
+        players = _sync_active_members_to_players(c, league_id)
 
         if not match_row or not league_row:
             raise HTTPException(status_code=404, detail="League or match not found")
@@ -359,7 +451,7 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
         if not league_row:
             return {"rows": [], "completed_matches": 0, "entry_fee": 0}
 
-        players = c.execute("SELECT id, name FROM players WHERE league_id = ? ORDER BY name ASC", (league_id,)).fetchall()
+        players = _sync_active_members_to_players(c, league_id)
         matches = c.execute(
             "SELECT id, participant_ids_json FROM matches WHERE league_id = ? AND status IN ('completed', 'canceled') ORDER BY id DESC",
             (league_id,),
@@ -402,7 +494,7 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
 
     league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
-        players = c.execute("SELECT id, name FROM players WHERE league_id = ? ORDER BY name ASC", (league_id,)).fetchall()
+        players = _sync_active_members_to_players(c, league_id)
         matches = c.execute(
             "SELECT id, title, match_date, status, participant_ids_json FROM matches WHERE league_id = ? ORDER BY id DESC",
             (league_id,),

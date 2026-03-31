@@ -20,6 +20,8 @@
   --shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
   --good: #5ce8a0;
   --bad: #ff8dae;
+  --font-heading: "Space Grotesk", "Manrope", "Inter", "Segoe UI", sans-serif;
+  --font-body: "Manrope", "Inter", "Segoe UI", sans-serif;
 }
 
 [data-theme="light"] {
@@ -44,6 +46,8 @@
   --shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
   --good: #059669;
   --bad: #dc2626;
+  --font-heading: "Space Grotesk", "Manrope", "Inter", "Segoe UI", sans-serif;
+  --font-body: "Manrope", "Inter", "Segoe UI", sans-serif;
 }
 
 * {
@@ -133,8 +137,8 @@
 
 body {
   margin: 0;
-  font-family: "Manrope", "Avenir Next", "Nunito Sans", "Segoe UI", sans-serif;
-  font-size: 14px;
+  font-family: var(--font-body);
+  font-size: clamp(15px, 1.4vw, 16px);
   line-height: 1.5;
   color: var(--text);
   background:
@@ -375,6 +379,176 @@ body.modal-open {
   display: grid;
   justify-items: end;
   gap: 4px;
+}
+
+.route-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.route-choice-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+  color: inherit;
+  text-align: left;
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.route-choice-card.primary,
+.route-choice-card.recommended {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.route-choice-card:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
+}
+
+.route-choice-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.route-choice-badge {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 2px 8px;
+}
+
+.route-choice-description {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.league-details-hero {
+  background:
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 22%, transparent), transparent 52%),
+    linear-gradient(165deg, color-mix(in srgb, var(--panel) 82%, #0f172a 18%), var(--panel));
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+  border-radius: 22px;
+}
+
+.league-hero-content {
+  display: grid;
+  gap: clamp(10px, 2vw, 16px);
+  padding: clamp(20px, 5vw, 32px);
+}
+
+.league-hero-content h2 {
+  margin: 6px 0 2px;
+  font-size: clamp(26px, 5vw, 40px);
+  line-height: 1.12;
+}
+
+.league-hero-content p {
+  font-size: clamp(14px, 2.6vw, 15.5px);
+  color: color-mix(in srgb, var(--muted) 80%, var(--text));
+}
+
+.league-hero-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.league-details-section {
+  margin-top: 16px;
+}
+
+.league-payout-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.league-payout-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-2);
+  padding: 10px 12px;
+}
+
+.league-payout-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+
+.league-payout-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  overflow: hidden;
+}
+
+.league-payout-bar {
+  height: 100%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 80%, #fff 20%), var(--accent));
+}
+
+.player-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 44%, var(--border));
+}
+
+.match-card {
+  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.match-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.match-winner-list {
+  margin: 8px 0 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.match-winner-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-chip.is-completed {
+  border-color: #34d399;
+  color: #34d399;
+}
+
+.status-chip.is-canceled {
+  border-color: #f59e0b;
+  color: #f59e0b;
+}
+
+.status-chip.is-pending {
+  border-color: #60a5fa;
+  color: #60a5fa;
 }
 
 .auth-panel-premium {
@@ -845,11 +1019,6 @@ body.modal-open {
   gap: 12px;
 }
 
-.welcome-modal-body label {
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .welcome-modal-actions {
   display: flex;
   gap: 10px;
@@ -1028,7 +1197,12 @@ body.modal-open {
   gap: 0;
   margin-bottom: 18px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.step-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .step-pill {
@@ -1479,6 +1653,41 @@ button.ghost:hover,
 .participant-pill input {
   width: auto;
   margin: 0;
+}
+
+.participant-basket {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.participant-basket-chip {
+  font-size: 11px;
+  line-height: 1.15;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent-solid) 42%, var(--border));
+  background: color-mix(in srgb, var(--chip) 80%, transparent);
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.participant-basket-chip.is-drop {
+  animation: participant-chip-drop 0.36s ease both;
+}
+
+@keyframes participant-chip-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .chips {
@@ -2131,6 +2340,17 @@ table {
   border-collapse: collapse;
 }
 
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 14px;
+}
+
+.table-scroll table {
+  min-width: 520px;
+}
+
 th,
 td {
   padding: 12px 10px;
@@ -2471,7 +2691,6 @@ th {
   background: var(--chip);
   border-color: var(--border);
 }
-
 
 .suggestions.hidden {
   display: none !important;

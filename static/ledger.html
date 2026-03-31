@@ -79,17 +79,19 @@
       <h2>Ledger</h2>
       <p id="ledger-summary" class="muted">Spent = completed matches x entry fee. Net = won - spent.</p>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Player</th>
-            <th>Spent</th>
-            <th>Won</th>
-            <th>Net</th>
-          </tr>
-        </thead>
-        <tbody id="ledger-body"></tbody>
-      </table>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Spent</th>
+              <th>Won</th>
+              <th>Net</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body"></tbody>
+        </table>
+      </div>
 
       <div class="flow-controls">
         <a class="button-link ghost" data-workflow-link href="/winners">Back to Winners</a>

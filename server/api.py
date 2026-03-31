@@ -18,6 +18,7 @@ from .auth import (
     verify_google_token,
     list_league_members,
     list_join_requests,
+    remove_league_member,
     require_active_member,
     require_admin,
     signup_user,
@@ -55,7 +56,7 @@ def save_league(
 
 @router.post("/players")
 def create_player(payload: PlayerPayload, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
-    return add_player(payload, user)
+    raise HTTPException(status_code=400, detail="Manual player add is disabled. Invite users to join the league instead.")
 
 
 @router.delete("/players/{player_id}")
@@ -170,8 +171,13 @@ def approve_request(
 
 
 @router.get("/league/members")
-def league_members(user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+def league_members(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, Any]:
     return list_league_members(user)
+
+
+@router.delete("/league/members/{member_user_id}")
+def delete_member(member_user_id: int, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
+    return remove_league_member(member_user_id, user)
 
 
 @router.patch("/league/members/{member_user_id}/role")

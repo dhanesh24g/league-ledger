@@ -483,7 +483,8 @@ export async function initWorkflowShell(currentPath) {
 
   const isAdmin = effectiveRole === 'admin';
   setAdminNavigationVisibility(isAdmin);
-  if (!isAdmin && !canCreateFirstLeague) {
+  const canReadPlayers = currentPath === '/players';
+  if (!isAdmin && !canCreateFirstLeague && !canReadPlayers) {
     window.location.replace('/welcome');
     return null;
   }

@@ -21,6 +21,7 @@ const enableOverrides = document.getElementById('enable-overrides');
 const overrideZone = document.getElementById('override-zone');
 const participantPicker = document.getElementById('participant-picker');
 const participantCount = document.getElementById('participant-count');
+const participantBasket = document.getElementById('participant-basket');
 const selectAllParticipantsBtn = document.getElementById('select-all-participants');
 
 let authUser = { username: '', role: 'read' };
@@ -40,12 +41,14 @@ function getSelectedParticipantIds() {
     .filter((value) => Number.isFinite(value));
 }
 
-function syncParticipantSummary() {
-  const selectedIds = getSelectedParticipantIds();
-  const totalPlayers = currentPlayers.length;
+function renderParticipantBasket(selectedIds, options = {}) {
+  if (!participantBasket) return;
 
-  if (!totalPlayers) {
-    participantCount.textContent = 'Add players first to build a match roster.';
+  const { animate = false } = options;
+  participantBasket.innerHTML = '';
+
+  if (!selectedIds.length) {
+    participantBasket.classList.add('hidden');
     return;
   }
 
@@ -53,9 +56,35 @@ function syncParticipantSummary() {
     .filter((player) => selectedIds.includes(Number(player.id)))
     .map((player) => player.name);
 
+  selectedNames.forEach((name, index) => {
+    const chip = document.createElement('span');
+    chip.className = 'participant-basket-chip';
+    if (animate) {
+      chip.classList.add('is-drop');
+      chip.style.animationDelay = `${Math.min(index, 10) * 45}ms`;
+    }
+    chip.textContent = name;
+    participantBasket.appendChild(chip);
+  });
+
+  participantBasket.classList.remove('hidden');
+}
+
+function syncParticipantSummary() {
+  const selectedIds = getSelectedParticipantIds();
+  const totalPlayers = currentPlayers.length;
+
+  if (!totalPlayers) {
+    participantCount.textContent = 'Add players first to build a match roster.';
+    renderParticipantBasket([]);
+    return;
+  }
+
   participantCount.textContent = selectedIds.length
-    ? `${selectedIds.length} of ${totalPlayers} selected: ${selectedNames.join(', ')}`
+    ? `${selectedIds.length} of ${totalPlayers} selected.`
     : 'Select at least two players for this match.';
+
+  renderParticipantBasket(selectedIds);
 }
 
 function applyParticipantSelection(participantIds, options = {}) {
@@ -215,7 +244,9 @@ addOverridePayoutBtn.addEventListener('click', () => {
 });
 
 selectAllParticipantsBtn.addEventListener('click', () => {
-  applyParticipantSelection(currentPlayers.map((player) => Number(player.id)));
+  const allPlayerIds = currentPlayers.map((player) => Number(player.id));
+  applyParticipantSelection(allPlayerIds);
+  renderParticipantBasket(allPlayerIds, { animate: true });
 });
 
 enableOverrides.addEventListener('change', () => toggleOverrideSection(enableOverrides.checked));

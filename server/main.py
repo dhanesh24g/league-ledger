@@ -80,6 +80,11 @@ def league_settings_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "league-settings.html")
 
 
+@app.get("/league-details")
+def league_details_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "league-details.html")
+
+
 @app.get("/health")
 def health_check() -> dict[str, str]:
     """Health check endpoint for debugging"""
