@@ -16,12 +16,14 @@ const leagueState = document.getElementById('league-state');
 const defaultPayouts = document.getElementById('default-payouts');
 const defaultPayoutTotal = document.getElementById('default-payout-total');
 const addDefaultPayoutBtn = document.getElementById('add-default-payout');
+const inviteZone = document.getElementById('invite-zone');
 const joinRequestsZone = document.getElementById('join-requests-zone');
 const membersZone = document.getElementById('members-zone');
 
 let suppressDraftSync = false;
 let authUser = { username: '', role: 'read' };
 const isCreateMode = new URLSearchParams(window.location.search).get('mode') === 'create';
+let invitePanelExpanded = false;
 
 function getPrizePool() {
   const fee = Number(leagueForm.elements.entry_fee.value);
@@ -42,6 +44,90 @@ function applyRoleBasedUI() {
   const controls = leagueForm.querySelectorAll('input, select, textarea, button');
   controls.forEach((control) => {
     control.disabled = !isAdmin;
+  });
+}
+
+async function copyInviteLink(link, button) {
+  try {
+    await navigator.clipboard.writeText(link);
+    const originalText = button.textContent;
+    button.textContent = 'Copied';
+    window.setTimeout(() => {
+      button.textContent = originalText;
+    }, 1400);
+  } catch (error) {
+    showError('Could not copy the invite link. Please copy it manually.');
+  }
+}
+
+async function shareInviteLink(link, button) {
+  if (!navigator.share) {
+    await copyInviteLink(link, button);
+    return;
+  }
+
+  try {
+    await navigator.share({
+      title: 'League Ledger Invite',
+      text: 'Join my league on League Ledger.',
+      url: link,
+    });
+  } catch (error) {
+    if (error && error.name === 'AbortError') return;
+    showError('Could not open the share sheet. Please copy the invite link instead.');
+  }
+}
+
+function renderInviteCard(league) {
+  if (!inviteZone) return;
+
+  const isAdmin = authUser.league_role === 'admin' || isCreateMode || !authUser.league_exists;
+  if (!league || !league.invite_link || !isAdmin) {
+    inviteZone.classList.add('hidden');
+    inviteZone.innerHTML = '';
+    return;
+  }
+
+  const inviteLink = `${window.location.origin}${league.invite_link}`;
+  inviteZone.classList.remove('hidden');
+  inviteZone.innerHTML = `
+    <div class="info-card invite-card">
+      <div class="welcome-step-header invite-card-head">
+        <div>
+          <h3>Invite Members</h3>
+          <p class="muted">Generate a shareable invite link so friends can request access to this league.</p>
+        </div>
+        <span class="welcome-meta-chip">Code: ${league.invite_code}</span>
+      </div>
+      <div class="invite-action-row">
+        <button type="button" id="toggle-invite-link" class="primary invite-primary-action">
+          ${invitePanelExpanded ? 'Invite Link Ready' : 'Generate Invite Link'}
+        </button>
+        ${invitePanelExpanded ? '<button type="button" id="share-invite-link" class="ghost">Share</button>' : ''}
+      </div>
+      <div class="invite-link-block ${invitePanelExpanded ? '' : 'hidden'}">
+        <label class="invite-link-label">Shareable Invitation Link
+          <input type="text" class="invite-link-input" value="${inviteLink}" readonly aria-label="League invite link">
+        </label>
+        <div class="invite-link-row">
+          <button type="button" id="copy-invite-link" class="primary">Copy Link</button>
+          <span class="muted small">Anyone with this link can request to join, but approval still stays with the league admin.</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  inviteZone.querySelector('#toggle-invite-link')?.addEventListener('click', () => {
+    invitePanelExpanded = true;
+    renderInviteCard(league);
+  });
+
+  inviteZone.querySelector('#copy-invite-link')?.addEventListener('click', (event) => {
+    copyInviteLink(inviteLink, event.currentTarget);
+  });
+
+  inviteZone.querySelector('#share-invite-link')?.addEventListener('click', (event) => {
+    shareInviteLink(inviteLink, event.currentTarget);
   });
 }
 
@@ -192,6 +278,7 @@ function persistDraft() {
 function setLeagueStateText(league) {
   if (!league) {
     leagueState.textContent = 'No league configured yet. Fill setup and save.';
+    renderInviteCard(null);
     return;
   }
 
@@ -222,6 +309,7 @@ function renderLeague(league) {
 
   payoutController.updateTotal();
   setLeagueStateText(league);
+  renderInviteCard(league);
   suppressDraftSync = false;
 }
 

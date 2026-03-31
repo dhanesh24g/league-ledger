@@ -176,6 +176,22 @@ body.modal-open {
   box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
 }
 
+[data-theme="light"] .shell-header p {
+  color: #52637a;
+}
+
+[data-theme="light"] .panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 247, 251, 0.96));
+  box-shadow: 0 18px 44px rgba(148, 163, 184, 0.12);
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  background: rgba(255, 255, 255, 0.99);
+  border-color: rgba(15, 23, 42, 0.12);
+}
+
 .header-content {
   max-width: 1220px;
   margin: 0 auto;
@@ -518,6 +534,7 @@ body.modal-open {
   text-align: left;
   cursor: pointer;
   transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  text-decoration: none;
 }
 
 .welcome-choice-card:hover,
@@ -581,6 +598,7 @@ body.modal-open {
   font-size: 13px;
   font-weight: 700;
   color: var(--text);
+  text-decoration: none;
 }
 
 .welcome-step-header,
@@ -669,6 +687,94 @@ body.modal-open {
 
 .member-role-select {
   min-width: 120px;
+}
+
+.invite-card {
+  gap: 14px;
+}
+
+.invite-card p {
+  margin: 6px 0 0;
+}
+
+.invite-card-head {
+  align-items: start;
+}
+
+.invite-action-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.invite-primary-action {
+  min-width: 190px;
+}
+
+.invite-link-block {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.invite-link-label {
+  gap: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.invite-link-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.invite-link-row .small {
+  max-width: 520px;
+  line-height: 1.45;
+}
+
+.invite-link-row .primary {
+  min-width: 126px;
+}
+
+[data-theme="light"] .invite-link-block {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 252, 0.95));
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="light"] .invite-link-label {
+  color: #0f172a;
+}
+
+[data-theme="light"] .invite-primary-action {
+  box-shadow: 0 16px 30px rgba(37, 99, 235, 0.16);
+}
+
+.invite-link-input {
+  font-family: "SFMono-Regular", "Menlo", "Monaco", "Consolas", monospace;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+.invite-link-input[readonly] {
+  cursor: text;
+}
+
+.invite-card .welcome-meta-chip {
+  font-size: 11px;
+}
+
+.invite-link-row {
+  gap: 10px;
 }
 
 .shell-header {
@@ -2042,6 +2148,22 @@ th {
   .rank-distribution-row {
     gap: 8px;
   }
+
+  .invite-link-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invite-action-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .invite-primary-action,
+  .invite-link-row .primary {
+    min-width: 0;
+    width: 100%;
+  }
 }
 
 .autocomplete {
@@ -2688,6 +2810,46 @@ th {
 [data-theme="light"] .feed-item {
   border-color: rgba(15, 23, 42, 0.08);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+}
+
+[data-theme="light"] .auth-panel-premium {
+  border-color: rgba(15, 23, 42, 0.08);
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.12), transparent 28%),
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.12), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(243, 247, 252, 0.97));
+  box-shadow: 0 24px 54px rgba(148, 163, 184, 0.18);
+}
+
+[data-theme="light"] .welcome-choice-card {
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 32%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(245, 248, 252, 0.97));
+  box-shadow: 0 16px 34px rgba(148, 163, 184, 0.14);
+}
+
+[data-theme="light"] .welcome-choice-card:hover,
+[data-theme="light"] .welcome-choice-card:focus-visible,
+[data-theme="light"] .welcome-membership-row:hover,
+[data-theme="light"] .welcome-membership-row:focus-visible {
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: 0 18px 36px rgba(148, 163, 184, 0.18);
+}
+
+[data-theme="light"] .welcome-choice-eyebrow.create {
+  background: rgba(22, 163, 74, 0.1);
+  color: #166534;
+  border-color: rgba(22, 163, 74, 0.14);
+}
+
+[data-theme="light"] .welcome-choice-eyebrow.join {
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+  border-color: rgba(37, 99, 235, 0.14);
+}
+
+[data-theme="light"] .welcome-choice-cta {
+  color: #0f172a;
 }
 
 [data-theme="light"] .status-chip,
