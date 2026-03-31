@@ -397,9 +397,6 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
 
 
 def get_stats(user: dict[str, Any]) -> dict[str, Any]:
-    if user.get("league_role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
-
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_get_stats(user)
 

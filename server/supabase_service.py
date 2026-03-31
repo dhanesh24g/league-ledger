@@ -394,9 +394,6 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
 
-    if user.get("league_role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin role required")
-
     players_response = supabase.table("players").select("id, name").order("name").execute()
     players = players_response.data
 

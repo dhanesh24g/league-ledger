@@ -36,6 +36,23 @@ function setPlainHeaderMode() {
   document.querySelector('.header-center')?.classList.add('hidden');
 }
 
+function setReadNavigationMode() {
+  if (!topNav) return;
+  topNav.innerHTML = '';
+
+  const statsOption = document.createElement('option');
+  statsOption.value = '/stats';
+  statsOption.textContent = 'League Dashboard';
+  topNav.appendChild(statsOption);
+
+  const homeOption = document.createElement('option');
+  homeOption.value = '/welcome';
+  homeOption.textContent = 'Home';
+  topNav.appendChild(homeOption);
+
+  topNav.value = '/stats';
+}
+
 const RANK_VISUALS = {
   0: { icon: '🌧️', label: 'Washout / Refund' },
   1: { icon: '🥇', label: 'Champion' },
@@ -534,9 +551,7 @@ async function init() {
   localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
   authRole.textContent = `${user.user_id}`;
   if (effectiveRole !== 'admin') {
-    setPlainHeaderMode();
-    window.location.replace('/welcome');
-    return;
+    setReadNavigationMode();
   }
 
   stats = await callApi('/api/stats');

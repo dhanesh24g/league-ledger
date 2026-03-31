@@ -45,12 +45,6 @@ function parseInviteInput(value) {
   return raw.replace(/^\/join\//, '').trim();
 }
 
-function getSelectedLeagueIdFromQuery() {
-  const value = new URLSearchParams(window.location.search).get('league_id');
-  if (!value) return '';
-  return String(value);
-}
-
 function renderMembershipCards(user) {
   if (!Array.isArray(user.memberships) || !user.memberships.length) {
     return '';
@@ -84,40 +78,10 @@ function bindMembershipCards(user) {
       if (!leagueId) return;
       setActiveLeagueId(leagueId);
       const membership = user.memberships.find((item) => String(item.league_id) === String(leagueId));
-      const target = membership?.role === 'admin' ? '/setup' : `/welcome?league_id=${encodeURIComponent(String(leagueId))}`;
+      const target = membership?.role === 'admin' ? '/setup' : '/stats';
       window.location.href = target;
     });
   });
-}
-
-function renderReadLeagueContext(user, membership) {
-  const league = membership?.league;
-  if (!league) {
-    renderHome(user);
-    return;
-  }
-
-  welcomeTitle.textContent = `${league.name} · Read Access`;
-  welcomeCopy.textContent = 'Your access is intentionally limited to league overview on this home screen.';
-  welcomeActions.innerHTML = `
-    <div class="info-card welcome-card">
-      <h3>League Context Selected</h3>
-      <p class="muted">You are currently inside <strong>${league.name}</strong> with read-only access. Workflow and stats dashboards are restricted to admins.</p>
-      <div class="welcome-meta-row">
-        <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
-        <span class="welcome-meta-chip">${league.tournament || 'League'}</span>
-        <span class="welcome-meta-chip">Role: Read</span>
-      </div>
-      <button id="back-to-leagues" type="button" class="ghost welcome-inline-action">Back To My Leagues</button>
-    </div>
-  `;
-
-  document.getElementById('back-to-leagues')?.addEventListener('click', () => {
-    window.history.replaceState({}, '', '/welcome');
-    renderHome(user);
-  });
-
-  bindJoinModal(user);
 }
 
 async function renderJoinRequests(user) {
@@ -206,7 +170,7 @@ async function renderInvitePreview(user, inviteCode) {
       setActiveLeagueId(league.id);
       window.location.href = membership.role === 'admin'
         ? '/setup'
-        : `/welcome?league_id=${encodeURIComponent(String(league.id))}`;
+        : '/stats';
     });
     return;
   }
@@ -387,21 +351,8 @@ async function init() {
   });
 
   const inviteCode = getInviteCodeFromLocation();
-  const selectedLeagueId = getSelectedLeagueIdFromQuery();
   if (inviteCode) {
     await renderInvitePreview(user, inviteCode);
-  } else if (selectedLeagueId) {
-    const membership = (user.memberships || []).find((item) => String(item.league_id) === String(selectedLeagueId));
-    if (membership?.league_id) {
-      setActiveLeagueId(membership.league_id);
-      if (membership.role === 'admin') {
-        window.location.replace('/setup');
-        return;
-      }
-      renderReadLeagueContext(user, membership);
-    } else {
-      renderHome(user);
-    }
   } else {
     if (user.active_league_id) {
       setActiveLeagueId(user.active_league_id);
