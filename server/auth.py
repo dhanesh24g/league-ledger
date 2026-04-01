@@ -506,6 +506,7 @@ def _build_profile(
     memberships: list[dict[str, Any]],
     requests: list[dict[str, Any]],
     requested_league_id: int | None = None,
+    league_exists_override: bool | None = None,
 ) -> dict[str, Any]:
     leagues_by_id = {int(row["id"]): row for row in leagues}
     active_memberships = [row for row in memberships if str(row.get("status", "")).lower() == "active"]
@@ -592,7 +593,7 @@ def _build_profile(
         "role": "read",
         "league_role": league_role,
         "membership_status": membership_status,
-        "league_exists": bool(leagues),
+        "league_exists": bool(leagues) if league_exists_override is None else bool(league_exists_override),
         "active_league_id": int(current_league["id"]) if current_league else None,
         "league": _shape_league_summary(current_league) if current_league else None,
         "memberships": memberships_payload,
@@ -647,10 +648,9 @@ def _supabase_profile_query(user_id_value: int | None = None, user_id_label: str
         return None
 
     user = response.data[0]
-    leagues = supabase.table("league").select("*").order("created_at").order("id").execute().data or []
     memberships = (
         supabase.table("league_memberships")
-        .select("*")
+        .select("id, user_id, league_id, role, status, created_at")
         .eq("user_id", int(user["id"]))
         .order("created_at")
         .order("id")
@@ -660,7 +660,7 @@ def _supabase_profile_query(user_id_value: int | None = None, user_id_label: str
     )
     requests = (
         supabase.table("league_join_requests")
-        .select("*")
+        .select("id, user_id, league_id, status, created_at, reviewed_at")
         .eq("user_id", int(user["id"]))
         .order("created_at")
         .order("id")
@@ -668,7 +668,41 @@ def _supabase_profile_query(user_id_value: int | None = None, user_id_label: str
         .data
         or []
     )
-    return _build_profile(user, leagues, memberships, requests, requested_league_id=requested_league_id)
+
+    league_ids = {
+        int(row["league_id"])
+        for row in [*memberships, *requests]
+        if row.get("league_id") is not None
+    }
+    if requested_league_id is not None:
+        league_ids.add(int(requested_league_id))
+
+    leagues: list[dict[str, Any]] = []
+    if league_ids:
+        leagues = (
+            supabase.table("league")
+            .select("*")
+            .in_("id", sorted(league_ids))
+            .order("created_at")
+            .order("id")
+            .execute()
+            .data
+            or []
+        )
+
+    league_exists = bool(leagues)
+    if not league_exists:
+        any_league_row = supabase.table("league").select("id").limit(1).execute().data or []
+        league_exists = bool(any_league_row)
+
+    return _build_profile(
+        user,
+        leagues,
+        memberships,
+        requests,
+        requested_league_id=requested_league_id,
+        league_exists_override=league_exists,
+    )
 
 
 def get_user_profile_by_user_id(user_id_value: str, requested_league_id: int | None = None) -> dict[str, Any] | None:

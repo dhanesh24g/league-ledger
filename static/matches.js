@@ -5,6 +5,7 @@ import {
   initWorkflowShell,
   navigateTo,
   queueToast,
+  setButtonLoading,
   setMatchDraft,
   setSelectedMatchId,
   showError,
@@ -264,7 +265,10 @@ matchForm.addEventListener('submit', async (event) => {
   }
 
   let closeLoading = null;
+  const submitBtn = matchForm.querySelector('button[type="submit"]');
+  let restoreSubmitButton = null;
   try {
+    restoreSubmitButton = setButtonLoading(submitBtn, 'Saving match...');
     closeLoading = showLoading('Saving match...');
     const participantIds = getSelectedParticipantIds();
     if (participantIds.length < 2) {
@@ -320,6 +324,7 @@ matchForm.addEventListener('submit', async (event) => {
   } catch (error) {
     showError(error);
   } finally {
+    if (restoreSubmitButton) restoreSubmitButton();
     if (closeLoading) closeLoading();
   }
 });

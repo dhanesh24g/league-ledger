@@ -65,7 +65,12 @@ def _sync_active_members_to_players(supabase: Any, league_id: int) -> list[dict[
     if not membership_user_ids:
         return []
 
-    users_response = supabase.table("users").select("id, first_name, last_name, user_id").execute()
+    users_response = (
+        supabase.table("users")
+        .select("id, first_name, last_name, user_id")
+        .in_("id", membership_user_ids)
+        .execute()
+    )
     users_by_id = {int(row["id"]): row for row in (users_response.data or [])}
 
     desired_names: list[str] = []
@@ -92,11 +97,13 @@ def _sync_active_members_to_players(supabase: Any, league_id: int) -> list[dict[
     existing_names = {str(row.get("name") or "") for row in (existing_players_response.data or [])}
 
     missing_names = [name for name in desired_names if name not in existing_names]
-    for player_name in missing_names:
+    if missing_names:
         try:
-            supabase.table("players").insert({"league_id": league_id, "name": player_name}).execute()
+            supabase.table("players").insert(
+                [{"league_id": league_id, "name": player_name} for player_name in missing_names]
+            ).execute()
         except Exception as exc:
-            logger.error(f"Failed to insert player {player_name} for league {league_id}: {str(exc)}", exc_info=True)
+            logger.error(f"Failed to insert players for league {league_id}: {str(exc)}", exc_info=True)
             raise
 
     players_response = (
@@ -544,13 +551,15 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     players = _sync_active_members_to_players(supabase, league_id)
     
     # Get winnings
-    winnings_response = (
-        supabase.table("winner_entries")
-        .select("player_id, amount, match_id")
-        .in_("match_id", [int(match["id"]) for match in matches] if matches else [-1])
-        .execute()
-    )
-    winnings = winnings_response.data
+    winnings: list[dict[str, Any]] = []
+    if matches:
+        winnings_response = (
+            supabase.table("winner_entries")
+            .select("player_id, amount, match_id")
+            .in_("match_id", [int(match["id"]) for match in matches])
+            .execute()
+        )
+        winnings = winnings_response.data or []
     
     winnings_map = {}
     for item in winnings:
@@ -598,15 +607,17 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     matches_response = supabase.table("matches").select("id, title, match_date, status, participant_ids_json").eq("league_id", league_id).order("id", desc=True).execute()
     matches = matches_response.data
 
-    winners_response = (
-        supabase.table("winner_entries")
-        .select("match_id, rank, player_id, amount")
-        .in_("match_id", [int(match["id"]) for match in matches] if matches else [-1])
-        .order("match_id", desc=True)
-        .order("rank")
-        .execute()
-    )
-    winners = winners_response.data
+    winners: list[dict[str, Any]] = []
+    if matches:
+        winners_response = (
+            supabase.table("winner_entries")
+            .select("match_id, rank, player_id, amount")
+            .in_("match_id", [int(match["id"]) for match in matches])
+            .order("match_id", desc=True)
+            .order("rank")
+            .execute()
+        )
+        winners = winners_response.data or []
 
     player_name_by_id = {int(p["id"]): str(p["name"]) for p in players}
     player_stats: dict[int, dict[str, Any]] = {

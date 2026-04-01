@@ -6,6 +6,7 @@ import {
   initWorkflowShell,
   navigateTo,
   queueToast,
+  setButtonLoading,
   setCurrentWorkflowPage,
   setSelectedMatchId,
   setWinnerDraft,
@@ -496,11 +497,11 @@ function renderWinnerForm(matchId) {
 async function saveWinners(match, options = {}) {
   const { showSuccess = false } = options;
   let closeLoading = null;
+  let restoreSaveButton = null;
   try {
     closeLoading = showLoading('Saving winners...');
     if (saveWinnersBtn) {
-      saveWinnersBtn.disabled = true;
-      saveWinnersBtn.textContent = 'Saving...';
+      restoreSaveButton = setButtonLoading(saveWinnersBtn, 'Saving...');
     }
 
     refreshConsumedRankCards(match);
@@ -525,10 +526,7 @@ async function saveWinners(match, options = {}) {
     return false;
   } finally {
     if (closeLoading) closeLoading();
-    if (saveWinnersBtn) {
-      saveWinnersBtn.disabled = false;
-      saveWinnersBtn.textContent = 'Save Winners';
-    }
+    if (restoreSaveButton) restoreSaveButton();
   }
 }
 
@@ -566,7 +564,9 @@ cancelMatchBtn.addEventListener('click', async () => {
   if (!proceed) return;
 
   let closeLoading = null;
+  let restoreCancelButton = null;
   try {
+    restoreCancelButton = setButtonLoading(cancelMatchBtn, 'Cancelling...');
     closeLoading = showLoading('Cancelling match...');
     await callApi(`/api/matches/${matchSelect.value}/cancel`, { method: 'POST' });
     clearWinnerDraft(matchSelect.value);
@@ -576,6 +576,7 @@ cancelMatchBtn.addEventListener('click', async () => {
   } catch (error) {
     showError(error);
   } finally {
+    if (restoreCancelButton) restoreCancelButton();
     if (closeLoading) closeLoading();
   }
 });
@@ -592,12 +593,18 @@ continueLedgerBtn.addEventListener('click', async () => {
     return;
   }
 
-  const saved = await saveWinners(match);
-  if (!saved) return;
+  let restoreContinueButton = null;
+  try {
+    restoreContinueButton = setButtonLoading(continueLedgerBtn, 'Saving...');
+    const saved = await saveWinners(match);
+    if (!saved) return;
 
-  queueToast('Winners saved successfully.');
-  setCurrentWorkflowPage('/ledger');
-  navigateTo('/ledger');
+    queueToast('Winners saved successfully.');
+    setCurrentWorkflowPage('/ledger');
+    navigateTo('/ledger');
+  } finally {
+    if (restoreContinueButton) restoreContinueButton();
+  }
 });
 
 async function init() {

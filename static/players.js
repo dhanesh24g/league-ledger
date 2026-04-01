@@ -1,6 +1,7 @@
 import {
   callApi,
   initWorkflowShell,
+  setButtonLoading,
   showError,
   showLoading,
   showSuccess,
@@ -43,7 +44,9 @@ function renderPlayers(members) {
         if (!confirmed) return;
 
         let closeLoading = null;
+        let restoreButton = null;
         try {
+          restoreButton = setButtonLoading(removeBtn, 'Removing...');
           closeLoading = showLoading('Removing member...');
           await callApi(`/api/league/members/${member.user_id}`, { method: 'DELETE' });
           const result = await callApi('/api/league/members');
@@ -52,6 +55,7 @@ function renderPlayers(members) {
         } catch (error) {
           showError(error);
         } finally {
+          if (restoreButton) restoreButton();
           if (closeLoading) closeLoading();
         }
       });

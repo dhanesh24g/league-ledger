@@ -1705,6 +1705,33 @@ button.ghost:hover,
   transform: translateY(-1px);
 }
 
+button.is-loading,
+.button-link.is-loading {
+  cursor: progress;
+  transform: none;
+  opacity: 0.92;
+}
+
+button.is-loading:hover,
+.button-link.is-loading:hover {
+  transform: none;
+}
+
+.button-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, currentColor 28%, transparent);
+  border-top-color: currentColor;
+  animation: toast-spin 0.85s linear infinite;
+  flex: 0 0 14px;
+}
+
+.button-link,
+button {
+  gap: 8px;
+}
+
 .inline-form {
   display: flex;
   align-items: start;
@@ -2493,6 +2520,31 @@ button.ghost:hover,
   flex: 1 1 220px;
 }
 
+.setup-page .setup-panel {
+  gap: 12px;
+}
+
+.setup-page .info-card {
+  padding: 14px;
+  border-radius: 14px;
+}
+
+.setup-page .request-row {
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.setup-page .setup-flow-controls {
+  margin-top: 8px;
+  gap: 10px;
+}
+
+.setup-page .setup-flow-controls>.button-link {
+  flex: 0 1 auto;
+  min-height: 44px;
+  padding: 0.75rem 1.1rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -2674,6 +2726,10 @@ th {
     flex-direction: column;
   }
 
+  .flow-controls>* {
+    flex: 0 0 auto;
+  }
+
   .step-nav {
     display: grid;
     grid-template-columns: 1fr;
@@ -2695,6 +2751,11 @@ th {
 
   .flow-controls .button-link {
     width: 100%;
+  }
+
+  .setup-page .setup-flow-controls>.button-link {
+    min-height: 42px;
+    padding: 0.7rem 0.95rem;
   }
 
   .chips {
