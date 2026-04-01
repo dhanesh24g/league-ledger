@@ -4,6 +4,8 @@ const googleLoginBtn = document.getElementById('google-login-btn');
 const googleLoginHint = document.getElementById('google-login-hint');
 
 let authConfig = { google_enabled: false, google_client_id: null };
+let googleIdentityScriptPromise = null;
+let googleClientInitialized = false;
 
 async function callApi(url, options = {}) {
   const res = await fetch(url, {
@@ -54,7 +56,8 @@ function updateThemeIcons(theme) {
   lightIcon.classList.toggle('active', theme === 'light');
   darkIcon.classList.toggle('active', theme !== 'light');
   if (themeToggle) {
-    themeToggle.setAttribute('aria-label', `Theme setting: ${theme === 'light' ? 'Light' : 'Dark'}`);
+    themeToggle.setAttribute('aria-label', 'Toggle theme');
+    themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
     themeToggle.dataset.theme = theme;
   }
 }
@@ -77,33 +80,72 @@ function initThemeToggle() {
 }
 
 function initGoogleLogin() {
-  if (!authConfig.google_enabled || !authConfig.google_client_id || !window.google?.accounts?.id) {
+  if (!authConfig.google_enabled || !authConfig.google_client_id) {
     googleLoginBtn.disabled = true;
     setGoogleState('error', 'Google sign-in is not configured in this environment yet.');
     return;
   }
 
-  google.accounts.id.initialize({
-    client_id: authConfig.google_client_id,
-    callback: async (response) => {
-      try {
-        const result = await callApi('/api/auth/google', {
-          method: 'POST',
-          body: JSON.stringify({ credential: response.credential }),
-        });
-        applyAuthResult(result);
-      } catch (error) {
-        setGoogleState('error', error instanceof Error ? error.message : String(error));
-      }
-    },
-  });
+  googleLoginBtn.disabled = false;
+  setGoogleState('success', 'Tap to continue with Google when needed.');
 
-  googleLoginBtn.addEventListener('click', () => {
-    google.accounts.id.prompt();
+  const loadGoogleIdentityScript = async () => {
+    if (window.google?.accounts?.id) return;
+    if (!googleIdentityScriptPromise) {
+      googleIdentityScriptPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Google sign-in client.'));
+        document.head.appendChild(script);
+      });
+    }
+    await googleIdentityScriptPromise;
+  };
+
+  const ensureGoogleClient = async () => {
+    await loadGoogleIdentityScript();
+    if (!window.google?.accounts?.id) {
+      throw new Error('Google sign-in client is unavailable. Please try again.');
+    }
+    if (googleClientInitialized) return;
+
+    google.accounts.id.initialize({
+      client_id: authConfig.google_client_id,
+      callback: async (response) => {
+        try {
+          const result = await callApi('/api/auth/google', {
+            method: 'POST',
+            body: JSON.stringify({ credential: response.credential }),
+          });
+          applyAuthResult(result);
+        } catch (error) {
+          setGoogleState('error', error instanceof Error ? error.message : String(error));
+        }
+      },
+    });
+
+    googleClientInitialized = true;
+  };
+
+  googleLoginBtn.addEventListener('click', async () => {
+    try {
+      googleLoginBtn.disabled = true;
+      setGoogleState('success', 'Loading Google sign-in…');
+      await ensureGoogleClient();
+      google.accounts.id.prompt();
+      setGoogleState('success', 'Continue in the Google sign-in popup.');
+    } catch (error) {
+      setGoogleState('error', error instanceof Error ? error.message : String(error));
+    } finally {
+      googleLoginBtn.disabled = false;
+    }
   });
 }
 
-async function init() {
+async function initLogin() {
   const storedRole = localStorage.getItem('dhaneshlabs-login-role-hint');
   if (storedRole === 'read') {
     document.body.classList.add('login-read-mode');

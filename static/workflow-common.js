@@ -348,7 +348,8 @@ function updateThemeIcons(theme) {
   }
 
   if (themeToggle) {
-    themeToggle.setAttribute('aria-label', `Theme setting: ${theme === 'light' ? 'Light' : 'Dark'}`);
+    themeToggle.setAttribute('aria-label', 'Toggle theme');
+    themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
     themeToggle.dataset.theme = theme;
   }
 }
