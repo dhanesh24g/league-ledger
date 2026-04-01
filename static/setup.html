@@ -33,12 +33,10 @@
   </script>
 </head>
 
-<body>
+<body class="setup-page">
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
-    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span><span
-        class="theme-option-label">Light</span></span>
-    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span><span
-        class="theme-option-label">Dark</span></span>
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
   </button>
 
   <header class="app-header">
@@ -94,7 +92,7 @@
       <a class="step-pill" data-route="/ledger" data-workflow-link href="/ledger">Ledger</a>
     </nav>
 
-    <section class="panel active">
+    <section class="panel active setup-panel">
       <h2>League Setup</h2>
       <p class="muted">Define your default rules once. Refreshing this page keeps your draft instead of resetting the
         workflow.</p>
@@ -142,7 +140,7 @@
       <div id="invite-zone" class="stack hidden"></div>
       <div id="join-requests-zone" class="stack hidden"></div>
       <div id="members-zone" class="stack hidden"></div>
-      <div class="flow-controls">
+      <div class="flow-controls setup-flow-controls">
         <a class="button-link ghost" href="/welcome">← Back to Welcome</a>
         <a class="button-link primary" data-workflow-link href="/players">Continue to Players</a>
       </div>

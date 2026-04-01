@@ -6,6 +6,8 @@ class NotificationManager {
     this.user = null;
     this.syncTimer = null;
     this.isSyncing = false;
+    this.hasBootstrapped = false;
+    this.syncIntervalMs = 60000;
     this.storageKey = 'league-ledger-notifications';
     this.trackerStorageKey = '';
     this.notificationBtn = document.getElementById('notification-btn');
@@ -41,14 +43,34 @@ class NotificationManager {
     // Update badge
     this.updateBadge();
 
-    this.bootstrapServerSync();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!this.hasBootstrapped) return;
+      this.syncServerNotifications();
+    });
+
+    window.addEventListener('focus', () => {
+      if (!this.hasBootstrapped) return;
+      this.syncServerNotifications();
+    });
+  }
+
+  async ensureServerSyncStarted() {
+    if (this.hasBootstrapped) {
+      this.syncServerNotifications();
+      return;
+    }
+    await this.bootstrapServerSync();
   }
 
   async bootstrapServerSync() {
+    if (this.hasBootstrapped) return;
     try {
       const profile = await callApi('/api/auth/me');
       this.user = profile.user || null;
       if (!this.user?.id) return;
+
+      this.hasBootstrapped = true;
 
       this.storageKey = `league-ledger-notifications:${this.user.id}`;
       this.trackerStorageKey = `league-ledger-notification-tracker:${this.user.id}`;
@@ -56,10 +78,10 @@ class NotificationManager {
       this.updateBadge();
       this.renderNotifications();
 
-      await this.syncServerNotifications();
+      await this.syncServerNotifications(this.user);
       this.syncTimer = window.setInterval(() => {
         this.syncServerNotifications();
-      }, 15000);
+      }, this.syncIntervalMs);
     } catch (error) {
       console.warn('Notification sync bootstrap failed:', error);
     }
@@ -90,13 +112,12 @@ class NotificationManager {
     }
   }
 
-  async syncServerNotifications() {
+  async syncServerNotifications(currentUser = null) {
     if (!this.user || this.isSyncing) return;
     this.isSyncing = true;
 
     try {
-      const latestProfile = await callApi('/api/auth/me');
-      const latestUser = latestProfile.user || this.user;
+      const latestUser = currentUser || (await callApi('/api/auth/me')).user || this.user;
       this.user = latestUser;
 
       const tracker = this.loadTracker();
@@ -167,6 +188,7 @@ class NotificationManager {
 
   openNotificationDropdown() {
     this.notificationDropdown.classList.remove('hidden');
+    this.ensureServerSyncStarted();
     this.renderNotifications();
     // Mark all as read when opening
     this.markAllAsRead();

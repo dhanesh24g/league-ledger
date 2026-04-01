@@ -296,6 +296,24 @@ export function showLoading(message = 'Saving...') {
   return () => dismissToast(toast);
 }
 
+export function setButtonLoading(button, loadingText = 'Processing...') {
+  if (!button) return () => { };
+
+  const originalHtml = button.innerHTML;
+  const hadDisabled = button.disabled;
+  button.disabled = true;
+  button.setAttribute('aria-busy', 'true');
+  button.classList.add('is-loading');
+  button.innerHTML = `<span class="button-spinner" aria-hidden="true"></span><span>${loadingText}</span>`;
+
+  return () => {
+    button.classList.remove('is-loading');
+    button.removeAttribute('aria-busy');
+    button.disabled = hadDisabled;
+    button.innerHTML = originalHtml;
+  };
+}
+
 export function showSuccess(message, durationMs = 2400) {
   showToast(message, 'success', durationMs);
 }
@@ -348,7 +366,8 @@ function updateThemeIcons(theme) {
   }
 
   if (themeToggle) {
-    themeToggle.setAttribute('aria-label', `Theme setting: ${theme === 'light' ? 'Light' : 'Dark'}`);
+    themeToggle.setAttribute('aria-label', 'Toggle theme');
+    themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
     themeToggle.dataset.theme = theme;
   }
 }

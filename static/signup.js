@@ -8,6 +8,8 @@ const suggestionsRow = document.getElementById('user-id-suggestions');
 let authConfig = { google_enabled: false, google_client_id: null };
 let userIdCheckTimer = null;
 let lastSuggestedSeed = '';
+let googleIdentityScriptPromise = null;
+let googleClientInitialized = false;
 
 async function callApi(url, options = {}) {
   const res = await fetch(url, {
@@ -58,7 +60,8 @@ function updateThemeIcons(theme) {
   lightIcon.classList.toggle('active', theme === 'light');
   darkIcon.classList.toggle('active', theme !== 'light');
   if (themeToggle) {
-    themeToggle.setAttribute('aria-label', `Theme setting: ${theme === 'light' ? 'Light' : 'Dark'}`);
+    themeToggle.setAttribute('aria-label', 'Toggle theme');
+    themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
     themeToggle.dataset.theme = theme;
   }
 }
@@ -159,11 +162,11 @@ function queueUserIdCheck(immediate = false) {
     window.clearTimeout(userIdCheckTimer);
   }
   if (immediate) {
-    checkUserIdAvailability().catch(() => {});
+    checkUserIdAvailability().catch(() => { });
     return;
   }
   userIdCheckTimer = window.setTimeout(() => {
-    checkUserIdAvailability().catch(() => {});
+    checkUserIdAvailability().catch(() => { });
   }, 220);
 }
 
@@ -186,25 +189,64 @@ async function handleGoogleCredential(credential) {
 }
 
 function initGoogleSignup() {
-  if (!authConfig.google_enabled || !authConfig.google_client_id || !window.google?.accounts?.id) {
+  if (!authConfig.google_enabled || !authConfig.google_client_id) {
     googleSignupBtn.disabled = true;
     setGoogleState('error', 'Google sign-up is not configured in this environment yet.');
     return;
   }
 
-  google.accounts.id.initialize({
-    client_id: authConfig.google_client_id,
-    callback: async (response) => {
-      try {
-        await handleGoogleCredential(response.credential);
-      } catch (error) {
-        setGoogleState('error', error instanceof Error ? error.message : String(error));
-      }
-    },
-  });
+  googleSignupBtn.disabled = false;
+  setGoogleState('success', 'Tap to continue with Google when needed.');
 
-  googleSignupBtn.addEventListener('click', () => {
-    google.accounts.id.prompt();
+  const loadGoogleIdentityScript = async () => {
+    if (window.google?.accounts?.id) return;
+    if (!googleIdentityScriptPromise) {
+      googleIdentityScriptPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Google sign-up client.'));
+        document.head.appendChild(script);
+      });
+    }
+    await googleIdentityScriptPromise;
+  };
+
+  const ensureGoogleClient = async () => {
+    await loadGoogleIdentityScript();
+    if (!window.google?.accounts?.id) {
+      throw new Error('Google sign-up client is unavailable. Please try again.');
+    }
+    if (googleClientInitialized) return;
+
+    google.accounts.id.initialize({
+      client_id: authConfig.google_client_id,
+      callback: async (response) => {
+        try {
+          await handleGoogleCredential(response.credential);
+        } catch (error) {
+          setGoogleState('error', error instanceof Error ? error.message : String(error));
+        }
+      },
+    });
+
+    googleClientInitialized = true;
+  };
+
+  googleSignupBtn.addEventListener('click', async () => {
+    try {
+      googleSignupBtn.disabled = true;
+      setGoogleState('success', 'Loading Google sign-up…');
+      await ensureGoogleClient();
+      google.accounts.id.prompt();
+      setGoogleState('success', 'Continue in the Google sign-up popup.');
+    } catch (error) {
+      setGoogleState('error', error instanceof Error ? error.message : String(error));
+    } finally {
+      googleSignupBtn.disabled = false;
+    }
   });
 }
 
@@ -223,10 +265,10 @@ async function initSignup() {
 }
 
 signupForm.elements.first_name.addEventListener('input', () => {
-  refreshSuggestions().catch(() => {});
+  refreshSuggestions().catch(() => { });
 });
 signupForm.elements.last_name.addEventListener('input', () => {
-  refreshSuggestions().catch(() => {});
+  refreshSuggestions().catch(() => { });
 });
 signupForm.elements.user_id.addEventListener('input', () => {
   queueUserIdCheck();

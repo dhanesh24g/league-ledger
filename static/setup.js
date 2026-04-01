@@ -6,6 +6,7 @@ import {
   initWorkflowShell,
   navigateTo,
   queueToast,
+  setButtonLoading,
   setActiveLeagueId,
   setSetupDraft,
   showError,
@@ -177,8 +178,9 @@ async function renderJoinRequests() {
     joinRequestsZone.querySelectorAll('.approve-request').forEach((button) => {
       button.addEventListener('click', async () => {
         let closeLoading = null;
+        let restoreButton = null;
         try {
-          button.disabled = true;
+          restoreButton = setButtonLoading(button, 'Approving...');
           closeLoading = showLoading('Approving request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/approve`, {
             method: 'POST',
@@ -203,8 +205,8 @@ async function renderJoinRequests() {
           await renderMembers();
         } catch (error) {
           showError(error);
-          button.disabled = false;
         } finally {
+          if (restoreButton) restoreButton();
           if (closeLoading) closeLoading();
         }
       });
@@ -216,8 +218,9 @@ async function renderJoinRequests() {
         if (!confirmed) return;
 
         let closeLoading = null;
+        let restoreButton = null;
         try {
-          button.disabled = true;
+          restoreButton = setButtonLoading(button, 'Rejecting...');
           closeLoading = showLoading('Rejecting request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/reject`, {
             method: 'POST',
@@ -227,8 +230,8 @@ async function renderJoinRequests() {
           await renderJoinRequests();
         } catch (error) {
           showError(error);
-          button.disabled = false;
         } finally {
+          if (restoreButton) restoreButton();
           if (closeLoading) closeLoading();
         }
       });
@@ -362,7 +365,10 @@ leagueForm.addEventListener('submit', async (event) => {
   }
 
   let closeLoading = null;
+  const submitBtn = leagueForm.querySelector('button[type="submit"]');
+  let restoreSubmitButton = null;
   try {
+    restoreSubmitButton = setButtonLoading(submitBtn, 'Saving rules...');
     closeLoading = showLoading('Saving league settings...');
     const formData = new FormData(leagueForm);
     const payoutRows = [...defaultPayouts.querySelectorAll('.payout-row')];
@@ -417,6 +423,7 @@ leagueForm.addEventListener('submit', async (event) => {
   } catch (error) {
     showError(error);
   } finally {
+    if (restoreSubmitButton) restoreSubmitButton();
     if (closeLoading) closeLoading();
   }
 });
