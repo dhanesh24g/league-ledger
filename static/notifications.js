@@ -16,6 +16,10 @@ class NotificationManager {
     this.notificationList = document.getElementById('notification-list');
     this.clearNotificationsBtn = document.getElementById('clear-notifications');
     this.reviewModal = null;
+    this.handleViewportChange = () => {
+      if (!this.notificationDropdown || this.notificationDropdown.classList.contains('hidden')) return;
+      this.positionNotificationDropdown();
+    };
 
     this.init();
   }
@@ -53,6 +57,41 @@ class NotificationManager {
       if (!this.hasBootstrapped) return;
       this.syncServerNotifications();
     });
+
+    window.addEventListener('resize', this.handleViewportChange);
+    window.addEventListener('orientationchange', this.handleViewportChange);
+    window.addEventListener('scroll', this.handleViewportChange, { passive: true });
+  }
+
+  shouldUseViewportDropdownPosition() {
+    return window.matchMedia('(max-width: 1100px)').matches;
+  }
+
+  resetNotificationDropdownPosition() {
+    if (!this.notificationDropdown) return;
+    this.notificationDropdown.style.removeProperty('top');
+    this.notificationDropdown.style.removeProperty('left');
+    this.notificationDropdown.style.removeProperty('right');
+    this.notificationDropdown.style.removeProperty('width');
+    this.notificationDropdown.style.removeProperty('max-width');
+  }
+
+  positionNotificationDropdown() {
+    if (!this.notificationBtn || !this.notificationDropdown) return;
+
+    if (!this.shouldUseViewportDropdownPosition()) {
+      this.resetNotificationDropdownPosition();
+      return;
+    }
+
+    const buttonRect = this.notificationBtn.getBoundingClientRect();
+    const topOffset = Math.max(8, Math.round(buttonRect.bottom + 8));
+
+    this.notificationDropdown.style.top = `${topOffset}px`;
+    this.notificationDropdown.style.left = '12px';
+    this.notificationDropdown.style.right = '12px';
+    this.notificationDropdown.style.width = 'auto';
+    this.notificationDropdown.style.maxWidth = 'none';
   }
 
   async ensureServerSyncStarted() {
@@ -187,6 +226,7 @@ class NotificationManager {
   }
 
   openNotificationDropdown() {
+    this.positionNotificationDropdown();
     this.notificationDropdown.classList.remove('hidden');
     this.ensureServerSyncStarted();
     this.renderNotifications();
