@@ -53,7 +53,7 @@ Open in browser:
    - Ensure total payout matches prize pool.
 
 2. Add players
-   - Add names manually.
+   - Player can join using the invitation link shared to them, provided the admin accepts their league joining request.
 
 3. Add match
    - Add title/date.

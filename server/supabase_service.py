@@ -400,7 +400,7 @@ def add_match(payload: MatchPayload, user: dict[str, Any]) -> dict[str, str]:
         "match_date": payload.match_date.strip(),
         "winner_count": payload.winner_count,
         "payouts_json": payouts_json,
-        "participant_ids_json": json.dumps(participant_ids),
+        "participant_ids_json": participant_ids,
     }
 
     try:
