@@ -35,6 +35,7 @@ let invitePanelExpanded = false;
 let currentLeague = null;
 let membersCache = [];
 let membersLoaded = false;
+const createModeLockedMessage = 'Cannot proceed without creating / saving the league.';
 
 function getPrizePool() {
   const fee = Number(leagueForm.elements.entry_fee.value);
@@ -56,6 +57,38 @@ function applyRoleBasedUI() {
   controls.forEach((control) => {
     control.disabled = !isAdmin;
   });
+}
+
+function canProceedFromCreateMode() {
+  return Boolean(currentLeague?.id || getActiveLeagueId());
+}
+
+function applyCreateModeNavigationLock() {
+  const workflowLinks = document.querySelectorAll('[data-workflow-link]');
+  workflowLinks.forEach((link) => {
+    const href = link.getAttribute('href') || '';
+    const shouldLock = isCreateMode
+      && !canProceedFromCreateMode()
+      && href
+      && href !== '/setup'
+      && href !== '/welcome';
+
+    link.classList.toggle('workflow-link-locked', shouldLock);
+    link.setAttribute('aria-disabled', shouldLock ? 'true' : 'false');
+    if (shouldLock) {
+      link.setAttribute('title', createModeLockedMessage);
+    } else {
+      link.removeAttribute('title');
+    }
+  });
+}
+
+function handleCreateModeLockedNavigation(event) {
+  const link = event.target.closest('[data-workflow-link].workflow-link-locked');
+  if (!link) return;
+  event.preventDefault();
+  event.stopPropagation();
+  queueToast(createModeLockedMessage, 'info', 2200);
 }
 
 function updateSidebarActionButtons(league) {
@@ -379,6 +412,7 @@ function renderLeague(league) {
   setLeagueStateText(league);
   updateSidebarActionButtons(league);
   renderInviteCard(league);
+  applyCreateModeNavigationLock();
   suppressDraftSync = false;
 }
 
@@ -494,6 +528,7 @@ leagueForm.addEventListener('submit', async (event) => {
 async function init() {
   // Initialize notification system
   initNotifications();
+  document.addEventListener('click', handleCreateModeLockedNavigation);
 
   authUser = await initWorkflowShell('/setup');
   if (!authUser) return;

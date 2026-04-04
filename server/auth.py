@@ -61,6 +61,23 @@ def _invalidate_members_cache(league_id: int) -> None:
         _LEAGUE_MEMBERS_CACHE.pop(int(league_id), None)
 
 
+def invalidate_profile_cache(user_id_value: int | None = None, user_id_label: str | None = None) -> None:
+    keys_to_remove: list[str] = []
+    with _cache_lock:
+        for key in list(_profile_cache.keys()):
+            if user_id_value is not None and key.startswith(f"id_{int(user_id_value)}_"):
+                keys_to_remove.append(key)
+                continue
+            if user_id_label:
+                normalized_label = str(user_id_label)
+                if key.startswith(f"uid_{normalized_label}_"):
+                    keys_to_remove.append(key)
+
+        for key in keys_to_remove:
+            _profile_cache.pop(key, None)
+            _profile_cache_timestamps.pop(key, None)
+
+
 def _secret() -> bytes:
     return os.getenv("APP_AUTH_SECRET", "league-ledger-secret").encode("utf-8")
 

@@ -1863,6 +1863,24 @@ body.modal-open {
   pointer-events: none;
 }
 
+.workflow-link-locked {
+  cursor: not-allowed;
+  opacity: 0.56;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(8, 14, 28, 0.22);
+}
+
+.workflow-link-locked:not(.active) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 86%, #5b6478 14%), color-mix(in srgb, var(--panel-2) 90%, #2d3444 10%));
+  border-color: color-mix(in srgb, var(--border) 82%, transparent);
+  color: color-mix(in srgb, var(--text) 74%, transparent);
+}
+
+.workflow-link-locked:hover,
+.workflow-link-locked:focus-visible {
+  transform: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(8, 14, 28, 0.22);
+}
+
 @keyframes stepShine {
   0% {
     left: -35%;
@@ -8008,12 +8026,40 @@ th {
   .stats-page .stats-pulse-layout,
   .stats-page .stats-summary-strip,
   .stats-page .stats-overview,
+  .stats-page .stats-duo-layout,
   .stats-page .match-summary-strip,
   .stats-page .player-metric-grid,
   .stats-page .player-metric-stack,
   .stats-page .winner-rank-grid,
   .stats-page .pie-slice-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .stats-page .stats-duo-layout {
+    gap: 12px;
+    align-items: start;
+  }
+
+  .stats-page .stats-duo-layout > .stats-panel,
+  .stats-page .stats-duo-layout > .stats-panel > .feed,
+  .stats-page .stats-duo-layout > .stats-panel > .leaderboard-chart {
+    height: auto;
+    min-height: 0;
+    flex: initial;
+  }
+
+  .stats-page .inline-form {
+    margin-bottom: 8px;
+  }
+
+  .stats-page .inline-form select,
+  .stats-page .stats-panel .inline-form select {
+    flex: 0 1 220px;
+    width: min(220px, 100%);
+    max-width: 220px;
+    min-height: 38px;
+    padding: 0.6rem 0.8rem;
+    font-size: 12px;
   }
 
   .stats-page .stats-current-user-grid {
@@ -8035,6 +8081,42 @@ th {
     grid-template-rows: auto;
   }
 
+  .stats-page .match-spotlight-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    height: auto;
+  }
+
+  .stats-page .match-spotlight-main {
+    gap: 10px;
+  }
+
+  .stats-page .match-spotlight-head {
+    gap: 10px;
+  }
+
+  .stats-page .match-summary-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stats-page .match-summary-card {
+    padding: 8px 9px;
+  }
+
+  .stats-page .match-summary-card span {
+    font-size: 10px;
+  }
+
+  .stats-page .match-summary-card strong {
+    font-size: 14px;
+  }
+
+  .stats-page .winner-rank-grid,
+  .stats-page .winner-rank-grid-compact {
+    gap: 8px;
+  }
+
   .stats-page .chart-lane,
   .stats-page .rank-distribution-row {
     grid-template-columns: 1fr;
@@ -8048,7 +8130,7 @@ th {
   }
 
   .stats-page .pie-chart-shell {
-    min-height: 300px;
+    min-height: 260px;
   }
 
   .stats-page .pie-chart-svg,
@@ -8059,6 +8141,15 @@ th {
   .stats-page .dashboard-modal-panel {
     padding: 14px;
     border-radius: 16px;
+    width: min(100%, 100vw - 20px);
+    max-height: min(84vh, 720px);
+    overflow: hidden;
+  }
+
+  .stats-page .dashboard-modal-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2px;
   }
 
   .stats-page .ladder-modal-layout {
@@ -8083,6 +8174,53 @@ th {
   .stats-page .pie-summary-row,
   .stats-page .pie-detail-row {
     gap: 8px;
+  }
+
+  .stats-page .earners-compact-row,
+  .stats-page .earner-compact-row-pair {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .stats-page .earner-compact-row-pair > .earner-compact-cell:first-child {
+    border-right: 0;
+    padding-right: 8px;
+  }
+
+  .stats-page .earner-compact-cell {
+    grid-template-columns: 24px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    padding: 8px 9px;
+  }
+
+  .stats-page .earner-info,
+  .stats-page .earner-amounts {
+    min-width: 0;
+  }
+
+  .stats-page .earner-amounts {
+    grid-column: 2;
+    align-items: flex-start;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .stats-page .earner-amount-item {
+    align-items: flex-start;
+  }
+
+  .stats-page .earner-name,
+  .stats-page .earner-meta,
+  .stats-page .earner-amount-won,
+  .stats-page .earner-payout {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-page .pie-slice-detail-grid {
+    grid-template-columns: 1fr;
   }
 
   .stats-page .pie-slice {
