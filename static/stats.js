@@ -89,6 +89,10 @@ function barWidth(value, maxValue) {
   return `${Math.max(8, Math.round((Number(value || 0) / maxValue) * 100))}%`;
 }
 
+function isMobileStatsViewport() {
+  return Boolean(window.matchMedia && window.matchMedia('(max-width: 760px)').matches);
+}
+
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
   return {
@@ -114,7 +118,7 @@ function setModalState(modal, isOpen) {
   if (!modal) return;
   modal.classList.toggle('hidden', !isOpen);
   modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-  const anyModalOpen = [earnersModal, ladderModal, historyModal].some((node) => node && !node.classList.contains('hidden'));
+  const anyModalOpen = [earnersModal, ladderModal, historyModal, rankModal].some((node) => node && !node.classList.contains('hidden'));
   document.body.classList.toggle('modal-open', anyModalOpen);
 }
 
@@ -188,7 +192,8 @@ function renderPieChart(shares, options = {}) {
   const center = size / 2;
   const innerRadius = Number(options.innerRadius || Math.round(radius * 0.56));
   const label = escapeHtml(options.label || 'Payout share');
-  const totalLabel = escapeHtml(formatCurrency(options.totalAmount || 0));
+  const totalLabel = escapeHtml(options.centerValue || formatCurrency(options.totalAmount || 0));
+  const subLabel = options.centerSubValue ? escapeHtml(options.centerSubValue) : '';
   const interactive = options.interactive ? 'true' : 'false';
 
   if (!shares.length) {
@@ -220,7 +225,8 @@ function renderPieChart(shares, options = {}) {
       ${slices}
       <circle cx="${center}" cy="${center}" r="${innerRadius}" class="pie-chart-core"></circle>
       <text x="50%" y="47%" text-anchor="middle" class="pie-chart-center-label">${label}</text>
-      <text x="50%" y="57%" text-anchor="middle" class="pie-chart-center-value">${totalLabel}</text>
+      <text x="50%" y="${subLabel ? '55%' : '57%'}" text-anchor="middle" class="pie-chart-center-value">${totalLabel}</text>
+      ${subLabel ? `<text x="50%" y="63%" text-anchor="middle" class="pie-chart-center-subvalue">${subLabel}</text>` : ''}
     </svg>
   `;
 }
@@ -487,11 +493,27 @@ function renderLadderModal() {
   if (!ladderModalBody) return;
   const { shares, totalAmount } = buildPayoutShares(stats.players);
   const entryFee = Number(stats.summary?.entry_fee || 0);
+  const currentPlayer = findCurrentPlayer();
+  const currentEligiblePayout = currentPlayer
+    ? Number(currentPlayer.total_amount || 0) - (Number(currentPlayer.matches_played || 0) * entryFee)
+    : totalAmount;
+  const currentWinRate = currentPlayer && Number(currentPlayer.matches_played || 0) > 0
+    ? formatPercent((Number(currentPlayer.matches_won || 0) / Number(currentPlayer.matches_played || 0)) * 100)
+    : `${shares.length} earners`;
 
   ladderModalBody.innerHTML = `
     <div class="ladder-modal-layout">
       <div class="pie-chart-shell pie-chart-shell-large">
-        ${renderPieChart(shares, { size: 380, radius: 142, innerRadius: 78, label: 'Total Won', totalAmount, interactive: true })}
+        ${renderPieChart(shares, {
+          size: 380,
+          radius: 142,
+          innerRadius: 78,
+          label: currentPlayer ? 'Your Payout' : 'Top Earners',
+          centerValue: formatCurrency(currentEligiblePayout),
+          centerSubValue: currentPlayer ? `Win rate ${currentWinRate}` : currentWinRate,
+          totalAmount,
+          interactive: true,
+        })}
       </div>
       <div class="pie-detail-panel">
         <div id="ladder-slice-detail" class="pie-slice-detail-shell"></div>
@@ -518,6 +540,11 @@ function renderLadderModal() {
   bindInteractivePie(ladderModalBody, shares, (share) => {
     if (detailTarget) {
       detailTarget.innerHTML = renderLadderSliceDetails(share);
+      if (isMobileStatsViewport()) {
+        window.requestAnimationFrame(() => {
+          detailTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
     }
     ladderModalBody.querySelectorAll('[data-slice-trigger]').forEach((button) => {
       button.classList.toggle('is-active', String(button.getAttribute('data-slice-trigger')) === String(share.player_id));
@@ -694,11 +721,27 @@ function renderLeaderboardChart() {
   }
 
   const { shares, totalAmount } = buildPayoutShares(stats.players);
+  const currentPlayer = findCurrentPlayer();
+  const entryFee = Number(stats.summary?.entry_fee || 0);
+  const currentEligiblePayout = currentPlayer
+    ? Number(currentPlayer.total_amount || 0) - (Number(currentPlayer.matches_played || 0) * entryFee)
+    : totalAmount;
+  const currentWinRate = currentPlayer && Number(currentPlayer.matches_played || 0) > 0
+    ? formatPercent((Number(currentPlayer.matches_won || 0) / Number(currentPlayer.matches_played || 0)) * 100)
+    : `${shares.length} earners`;
 
   leaderboardChart.innerHTML = `
     <button id="open-ladder-modal" type="button" class="pie-chart-button pie-chart-button-block ladder-chart-trigger" aria-label="Open league ladder deep dive">
       <div class="pie-chart-shell pie-chart-shell-plain">
-        ${renderPieChart(shares, { size: 420, radius: 160, innerRadius: 88, label: 'Paid Out', totalAmount })}
+        ${renderPieChart(shares, {
+          size: 420,
+          radius: 160,
+          innerRadius: 88,
+          label: currentPlayer ? 'Your Payout' : 'Top Earners',
+          centerValue: formatCurrency(currentEligiblePayout),
+          centerSubValue: currentPlayer ? `Win rate ${currentWinRate}` : currentWinRate,
+          totalAmount,
+        })}
       </div>
     </button>
   `;
