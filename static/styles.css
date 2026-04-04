@@ -1073,7 +1073,7 @@ body.modal-open {
 }
 
 /* Login Form Loading States */
-.login-read-mode .auth-split-form input.loading {
+.auth-split-form input.loading {
   background: linear-gradient(90deg,
       var(--panel-1) 0%,
       var(--panel-2) 50%,
@@ -1084,7 +1084,7 @@ body.modal-open {
   caret-color: transparent;
 }
 
-.auth-split-form input.loading {
+.login-read-mode .auth-split-form input.loading {
   background: linear-gradient(90deg,
       var(--panel-1) 0%,
       var(--panel-2) 50%,
@@ -1097,19 +1097,21 @@ body.modal-open {
 
 .auth-split-form button.loading {
   position: relative;
-  color: transparent;
+  color: var(--text);
+  pointer-events: none;
+  padding-left: 40px;
 }
 
-.auth-split-form button.loading::after {
+.auth-split-form button.loading::before {
   content: '';
   position: absolute;
   top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  left: 16px;
+  transform: translateY(-50%);
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
+  border: 2px solid var(--accent);
+  border-top-color: transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -1132,7 +1134,7 @@ body.modal-open {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: var(--accent);
   animation: loading-dots 1.4s ease-in-out infinite both;
 }
 

@@ -13,8 +13,26 @@ async function callApi(url, options = {}) {
     ...options,
   });
   if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || 'Request failed');
+    let errorMessage = 'Request failed';
+    try {
+      const data = await res.json();
+      // Extract error message from various possible fields
+      if (data.detail) {
+        errorMessage = data.detail;
+      } else if (data.message) {
+        errorMessage = data.message;
+      } else if (data.error) {
+        errorMessage = data.error;
+      } else if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+        errorMessage = data.errors[0].message || data.errors[0];
+      } else {
+        errorMessage = `Error ${res.status}: ${res.statusText}`;
+      }
+    } catch (e) {
+      // If JSON parsing fails, use status text
+      errorMessage = `Error ${res.status}: ${res.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
   return res.json();
 }
@@ -189,7 +207,33 @@ loginForm.addEventListener('submit', async (event) => {
     applyAuthResult(result);
   } catch (err) {
     hideLoginLoading();
-    window.alert(err instanceof Error ? err.message : String(err));
+
+    // Properly extract error message
+    let errorMessage = 'Login failed. Please try again.';
+
+    if (err instanceof Error) {
+      errorMessage = err.message;
+    } else if (typeof err === 'object' && err !== null) {
+      // Handle object errors
+      errorMessage = err.detail || err.message || err.error || JSON.stringify(err);
+    } else {
+      errorMessage = String(err);
+    }
+
+    console.error('Login error:', err); // Log full error for debugging
+
+    // Show user-friendly error message
+    if (errorMessage.includes('Invalid user ID or password') || errorMessage.includes('Invalid credentials')) {
+      window.alert('Invalid username or password. Please check your credentials and try again.');
+    } else if (errorMessage.includes('User not found')) {
+      window.alert('Account not found. Please check your username or contact support.');
+    } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
+      window.alert('Network error. Please check your connection and try again.');
+    } else if (errorMessage.includes('[object Object]')) {
+      window.alert('Login failed. Please check your credentials and try again.');
+    } else {
+      window.alert(errorMessage || 'Login failed. Please try again.');
+    }
   }
 });
 
@@ -203,17 +247,7 @@ function showLoginLoading() {
   usernameField.disabled = true;
   passwordField.disabled = true;
 
-  // Show loading state on submit button
-  submitBtn.innerHTML = `
-    <span class="status-loading">
-      Signing in
-      <div class="loading-dots">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </span>
-  `;
+  // Add loading class to button
   submitBtn.classList.add('loading');
 
   // Add loading indication to fields
@@ -231,11 +265,8 @@ function hideLoginLoading() {
   usernameField.disabled = false;
   passwordField.disabled = false;
 
-  // Restore submit button text
-  submitBtn.innerHTML = 'Sign In';
+  // Remove loading indication
   submitBtn.classList.remove('loading');
-
-  // Remove loading indication from fields
   usernameField.classList.remove('loading');
   passwordField.classList.remove('loading');
 }
