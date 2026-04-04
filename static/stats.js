@@ -232,6 +232,9 @@ function renderLadderSliceDetails(share) {
     `;
   }
 
+  const entryFee = Number(stats.summary?.entry_fee || 0);
+  const eligiblePayout = Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee);
+
   return `
     <div class="pie-slice-detail-card">
       <div class="pie-slice-detail-head">
@@ -245,6 +248,10 @@ function renderLadderSliceDetails(share) {
         <div class="stats-current-user-metric">
           <span>Payout Won</span>
           <strong>${formatCurrency(share.total_amount)}</strong>
+        </div>
+        <div class="stats-current-user-metric">
+          <span>Eligible Payout</span>
+          <strong>${formatCurrency(eligiblePayout)}</strong>
         </div>
         <div class="stats-current-user-metric">
           <span>Matches Played</span>
@@ -408,6 +415,7 @@ function renderEarnersModal() {
 function renderLadderModal() {
   if (!ladderModalBody) return;
   const { shares, totalAmount } = buildPayoutShares(stats.players);
+  const entryFee = Number(stats.summary?.entry_fee || 0);
 
   ladderModalBody.innerHTML = `
     <div class="ladder-modal-layout">
@@ -422,7 +430,7 @@ function renderLadderModal() {
               <div class="pie-legend-chip" style="--slice-color:${share.color};"></div>
               <div>
                 <strong>${escapeHtml(share.name)}</strong>
-                <p class="muted">${share.matches_played} played • ${share.wins_total} titles</p>
+                <p class="muted">${share.matches_played} played • ${share.wins_total} titles • Eligible ${formatCurrency(Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee))}</p>
               </div>
               <div class="pie-detail-meta">
                 <strong>${formatCurrency(share.total_amount)}</strong>
@@ -524,13 +532,6 @@ function renderOverview() {
     </div>
   `).join('');
 
-  const topEarnerRowsCompact = topEarnerNames.map((player) => `
-    <div class="stats-leader-row">
-      <strong>${escapeHtml(player.name)}</strong>
-      <span>${formatCurrency(player.total_amount)}</span>
-    </div>
-  `).join('');
-
   const topEarnerRows = topEarners.map((player, index) => `
     <div class="top-earner-row">
       <span class="top-earner-rank">${TROPHIES[index] || `#${index + 1}`}</span>
@@ -540,18 +541,24 @@ function renderOverview() {
   `).join('');
 
   const currentPlayer = findCurrentPlayer();
+  const matchesYouPlayed = currentPlayer ? Number(currentPlayer.matches_played || 0) : Number(played_matches || 0);
   const eligiblePayoutAmount = currentPlayer
     ? Number(currentPlayer.total_amount || 0) - (Number(currentPlayer.matches_played || 0) * Number(entry_fee || 0))
     : 0;
+  const eligiblePayoutTone = eligiblePayoutAmount > 0 ? 'positive' : eligiblePayoutAmount < 0 ? 'negative' : 'neutral';
 
   statsSummaryStrip.innerHTML = `
+    <div class="summary-chip stats-kpi-card stats-kpi-card-payout stats-kpi-card-payout-${eligiblePayoutTone}">
+      <span class="summary-chip-label">Eligible Payout</span>
+      <strong>${formatCurrency(eligiblePayoutAmount)}</strong>
+    </div>
     <div class="summary-chip stats-kpi-card">
       <span class="summary-chip-label">Total Matches</span>
       <strong>${Number(total_matches || 0)}</strong>
     </div>
     <div class="summary-chip stats-kpi-card">
-      <span class="summary-chip-label">Matches Played</span>
-      <strong>${Number(played_matches || 0)}</strong>
+      <span class="summary-chip-label">Matches You Played</span>
+      <strong>${matchesYouPlayed}</strong>
     </div>
     <div class="summary-chip stats-kpi-card">
       <span class="summary-chip-label">Washout / Canceled</span>
@@ -565,11 +572,6 @@ function renderOverview() {
         <span class="spotlight-label">Most Wins</span>
         <div class="stats-leader-list">${topWinnerRows}</div>
         <p>First-place finishes collected so far.</p>
-      </article>
-      <article class="spotlight-card earner stats-feature-card">
-        <span class="spotlight-label">Top Earner</span>
-        <div class="stats-leader-list">${topEarnerRowsCompact}</div>
-        <p>Total amount won across all recorded results.</p>
       </article>
     </div>
     <article id="top-earners-card" class="stats-page spotlight-card leaders stats-right-card" style="cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;">
@@ -596,13 +598,8 @@ function renderOverview() {
 	          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
 	          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
 	        </div>
-	        <div class="player-tag-row stats-current-user-tags">
-	          <span class="player-tag">Winning matches ${Number(currentPlayer.matches_won || 0)}</span>
-	          <span class="player-tag">Washouts ${Number(currentPlayer.washout_matches || 0)}</span>
-	          <span class="player-tag">Entry fee ${formatCurrency(entry_fee)}</span>
-	        </div>
 	      ` : `
-        <div class="stats-current-user-empty">
+	        <div class="stats-current-user-empty">
           <strong>Your League Snapshot</strong>
           <p class="muted">We will show your compact player overview here once your stats are available in the league table.</p>
         </div>
