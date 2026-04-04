@@ -5671,6 +5671,29 @@ th {
     gap: 10px;
   }
 
+  .setup-page .setup-members-sidebar {
+    min-height: auto;
+    grid-template-rows: auto;
+    align-content: start;
+  }
+
+  .setup-page .setup-sidebar-body,
+  .setup-page #members-zone,
+  .setup-page #invite-zone {
+    min-height: 0;
+    height: auto;
+    align-content: start;
+    grid-auto-rows: max-content;
+  }
+
+  .setup-page .setup-invite-compact {
+    padding: 10px;
+  }
+
+  .setup-page .setup-invite-compact .invite-link-row {
+    grid-template-columns: 1fr;
+  }
+
   .setup-page .compact-request-list {
     grid-template-columns: 1fr;
   }
