@@ -2434,6 +2434,7 @@ button {
   font-size: 13px;
 }
 
+.setup-page .panel,
 .players-page .panel,
 .matches-page .panel,
 .winners-page .panel,
@@ -2441,6 +2442,7 @@ button {
   padding: 18px;
 }
 
+.setup-page .panel > .muted,
 .players-page .panel > .muted,
 .matches-page .panel > .muted,
 .winners-page .panel > .muted,
@@ -5389,7 +5391,7 @@ th {
 }
 
 .setup-page .setup-panel {
-  gap: 10px;
+  padding: 18px;
 }
 
 .setup-page .setup-utility-grid {
@@ -5424,9 +5426,9 @@ th {
 
 .setup-page .setup-sidebar-actions .button-link,
 .setup-page .setup-sidebar-actions button {
-  min-height: 27px;
-  padding: 0.34rem 0.54rem;
-  font-size: 10.8px;
+  min-height: 34px;
+  padding: 0.5rem 0.7rem;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
@@ -5531,12 +5533,12 @@ th {
 }
 
 .setup-page .compact-request-row strong {
-  font-size: 12.5px;
+  font-size: 13px;
   letter-spacing: 0.01em;
 }
 
 .setup-page .compact-request-row .muted {
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -5565,14 +5567,14 @@ th {
 
 .setup-page label {
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .setup-page input,
 .setup-page select {
-  min-height: 42px;
-  padding: 0.72rem 0.82rem;
-  font-size: 13px;
+  min-height: 44px;
+  padding: 0.8rem 0.9rem;
+  font-size: 14px;
 }
 
 .setup-page #default-payouts {
@@ -5583,14 +5585,14 @@ th {
   grid-template-columns: minmax(116px, 140px) minmax(88px, 116px) 42px;
   justify-content: start;
   gap: 8px;
-  padding: 8px;
+  padding: 9px;
   width: fit-content;
   max-width: 100%;
   justify-self: start;
 }
 
 .setup-page .payout-rank-display {
-  padding: 10px 12px;
+  padding: 11px 12px;
   gap: 8px;
   font-size: 14px;
 }
@@ -5623,8 +5625,8 @@ th {
 }
 
 .setup-page #add-default-payout-bottom {
-  min-height: 42px;
-  padding: 0.72rem 0.95rem;
+  min-height: 44px;
+  padding: 0.8rem 1rem;
 }
 
 @media (max-width: 760px) {
