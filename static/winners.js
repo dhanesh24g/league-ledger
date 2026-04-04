@@ -650,11 +650,17 @@ cancelMatchBtn.addEventListener('click', async () => {
   try {
     restoreCancelButton = setButtonLoading(cancelMatchBtn, 'Cancelling...');
     closeLoading = showLoading('Cancelling match...');
-    await callApi(`/api/matches/${matchSelect.value}/cancel`, { method: 'POST' });
+    const targetMatchId = String(matchSelect.value);
+    await callApi(`/api/matches/${targetMatchId}/cancel`, { method: 'POST' });
     appState = await callApi('/api/state');
+    const refreshedMatch = (appState.matches || []).find((item) => String(item.id) === targetMatchId);
+    if (!refreshedMatch || String(refreshedMatch.status || '').toLowerCase() !== 'canceled') {
+      throw new Error('The match did not switch to washout/cancelled status. Please refresh and try again.');
+    }
     renderMatchSelect();
-    renderMatchSummary(matchSelect.value);
-    clearWinnerDraft(matchSelect.value);
+    matchSelect.value = targetMatchId;
+    renderMatchSummary(targetMatchId);
+    clearWinnerDraft(targetMatchId);
     winnersForm.innerHTML = '<p class="muted">Match marked as washout/cancelled. Refund distributed equally.</p>';
     clearWinnerFeedback();
     showSuccess('Match cancelled and refund distributed.');

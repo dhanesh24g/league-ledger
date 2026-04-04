@@ -77,6 +77,14 @@ function renderParticipantBasket(selectedIds, options = {}) {
   participantBasket.classList.remove('hidden');
 }
 
+function normalizeTeamInputValue(input) {
+  if (!input) return;
+  const upper = String(input.value || '').toUpperCase();
+  if (input.value !== upper) {
+    input.value = upper;
+  }
+}
+
 function syncParticipantSummary() {
   const selectedIds = getSelectedParticipantIds();
   const totalPlayers = currentPlayers.length;
@@ -320,6 +328,13 @@ enableOverrides.addEventListener('change', () => toggleOverrideSection(enableOve
   matchForm.elements[name].addEventListener('input', persistDraft);
 });
 
+['team1', 'team2'].forEach((name) => {
+  matchForm.elements[name].addEventListener('input', (event) => {
+    normalizeTeamInputValue(event.currentTarget);
+    persistDraft();
+  });
+});
+
 matchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (authUser.league_role !== 'admin') {
@@ -340,8 +355,8 @@ matchForm.addEventListener('submit', async (event) => {
     }
 
     const formData = new FormData(matchForm);
-    const team1 = String(formData.get('team1') || '').trim();
-    const team2 = String(formData.get('team2') || '').trim();
+    const team1 = String(formData.get('team1') || '').trim().toUpperCase();
+    const team2 = String(formData.get('team2') || '').trim().toUpperCase();
     const payload = {
       title: `${team1} vs ${team2}`,
       match_date: String(formData.get('match_date') || ''),
