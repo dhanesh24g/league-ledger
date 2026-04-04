@@ -2547,6 +2547,11 @@ button {
   padding: 0.8rem;
 }
 
+.matches-page input[name="team1"],
+.matches-page input[name="team2"] {
+  text-transform: uppercase;
+}
+
 .matches-page .participant-picker {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px;
