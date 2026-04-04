@@ -4,6 +4,7 @@ import re
 import secrets
 import json
 import math
+from threading import Lock
 from typing import Any
 
 from fastapi import HTTPException
@@ -17,6 +18,41 @@ from .auth import get_supabase_client
 from .database import parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
+
+_CACHE_TTL_SECONDS = 20.0
+_LEAGUE_READ_CACHE: dict[tuple[int, str], tuple[float, dict[str, Any]]] = {}
+_LEAGUE_READ_CACHE_LOCK = Lock()
+
+
+def _cache_get(league_id: int, scope: str) -> dict[str, Any] | None:
+    now = time.monotonic()
+    key = (int(league_id), scope)
+    with _LEAGUE_READ_CACHE_LOCK:
+        row = _LEAGUE_READ_CACHE.get(key)
+        if not row:
+            return None
+        expires_at, payload = row
+        if now >= expires_at:
+            _LEAGUE_READ_CACHE.pop(key, None)
+            return None
+        return payload
+
+
+def _cache_set(league_id: int, scope: str, payload: dict[str, Any]) -> None:
+    key = (int(league_id), scope)
+    expires_at = time.monotonic() + _CACHE_TTL_SECONDS
+    with _LEAGUE_READ_CACHE_LOCK:
+        _LEAGUE_READ_CACHE[key] = (expires_at, payload)
+
+
+def _invalidate_league_cache(league_id: int, scopes: set[str] | None = None) -> None:
+    prefix = int(league_id)
+    target_scopes = scopes or {"state", "ledger", "stats"}
+    with _LEAGUE_READ_CACHE_LOCK:
+        for key in list(_LEAGUE_READ_CACHE.keys()):
+            cache_league_id, cache_scope = key
+            if cache_league_id == prefix and cache_scope in target_scopes:
+                _LEAGUE_READ_CACHE.pop(key, None)
 
 
 def _league_id_from_user(user: dict[str, Any]) -> int:
@@ -198,6 +234,9 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     league_id = _league_id_from_user(user)
+    cached = _cache_get(league_id, "state")
+    if cached is not None:
+        return cached
     
     try:
         # Get league data
@@ -214,7 +253,7 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     fallback_participant_ids = [int(player["id"]) for player in players]
 
-    return {
+    response = {
         "league": {
             "sport": league.get("sport") or "Cricket",
             "name": league["name"],
@@ -238,6 +277,8 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
             for match in matches
         ],
     }
+    _cache_set(league_id, "state", response)
+    return response
 
 
 def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool = False) -> dict[str, str]:
@@ -328,6 +369,8 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
             lookup = supabase.table("league").select("invite_code").eq("id", league_id).limit(1).execute()
             if lookup.data:
                 invite_code = str(lookup.data[0].get("invite_code") or "")
+
+        _invalidate_league_cache(league_id)
     except HTTPException:
         raise
     except Exception as exc:
@@ -359,6 +402,8 @@ def add_player(payload: PlayerPayload, user: dict[str, Any]) -> dict[str, str]:
             raise
         logger.exception("Supabase player insert failed")
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
+
+    _invalidate_league_cache(league_id)
     
     return {"message": "Player added"}
 
@@ -370,6 +415,7 @@ def delete_player(player_id: int, user: dict[str, Any]) -> dict[str, str]:
     league_id = _league_id_from_user(user)
     
     supabase.table("players").delete().eq("id", player_id).eq("league_id", league_id).execute()
+    _invalidate_league_cache(league_id)
     return {"message": "Player removed"}
 
 
@@ -418,6 +464,8 @@ def add_match(payload: MatchPayload, user: dict[str, Any]) -> dict[str, str]:
     except Exception as exc:
         logger.exception("Supabase match insert failed")
         raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
+
+    _invalidate_league_cache(league_id)
     
     return {"message": "Match added"}
 
@@ -481,6 +529,7 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
     
     # Update match status
     supabase.table("matches").update({"status": "completed"}).eq("id", match_id).execute()
+    _invalidate_league_cache(league_id)
     
     return {"message": "Winners saved"}
 
@@ -522,6 +571,7 @@ def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     
     # Update match status
     supabase.table("matches").update({"status": "canceled"}).eq("id", match_id).execute()
+    _invalidate_league_cache(league_id)
     
     return {"message": "Match marked as canceled and refund distributed equally"}
 
@@ -534,6 +584,9 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     if user.get("league_role") != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     league_id = _league_id_from_user(user)
+    cached = _cache_get(league_id, "ledger")
+    if cached is not None:
+        return cached
     
     # Get league data
     league_response = supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
@@ -589,11 +642,13 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
             "net": net,
         })
     
-    return {
+    response = {
         "rows": rows,
         "completed_matches": completed_matches,
         "entry_fee": entry_fee,
     }
+    _cache_set(league_id, "ledger", response)
+    return response
 
 
 def get_stats(user: dict[str, Any]) -> dict[str, Any]:
@@ -601,6 +656,9 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     if not supabase:
         raise HTTPException(status_code=500, detail="Supabase not configured")
     league_id = _league_id_from_user(user)
+    cached = _cache_get(league_id, "stats")
+    if cached is not None:
+        return cached
 
     players = _sync_active_members_to_players(supabase, league_id)
 
@@ -763,7 +821,7 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     total_matches = len(matches)
     played_matches = sum(1 for match in matches if str(match["status"]) == "completed")
     canceled_matches = sum(1 for match in matches if str(match["status"]) == "canceled")
-    return {
+    response = {
         "summary": {
             "total_matches": total_matches,
             "played_matches": played_matches,
@@ -772,3 +830,5 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
         "matches": match_stats,
         "players": player_stats_list,
     }
+    _cache_set(league_id, "stats", response)
+    return response

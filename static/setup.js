@@ -24,11 +24,17 @@ const addDefaultPayoutBtn = document.getElementById('add-default-payout-bottom')
 const inviteZone = document.getElementById('invite-zone');
 const joinRequestsZone = document.getElementById('join-requests-zone');
 const membersZone = document.getElementById('members-zone');
+const toggleMembersBtn = document.getElementById('toggle-members-btn');
+const toggleInviteBtn = document.getElementById('toggle-invite-btn');
 
 let suppressDraftSync = false;
 let authUser = { username: '', role: 'read' };
 const isCreateMode = new URLSearchParams(window.location.search).get('mode') === 'create';
+let membersPanelExpanded = false;
 let invitePanelExpanded = false;
+let currentLeague = null;
+let membersCache = [];
+let membersLoaded = false;
 
 function getPrizePool() {
   const fee = Number(leagueForm.elements.entry_fee.value);
@@ -50,6 +56,25 @@ function applyRoleBasedUI() {
   controls.forEach((control) => {
     control.disabled = !isAdmin;
   });
+}
+
+function updateSidebarActionButtons(league) {
+  const isAdmin = authUser.league_role === 'admin' || isCreateMode || !authUser.league_exists;
+
+  if (toggleMembersBtn) {
+    toggleMembersBtn.classList.toggle('hidden', !isAdmin);
+    toggleMembersBtn.classList.toggle('is-active', membersPanelExpanded);
+    toggleMembersBtn.setAttribute('aria-expanded', membersPanelExpanded ? 'true' : 'false');
+    toggleMembersBtn.textContent = membersPanelExpanded ? '👥 Hide League Members' : '👥 Show League Members';
+  }
+
+  const canInvite = Boolean(isAdmin && league && league.invite_link);
+  if (toggleInviteBtn) {
+    toggleInviteBtn.classList.toggle('hidden', !canInvite);
+    toggleInviteBtn.classList.toggle('is-active', canInvite && invitePanelExpanded);
+    toggleInviteBtn.setAttribute('aria-expanded', invitePanelExpanded ? 'true' : 'false');
+    toggleInviteBtn.textContent = invitePanelExpanded ? '🔗 Hide Invite Link' : '🔗 Invite Members';
+  }
 }
 
 async function copyInviteLink(link, button) {
@@ -90,42 +115,37 @@ function renderInviteCard(league) {
   if (!league || !league.invite_link || !isAdmin) {
     inviteZone.classList.add('hidden');
     inviteZone.innerHTML = '';
+    updateSidebarActionButtons(null);
+    invitePanelExpanded = false;
+    return;
+  }
+
+  updateSidebarActionButtons(league);
+
+  if (!invitePanelExpanded) {
+    inviteZone.classList.add('hidden');
+    inviteZone.innerHTML = '';
     return;
   }
 
   const inviteLink = `${window.location.origin}${league.invite_link}`;
   inviteZone.classList.remove('hidden');
   inviteZone.innerHTML = `
-    <div class="info-card invite-card">
-      <div class="welcome-step-header invite-card-head">
-        <div>
-          <h3>Invite Members</h3>
-          <p class="muted">Generate a shareable invite link so friends can request access to this league.</p>
-        </div>
+    <div class="invite-link-block setup-invite-compact">
+      <div class="line-head">
+        <strong>Invite Members</strong>
         <span class="welcome-meta-chip">Code: ${league.invite_code}</span>
       </div>
-      <div class="invite-action-row">
-        <button type="button" id="toggle-invite-link" class="primary invite-primary-action">
-          ${invitePanelExpanded ? 'Invite Link Ready' : 'Generate Invite Link'}
-        </button>
-        ${invitePanelExpanded ? '<button type="button" id="share-invite-link" class="ghost">Share</button>' : ''}
+      <label class="invite-link-label">Shareable Invitation Link
+        <input type="text" class="invite-link-input" value="${inviteLink}" readonly aria-label="League invite link">
+      </label>
+      <div class="invite-link-row">
+        <button type="button" id="copy-invite-link" class="primary">Copy Link</button>
+        <button type="button" id="share-invite-link" class="ghost">Share</button>
       </div>
-      <div class="invite-link-block ${invitePanelExpanded ? '' : 'hidden'}">
-        <label class="invite-link-label">Shareable Invitation Link
-          <input type="text" class="invite-link-input" value="${inviteLink}" readonly aria-label="League invite link">
-        </label>
-        <div class="invite-link-row">
-          <button type="button" id="copy-invite-link" class="primary">Copy Link</button>
-          <span class="muted small">Anyone with this link can request to join, but approval still stays with the league admin.</span>
-        </div>
-      </div>
+      <span class="muted small">Anyone with this link can request to join. Admin approval is still required.</span>
     </div>
   `;
-
-  inviteZone.querySelector('#toggle-invite-link')?.addEventListener('click', () => {
-    invitePanelExpanded = true;
-    renderInviteCard(league);
-  });
 
   inviteZone.querySelector('#copy-invite-link')?.addEventListener('click', (event) => {
     copyInviteLink(inviteLink, event.currentTarget);
@@ -186,6 +206,8 @@ async function renderJoinRequests() {
             method: 'POST',
             body: JSON.stringify({ role: 'read' }),
           });
+          membersLoaded = false;
+          membersCache = [];
 
           // Show notification to admin
           if (window.notificationManager) {
@@ -244,41 +266,54 @@ async function renderJoinRequests() {
 
 async function renderMembers() {
   if (authUser.league_role !== 'admin') {
+    membersZone.classList.remove('hidden');
+    membersZone.innerHTML = '<p class="muted small">League members become visible here for the admin view.</p>';
+    return;
+  }
+
+  if (!membersPanelExpanded) {
     membersZone.classList.add('hidden');
     membersZone.innerHTML = '';
     return;
   }
 
+  membersZone.classList.remove('hidden');
+
   try {
-    const result = await callApi('/api/league/members');
-    if (!result.members.length) {
-      membersZone.classList.add('hidden');
-      membersZone.innerHTML = '';
+    if (!membersLoaded) {
+      const result = await callApi('/api/league/members');
+      membersCache = Array.isArray(result.members) ? result.members : [];
+      membersLoaded = true;
+    }
+
+    if (!membersCache.length) {
+      membersZone.innerHTML = '<p class="muted small">No league members added yet.</p>';
       return;
     }
 
-    membersZone.classList.remove('hidden');
     membersZone.innerHTML = `
-      <div class="info-card">
-        <h3>League Members</h3>
-        <div class="request-list">
-          ${result.members.map((member) => `
-            <div class="request-row">
-              <div>
-                <strong>${member.first_name} ${member.last_name}</strong>
-                <p class="muted">${member.user_id_label} • ${member.email}</p>
-              </div>
-              <div class="member-role-actions">
-                <span class="status-chip">Role: ${member.role === 'admin' ? 'Admin' : 'Read'}</span>
-              </div>
+      <div class="request-list compact-request-list">
+        ${membersCache.map((member) => {
+      const fullName = `${String(member.first_name || '').trim()} ${String(member.last_name || '').trim()}`.trim();
+      const displayName = fullName || member.user_id_label;
+      return `
+          <div class="request-row compact-request-row compact-member-card">
+            <div class="compact-member-meta">
+              <strong>${displayName}</strong>
+              <p class="muted">${member.user_id_label} • ${member.email}</p>
             </div>
-          `).join('')}
-        </div>
+            <div class="member-role-actions compact-member-role-actions">
+              <span class="status-chip">${member.role === 'admin' ? 'Admin' : 'Read'}</span>
+            </div>
+          </div>
+        `;
+    }).join('')}
       </div>
     `;
   } catch (error) {
-    membersZone.classList.add('hidden');
-    membersZone.innerHTML = '';
+    membersLoaded = false;
+    membersCache = [];
+    membersZone.innerHTML = '<p class="muted small">Could not load members right now.</p>';
   }
 }
 
@@ -316,6 +351,7 @@ function setLeagueStateText(league) {
 }
 
 function renderLeague(league) {
+  currentLeague = league || null;
   const draft = getSetupDraft();
   const source = draft && draft.dirty ? draft : league;
 
@@ -335,9 +371,30 @@ function renderLeague(league) {
 
   payoutController.updateTotal();
   setLeagueStateText(league);
+  updateSidebarActionButtons(league);
   renderInviteCard(league);
   suppressDraftSync = false;
 }
+
+toggleMembersBtn?.addEventListener('click', async () => {
+  membersPanelExpanded = !membersPanelExpanded;
+  if (membersPanelExpanded) {
+    invitePanelExpanded = false;
+  }
+  updateSidebarActionButtons(currentLeague);
+  await renderMembers();
+  renderInviteCard(currentLeague);
+});
+
+toggleInviteBtn?.addEventListener('click', async () => {
+  invitePanelExpanded = !invitePanelExpanded;
+  if (invitePanelExpanded) {
+    membersPanelExpanded = false;
+  }
+  updateSidebarActionButtons(currentLeague);
+  await renderMembers();
+  renderInviteCard(currentLeague);
+});
 
 addDefaultPayoutBtn.addEventListener('click', () => {
   payoutController.createRow('');

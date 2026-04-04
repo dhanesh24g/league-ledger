@@ -1,5 +1,6 @@
 const STORAGE_KEYS = {
   token: 'league-ledger-token',
+  refreshToken: 'league-ledger-refresh-token',
   role: 'league-ledger-user-role',
   username: 'league-ledger-username',
   fullName: 'league-ledger-full-name',
@@ -10,6 +11,52 @@ const STORAGE_KEYS = {
 };
 
 const FLASH_TOAST_KEY = 'league-ledger-flash-toast';
+let refreshInFlight = null;
+let refreshTimerId = null;
+
+const PROACTIVE_REFRESH_BUFFER_MS = 2 * 60 * 1000;
+const MIN_PROACTIVE_REFRESH_DELAY_MS = 15 * 1000;
+
+function parseTokenPayload(token) {
+  if (!token || typeof token !== 'string') return null;
+  const [payloadPart] = token.split('.');
+  if (!payloadPart) return null;
+  try {
+    const normalized = payloadPart.replace(/-/g, '+').replace(/_/g, '/');
+    const padLength = (4 - (normalized.length % 4)) % 4;
+    const padded = normalized + '='.repeat(padLength);
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch (_) {
+    return null;
+  }
+}
+
+function clearRefreshSchedule() {
+  if (refreshTimerId !== null) {
+    window.clearTimeout(refreshTimerId);
+    refreshTimerId = null;
+  }
+}
+
+function scheduleProactiveRefresh() {
+  clearRefreshSchedule();
+
+  const token = getToken();
+  const payload = parseTokenPayload(token);
+  const expSeconds = Number(payload?.exp || 0);
+  if (!Number.isFinite(expSeconds) || expSeconds <= 0) return;
+
+  const targetMs = (expSeconds * 1000) - PROACTIVE_REFRESH_BUFFER_MS;
+  const delayMs = Math.max(MIN_PROACTIVE_REFRESH_DELAY_MS, targetMs - Date.now());
+
+  refreshTimerId = window.setTimeout(async () => {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      scheduleProactiveRefresh();
+    }
+  }, delayMs);
+}
 
 const WORKFLOW_ROUTES = ['/setup', '/players', '/matches', '/winners', '/ledger', '/league-settings'];
 
@@ -166,6 +213,10 @@ export function getToken() {
   return localStorage.getItem(STORAGE_KEYS.token) || '';
 }
 
+export function getRefreshToken() {
+  return localStorage.getItem(STORAGE_KEYS.refreshToken) || '';
+}
+
 export function getActiveLeagueId() {
   const value = localStorage.getItem(STORAGE_KEYS.leagueId);
   return value ? String(value) : '';
@@ -194,11 +245,13 @@ export function clearPostAuthPath() {
 
 export function clearAuthStorage() {
   localStorage.removeItem(STORAGE_KEYS.token);
+  localStorage.removeItem(STORAGE_KEYS.refreshToken);
   localStorage.removeItem(STORAGE_KEYS.role);
   localStorage.removeItem(STORAGE_KEYS.username);
   localStorage.removeItem(STORAGE_KEYS.fullName);
   localStorage.removeItem(STORAGE_KEYS.leagueId);
   localStorage.removeItem(STORAGE_KEYS.postAuthPath);
+  clearRefreshSchedule();
 }
 
 export function authHeaders() {
@@ -207,7 +260,54 @@ export function authHeaders() {
   return token ? { Authorization: `Bearer ${token}`, ...(leagueId ? { 'X-League-ID': leagueId } : {}) } : {};
 }
 
-export async function callApi(url, options = {}) {
+async function refreshAccessToken() {
+  if (refreshInFlight) return refreshInFlight;
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) return false;
+
+  refreshInFlight = (async () => {
+    const leagueId = getActiveLeagueId();
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(leagueId ? { 'X-League-ID': leagueId } : {}),
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) return false;
+    const data = await response.json().catch(() => ({}));
+    if (!data?.token) return false;
+
+    localStorage.setItem(STORAGE_KEYS.token, String(data.token));
+    if (data.refresh_token) {
+      localStorage.setItem(STORAGE_KEYS.refreshToken, String(data.refresh_token));
+    }
+    if (data.user?.league_role) {
+      localStorage.setItem(STORAGE_KEYS.role, data.user.league_role === 'admin' ? 'admin' : 'read');
+    }
+    if (data.user?.user_id) {
+      localStorage.setItem(STORAGE_KEYS.username, String(data.user.user_id));
+    }
+    if (data.user?.full_name || data.user?.user_id) {
+      localStorage.setItem(STORAGE_KEYS.fullName, String(data.user.full_name || data.user.user_id));
+    }
+    if (data.user?.active_league_id) {
+      localStorage.setItem(STORAGE_KEYS.leagueId, String(data.user.active_league_id));
+    }
+    scheduleProactiveRefresh();
+    return true;
+  })();
+
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
+  }
+}
+
+export async function callApi(url, options = {}, retryOnAuthError = true) {
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
@@ -218,6 +318,12 @@ export async function callApi(url, options = {}) {
   });
 
   if (response.status === 401) {
+    if (retryOnAuthError && !String(url).includes('/api/auth/refresh')) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
+        return callApi(url, options, false);
+      }
+    }
     clearAuthStorage();
     window.location.replace('/login');
     throw new Error('Session expired. Please login again.');
@@ -482,6 +588,8 @@ export async function initWorkflowShell(currentPath) {
     window.location.replace('/login');
     return null;
   }
+
+  scheduleProactiveRefresh();
 
   const profile = await callApi('/api/auth/me');
   const user = profile.user;

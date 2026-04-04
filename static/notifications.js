@@ -85,13 +85,21 @@ class NotificationManager {
     }
 
     const buttonRect = this.notificationBtn.getBoundingClientRect();
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+    const viewportPadding = 12;
+    const dropdownWidth = Math.min(380, Math.max(220, viewportWidth - (viewportPadding * 2)));
     const topOffset = Math.max(8, Math.round(buttonRect.bottom + 8));
+    const maxLeft = Math.max(viewportPadding, viewportWidth - dropdownWidth - viewportPadding);
+    const leftOffset = Math.max(
+      viewportPadding,
+      Math.min(Math.round(buttonRect.right - dropdownWidth), maxLeft),
+    );
 
     this.notificationDropdown.style.top = `${topOffset}px`;
-    this.notificationDropdown.style.left = '12px';
-    this.notificationDropdown.style.right = '12px';
-    this.notificationDropdown.style.width = 'auto';
-    this.notificationDropdown.style.maxWidth = 'none';
+    this.notificationDropdown.style.left = `${leftOffset}px`;
+    this.notificationDropdown.style.right = 'auto';
+    this.notificationDropdown.style.width = `${dropdownWidth}px`;
+    this.notificationDropdown.style.maxWidth = `${dropdownWidth}px`;
   }
 
   async ensureServerSyncStarted() {
@@ -226,10 +234,11 @@ class NotificationManager {
   }
 
   openNotificationDropdown() {
-    this.positionNotificationDropdown();
     this.notificationDropdown.classList.remove('hidden');
+    this.positionNotificationDropdown();
     this.ensureServerSyncStarted();
     this.renderNotifications();
+    window.requestAnimationFrame(() => this.positionNotificationDropdown());
     // Mark all as read when opening
     this.markAllAsRead();
   }

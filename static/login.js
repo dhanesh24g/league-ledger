@@ -21,6 +21,9 @@ async function callApi(url, options = {}) {
 
 function applyAuthResult(result) {
   localStorage.setItem('league-ledger-token', result.token);
+  if (result.refresh_token) {
+    localStorage.setItem('league-ledger-refresh-token', result.refresh_token);
+  }
   localStorage.setItem('league-ledger-user-role', result.user.league_role === 'admin' ? 'admin' : 'read');
   localStorage.setItem('league-ledger-username', result.user.user_id);
   localStorage.setItem('league-ledger-full-name', result.user.full_name || result.user.user_id);

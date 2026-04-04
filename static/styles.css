@@ -4598,3 +4598,423 @@ th {
     max-width: none;
   }
 }
+
+/* Setup page compact layout */
+.setup-page .setup-form-grid {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.setup-page .setup-field {
+  min-width: 0;
+}
+
+.setup-page .setup-field-sport {
+  grid-column: span 2;
+}
+
+.setup-page .setup-field-name {
+  grid-column: span 3;
+}
+
+.setup-page .setup-field-tournament {
+  grid-column: span 3;
+}
+
+.setup-page .setup-field-entry-fee,
+.setup-page .setup-field-active-players {
+  grid-column: span 2;
+}
+
+.setup-page .setup-panel {
+  gap: 10px;
+}
+
+.setup-page .setup-utility-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.82fr) minmax(340px, 1.18fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.setup-page .setup-payout-card {
+  width: 100%;
+}
+
+.setup-page .setup-members-sidebar {
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px;
+  border-radius: 16px;
+}
+
+.setup-page .setup-sidebar-head {
+  margin-bottom: 0;
+}
+
+.setup-page .setup-sidebar-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.setup-page .setup-sidebar-actions .button-link,
+.setup-page .setup-sidebar-actions button {
+  min-height: 27px;
+  padding: 0.34rem 0.54rem;
+  font-size: 10.8px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  background: color-mix(in srgb, var(--input-bg) 90%, transparent);
+  color: var(--text);
+  transition: background 0.18s ease, border-color 0.18s ease, transform 0.16s ease, box-shadow 0.18s ease;
+}
+
+.setup-page .setup-sidebar-actions #toggle-members-btn {
+  border-color: color-mix(in srgb, #70b8ff 34%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, #205d9e 24%, var(--input-bg)), color-mix(in srgb, #0090ff 14%, var(--input-bg)));
+}
+
+.setup-page .setup-sidebar-actions #toggle-invite-btn {
+  border-color: color-mix(in srgb, #4ade80 30%, var(--border));
+  background: linear-gradient(160deg, color-mix(in srgb, #1f7a4d 24%, var(--input-bg)), color-mix(in srgb, #30a46c 14%, var(--input-bg)));
+}
+
+.setup-page .setup-sidebar-actions button:hover,
+.setup-page .setup-sidebar-actions .button-link:hover {
+  background: color-mix(in srgb, var(--panel) 74%, rgba(59, 130, 246, 0.26));
+  border-color: color-mix(in srgb, var(--border) 62%, rgba(96, 165, 250, 0.52));
+  transform: translateY(-1px);
+}
+
+.setup-page .setup-sidebar-actions button:focus-visible,
+.setup-page .setup-sidebar-actions .button-link:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.65);
+  outline-offset: 2px;
+}
+
+.setup-page .setup-sidebar-actions button.is-active,
+.setup-page .setup-sidebar-actions .button-link.is-active {
+  border-color: rgba(125, 211, 252, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(219, 234, 254, 0.2);
+}
+
+.setup-page .setup-sidebar-actions #toggle-members-btn.is-active {
+  background: linear-gradient(145deg, rgba(0, 144, 255, 0.34), rgba(32, 93, 158, 0.3));
+  border-color: rgba(112, 184, 255, 0.74);
+}
+
+.setup-page .setup-sidebar-actions #toggle-invite-btn.is-active {
+  background: linear-gradient(145deg, rgba(48, 164, 108, 0.34), rgba(31, 122, 77, 0.28));
+  border-color: rgba(134, 239, 172, 0.7);
+}
+
+.setup-page .setup-sidebar-body {
+  min-height: 0;
+  align-content: start;
+  gap: 8px;
+}
+
+.setup-page .setup-invite-compact {
+  gap: 8px;
+  padding: 11px;
+  border-radius: 12px;
+}
+
+.setup-page .setup-invite-compact .line-head {
+  margin-bottom: 0;
+}
+
+.setup-page .setup-invite-compact .invite-link-label {
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.setup-page .setup-invite-compact .invite-link-input {
+  min-height: 38px;
+  padding: 0.62rem 0.7rem;
+  font-size: 12px;
+}
+
+.setup-page .setup-invite-compact .invite-link-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.setup-page .setup-invite-compact .invite-link-row button {
+  min-height: 34px;
+  padding: 0.5rem 0.72rem;
+  font-size: 12px;
+}
+
+.setup-page .compact-request-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.setup-page .compact-request-row {
+  padding: 10px 11px;
+  border-radius: 12px;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  border-color: color-mix(in srgb, var(--border) 85%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--panel) 88%, transparent), color-mix(in srgb, var(--input-bg) 60%, transparent));
+}
+
+.setup-page .compact-request-row strong {
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+}
+
+.setup-page .compact-request-row .muted {
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.setup-page .compact-member-role-actions {
+  justify-content: flex-end;
+}
+
+.setup-page .compact-request-row .status-chip {
+  min-height: 24px;
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.setup-page .compact-member-card {
+  min-height: 74px;
+}
+
+.setup-page .compact-member-meta {
+  min-width: 0;
+}
+
+.setup-page .compact-member-meta p {
+  margin: 0;
+}
+
+.setup-page label {
+  gap: 6px;
+  font-size: 12px;
+}
+
+.setup-page input,
+.setup-page select {
+  min-height: 42px;
+  padding: 0.72rem 0.82rem;
+  font-size: 13px;
+}
+
+.setup-page #default-payouts {
+  gap: 8px;
+}
+
+.setup-page .payout-row {
+  grid-template-columns: minmax(116px, 140px) minmax(88px, 116px) 42px;
+  justify-content: start;
+  gap: 8px;
+  padding: 8px;
+  width: fit-content;
+  max-width: 100%;
+  justify-self: start;
+}
+
+.setup-page .payout-rank-display {
+  padding: 10px 12px;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.setup-page .rank-icon {
+  font-size: 18px;
+}
+
+.setup-page .rank-text {
+  font-size: 14px;
+}
+
+.setup-page .payout-amount {
+  min-width: 0;
+  width: 100%;
+  text-align: right;
+}
+
+.setup-page .payout-row .remove {
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  padding: 0;
+}
+
+.setup-page .payout-total {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.setup-page #add-default-payout-bottom {
+  min-height: 42px;
+  padding: 0.72rem 0.95rem;
+}
+
+@media (max-width: 760px) {
+  .setup-page .header-content {
+    gap: 10px;
+  }
+
+  .setup-page .logo {
+    width: 34px;
+    height: 34px;
+  }
+
+  .setup-page .brand-name {
+    font-size: 15px;
+  }
+
+  .setup-page .app-name {
+    font-size: 10px;
+  }
+
+  .setup-page .notification-btn,
+  .setup-page .theme-toggle {
+    width: 36px;
+    min-width: 36px;
+    height: 36px;
+  }
+
+  .setup-page .notification-icon {
+    font-size: 14px;
+  }
+
+  .setup-page .shell-header {
+    padding: 10px 12px 4px;
+  }
+
+  .setup-page .shell-header p {
+    font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .setup-page .shell-main {
+    padding: 8px 12px 20px;
+  }
+
+  .setup-page .panel {
+    padding: 13px;
+  }
+
+  .setup-page h2 {
+    font-size: 20px;
+  }
+
+  .setup-page h3 {
+    font-size: 15px;
+  }
+
+  .setup-page .step-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+  }
+
+  .setup-page .step-pill,
+  .setup-page .step-pill:first-child,
+  .setup-page .step-pill:last-child {
+    min-width: 126px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    clip-path: none;
+    margin: 0;
+    font-size: 13px;
+  }
+
+  .setup-page .setup-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px 8px;
+  }
+
+  .setup-page .setup-utility-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .setup-page .compact-request-list {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-page .setup-payout-card {
+    width: 100%;
+  }
+
+  .setup-page .setup-field-name,
+  .setup-page .setup-field-tournament,
+  .setup-page .full {
+    grid-column: 1 / -1;
+  }
+
+  .setup-page .setup-field-sport,
+  .setup-page .setup-field-entry-fee,
+  .setup-page .setup-field-active-players {
+    grid-column: span 1;
+  }
+
+  .setup-page label {
+    gap: 5px;
+    font-size: 11px;
+  }
+
+  .setup-page input,
+  .setup-page select {
+    min-height: 40px;
+    padding: 0.66rem 0.72rem;
+    font-size: 13px;
+  }
+
+  .setup-page .line-head {
+    margin-bottom: 4px;
+  }
+
+  .setup-page .payout-row {
+    grid-template-columns: minmax(0, 1fr) 84px 40px;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .setup-page .payout-rank-display {
+    min-width: 0;
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .setup-page .rank-icon {
+    font-size: 17px;
+  }
+
+  .setup-page .rank-text {
+    font-size: 13px;
+  }
+
+  .setup-page .payout-row .remove {
+    width: 40px;
+    min-width: 40px;
+    height: 40px;
+  }
+
+  .setup-page .payout-total {
+    font-size: 12px;
+  }
+
+  .setup-page .flow-controls {
+    gap: 8px;
+  }
+}
