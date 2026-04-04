@@ -73,6 +73,26 @@ def _rank_label(rank: int, status: str, has_result: bool) -> str:
     return "Played" if has_result else status.title()
 
 
+def _build_refund_rows(match_id: int, participant_ids: list[int], entry_fee: float) -> list[dict[str, Any]]:
+    if not participant_ids:
+        return []
+    pool = float(entry_fee) * len(participant_ids)
+    split = round(pool / len(participant_ids), 2)
+    remainder = round(pool - (split * len(participant_ids)), 2)
+    rows: list[dict[str, Any]] = []
+    for idx, player_id in enumerate(participant_ids):
+        amount = split + (remainder if idx == 0 else 0.0)
+        rows.append(
+            {
+                "match_id": int(match_id),
+                "rank": 0,
+                "player_id": int(player_id),
+                "amount": round(amount, 2),
+            }
+        )
+    return rows
+
+
 def _generate_invite_code(name: str, league_id: int) -> str:
     import re
 
@@ -469,11 +489,23 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
             (league_id,),
         ).fetchall()
 
-    winnings_map = {row["player_id"]: float(row["total"]) for row in winnings}
     entry_fee = float(league_row["entry_fee"])
     completed_matches = len(matches)
     fallback_participants = [int(player["id"]) for player in players]
     match_counts_by_player: dict[int, int] = {}
+    winner_match_ids = {int(item["match_id"]) for item in winnings}
+
+    for match in matches:
+        match_id = int(match["id"])
+        participant_ids = parse_participant_ids(match["participant_ids_json"]) or fallback_participants
+        if str(match["status"]) == "canceled" and match_id not in winner_match_ids:
+            winnings.extend(_build_refund_rows(match_id, participant_ids, entry_fee))
+
+    winnings_map: dict[int, float] = {}
+    for row in winnings:
+        player_id = int(row["player_id"])
+        amount = float(row["total"]) if "total" in row.keys() else float(row["amount"])
+        winnings_map[player_id] = round(winnings_map.get(player_id, 0.0) + amount, 2)
 
     for match in matches:
         participant_ids = parse_participant_ids(match["participant_ids_json"]) or fallback_participants
@@ -572,6 +604,42 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
         rank_key = str(row["rank"])
         stat["rank_counts"][rank_key] = int(stat["rank_counts"].get(rank_key, 0)) + 1
         stat["total_amount"] = round(float(stat["total_amount"]) + float(row["amount"]), 2)
+
+    for match in matches:
+        match_id = int(match["id"])
+        participant_ids = _normalize_participant_ids(parse_participant_ids(match["participant_ids_json"]))
+        if not participant_ids:
+            participant_ids = _normalize_participant_ids(list(player_name_by_id.keys()))
+        if str(match["status"]) != "canceled" or by_match.get(match_id):
+            continue
+
+        synthetic_rows = _build_refund_rows(match_id, participant_ids, entry_fee=float(league["entry_fee"] or 0))
+        for row in synthetic_rows:
+            row["player_name"] = player_name_by_id.get(int(row["player_id"]), f"Archived Player #{row['player_id']}")
+            by_match.setdefault(match_id, []).append(row)
+            winner_lookup.setdefault(match_id, {})[int(row["player_id"])] = {
+                "rank": 0,
+                "amount": float(row["amount"]),
+            }
+            stat = player_stats.get(int(row["player_id"]))
+            if not stat:
+                stat = {
+                    "player_id": int(row["player_id"]),
+                    "name": row["player_name"],
+                    "wins_total": 0,
+                    "rank_counts": {},
+                    "matches_played": 0,
+                    "matches_won": 0,
+                    "washout_matches": 0,
+                    "total_amount": 0.0,
+                    "match_history": [],
+                    "_played_match_ids": set(),
+                    "_washout_match_ids": set(),
+                }
+                player_stats[int(row["player_id"])] = stat
+            stat["_washout_match_ids"].add(match_id)
+            stat["rank_counts"]["0"] = int(stat["rank_counts"].get("0", 0)) + 1
+            stat["total_amount"] = round(float(stat["total_amount"]) + float(row["amount"]), 2)
 
     for match_id, rows in by_match.items():
         unique_players = {r["player_id"] for r in rows if int(r["rank"]) > 0}
