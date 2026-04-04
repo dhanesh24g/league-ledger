@@ -7382,6 +7382,10 @@ th {
   box-shadow: var(--input-shadow);
 }
 
+.stats-page .stats-mobile-select-shell {
+  display: contents;
+}
+
 .stats-page .stats-mobile-select-proxy-copy {
   min-width: 0;
   overflow: hidden;
@@ -8175,24 +8179,48 @@ th {
     justify-content: flex-start;
   }
 
+  .stats-page .stats-mobile-select-shell {
+    position: relative;
+    display: inline-flex;
+    width: min(214px, 100%);
+    max-width: 214px;
+    align-self: flex-start;
+  }
+
+  .stats-page .inline-form .stats-mobile-select-shell {
+    width: min(214px, 100%);
+    max-width: 214px;
+  }
+
+  .stats-page .header-center .stats-mobile-select-shell {
+    width: min(214px, 100%);
+    max-width: 214px;
+  }
+
   .stats-page .stats-mobile-select-source {
     position: absolute !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-    width: 1px !important;
-    height: 1px !important;
+    inset: 0 !important;
+    opacity: 0.015 !important;
+    pointer-events: auto !important;
+    width: 100% !important;
+    height: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     border: 0 !important;
-    overflow: hidden !important;
-    clip-path: inset(50%) !important;
-    clip: rect(0 0 0 0) !important;
+    z-index: 3 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    color: transparent !important;
     white-space: nowrap !important;
   }
 
   .stats-page .stats-mobile-select-proxy {
     display: inline-flex;
+    width: 100%;
+    max-width: none;
     align-self: flex-start;
+    pointer-events: none;
   }
 
   .stats-page .stats-current-user-grid {
