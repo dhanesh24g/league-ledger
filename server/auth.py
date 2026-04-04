@@ -8,6 +8,7 @@ import json
 import os
 import random
 import secrets
+from threading import Lock
 import time
 from typing import Any
 
@@ -16,11 +17,42 @@ from fastapi import Depends, Header, HTTPException
 
 from .database import DatabaseManager, get_supabase_client
 
-TOKEN_TTL_SECONDS = 60 * 60 * 4
+ACCESS_TOKEN_TTL_SECONDS = int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", str(60 * 60)))
+REFRESH_TOKEN_TTL_SECONDS = int(os.getenv("APP_REFRESH_TOKEN_TTL_SECONDS", str(60 * 60 * 24 * 30)))
+TOKEN_TTL_SECONDS = ACCESS_TOKEN_TTL_SECONDS
 PBKDF2_ITERATIONS = 120_000
 USER_ID_CACHE_TTL_SECONDS = 60
 PASSWORD_RESET_TOKEN_TTL_SECONDS = 60 * 30
+LEAGUE_MEMBERS_CACHE_TTL_SECONDS = 20
 _USER_ID_CACHE: dict[str, Any] = {"loaded_at": 0.0, "values": set()}
+_LEAGUE_MEMBERS_CACHE: dict[int, tuple[float, dict[str, Any]]] = {}
+_LEAGUE_MEMBERS_CACHE_LOCK = Lock()
+
+
+def _members_cache_get(league_id: int) -> dict[str, Any] | None:
+    now = time.monotonic()
+    key = int(league_id)
+    with _LEAGUE_MEMBERS_CACHE_LOCK:
+        row = _LEAGUE_MEMBERS_CACHE.get(key)
+        if not row:
+            return None
+        expires_at, payload = row
+        if now >= expires_at:
+            _LEAGUE_MEMBERS_CACHE.pop(key, None)
+            return None
+        return payload
+
+
+def _members_cache_set(league_id: int, payload: dict[str, Any]) -> None:
+    key = int(league_id)
+    expires_at = time.monotonic() + LEAGUE_MEMBERS_CACHE_TTL_SECONDS
+    with _LEAGUE_MEMBERS_CACHE_LOCK:
+        _LEAGUE_MEMBERS_CACHE[key] = (expires_at, payload)
+
+
+def _invalidate_members_cache(league_id: int) -> None:
+    with _LEAGUE_MEMBERS_CACHE_LOCK:
+        _LEAGUE_MEMBERS_CACHE.pop(int(league_id), None)
 
 
 def _secret() -> bytes:
@@ -457,14 +489,29 @@ def create_token(user: dict[str, Any]) -> str:
         "uid": int(user["id"]),
         "sub": user["user_id"],
         "iat": int(time.time()),
-        "exp": int(time.time()) + TOKEN_TTL_SECONDS,
+        "exp": int(time.time()) + ACCESS_TOKEN_TTL_SECONDS,
+        "typ": "access",
     }
     payload_part = _encode(payload)
     sig = hmac.new(_secret(), payload_part.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{payload_part}.{sig}"
 
 
-def decode_token(token: str) -> dict[str, Any]:
+def create_refresh_token(user: dict[str, Any]) -> str:
+    payload = {
+        "uid": int(user["id"]),
+        "sub": user["user_id"],
+        "iat": int(time.time()),
+        "exp": int(time.time()) + REFRESH_TOKEN_TTL_SECONDS,
+        "typ": "refresh",
+        "jti": secrets.token_hex(12),
+    }
+    payload_part = _encode(payload)
+    sig = hmac.new(_secret(), payload_part.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{payload_part}.{sig}"
+
+
+def decode_token(token: str, expected_type: str | None = None) -> dict[str, Any]:
     try:
         payload_part, sig = token.split(".", 1)
     except ValueError as exc:
@@ -477,7 +524,29 @@ def decode_token(token: str) -> dict[str, Any]:
     payload = _decode(payload_part)
     if int(payload.get("exp", 0)) < int(time.time()):
         raise HTTPException(status_code=401, detail="Token expired")
+
+    token_type = str(payload.get("typ") or "access")
+    if expected_type and token_type != expected_type:
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
     return payload
+
+
+def refresh_session(refresh_token: str, requested_league_id: int | None = None) -> dict[str, Any]:
+    payload = decode_token(refresh_token, expected_type="refresh")
+    user_id_value = int(payload.get("uid", 0))
+    if not user_id_value:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    profile = get_user_profile_by_id(user_id_value, requested_league_id=requested_league_id)
+    if not profile:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    return {
+        "token": create_token(profile),
+        "refresh_token": create_refresh_token(profile),
+        "user": profile,
+    }
 
 
 def _shape_league_summary(row: dict[str, Any]) -> dict[str, Any]:
@@ -1047,6 +1116,7 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
                     "user_id_label": str(user_row.get("user_id") or ""),
                 },
             )
+        _invalidate_members_cache(league_id)
         return {"message": "Join request approved"}
 
     with DatabaseManager() as connection:
@@ -1084,6 +1154,7 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
                 },
                 connection=connection,
             )
+    _invalidate_members_cache(league_id)
     return {"message": "Join request approved"}
 
 
@@ -1134,6 +1205,10 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=403, detail="Active league membership required")
 
     league_id = int(user["active_league_id"])
+    cached = _members_cache_get(league_id)
+    if cached is not None:
+        return cached
+
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
@@ -1164,7 +1239,9 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
                     "role": _normalize_membership_role(membership.get("role", "read")),
                 }
             )
-        return {"members": rows}
+        response = {"members": rows}
+        _members_cache_set(league_id, response)
+        return response
 
     with DatabaseManager() as connection:
         rows = connection.execute(
@@ -1183,7 +1260,9 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
             """,
             (league_id,),
         ).fetchall()
-    return {"members": [{**dict(row), "role": _normalize_membership_role(dict(row)["role"])} for row in rows]}
+    response = {"members": [{**dict(row), "role": _normalize_membership_role(dict(row)["role"])} for row in rows]}
+    _members_cache_set(league_id, response)
+    return response
 
 
 def remove_league_member(member_user_id: int, user: dict[str, Any]) -> dict[str, str]:
@@ -1212,6 +1291,7 @@ def remove_league_member(member_user_id: int, user: dict[str, Any]) -> dict[str,
 
         supabase.table("league_memberships").delete().eq("league_id", league_id).eq("user_id", target_user_id).execute()
         supabase.table("league_join_requests").delete().eq("league_id", league_id).eq("user_id", target_user_id).execute()
+        _invalidate_members_cache(league_id)
         return {"message": "League member removed"}
 
     with DatabaseManager() as connection:
@@ -1225,6 +1305,7 @@ def remove_league_member(member_user_id: int, user: dict[str, Any]) -> dict[str,
             "DELETE FROM league_join_requests WHERE league_id = ? AND user_id = ?",
             (league_id, target_user_id),
         )
+    _invalidate_members_cache(league_id)
     return {"message": "League member removed"}
 
 
@@ -1250,6 +1331,7 @@ def update_membership_role(member_user_id: int, role: str, user: dict[str, Any])
         if not response.data:
             raise HTTPException(status_code=404, detail="League member not found")
         supabase.table("league_memberships").update({"role": normalized_role}).eq("league_id", league_id).eq("user_id", int(member_user_id)).execute()
+        _invalidate_members_cache(league_id)
         return {"message": "Member role updated"}
 
     with DatabaseManager() as connection:
@@ -1263,6 +1345,7 @@ def update_membership_role(member_user_id: int, role: str, user: dict[str, Any])
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="League member not found")
+    _invalidate_members_cache(league_id)
     return {"message": "Member role updated"}
 
 
@@ -1300,7 +1383,7 @@ def current_user(
             raise HTTPException(status_code=400, detail="Invalid league selection") from exc
 
     token = authorization.split(" ", 1)[1].strip()
-    payload = decode_token(token)
+    payload = decode_token(token, expected_type="access")
     user_id_value = int(payload.get("uid", 0))
     if not user_id_value:
         raise HTTPException(status_code=401, detail="Invalid token payload")

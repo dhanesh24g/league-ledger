@@ -10,11 +10,13 @@ from .auth import (
     auth_config,
     authenticate,
     create_join_request,
+    create_refresh_token,
     create_token,
     current_user,
     reject_join_request,
     request_password_reset,
     reset_password,
+    refresh_session,
     get_league_by_invite_code,
     suggest_user_ids,
     user_id_availability,
@@ -27,7 +29,7 @@ from .auth import (
     signup_user,
     update_membership_role,
 )
-from .schemas import ForgotPasswordPayload, GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, ResetPasswordPayload, SignupPayload, WinnersPayload
+from .schemas import ForgotPasswordPayload, GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, RefreshTokenPayload, ResetPasswordPayload, SignupPayload, WinnersPayload
 from .service import (
     add_match,
     add_player,
@@ -125,7 +127,8 @@ def signup(payload: SignupPayload) -> dict[str, Any]:
         payload.google_token,
     )
     token = create_token(user)
-    return {"token": token, "user": user}
+    refresh_token = create_refresh_token(user)
+    return {"token": token, "refresh_token": refresh_token, "user": user}
 
 
 @router.post("/auth/login")
@@ -135,7 +138,8 @@ def login(payload: LoginPayload, x_league_id: str | None = None) -> dict[str, An
     if not user:
         raise HTTPException(status_code=401, detail="Invalid user ID or password")
     token = create_token(user)
-    return {"token": token, "user": user}
+    refresh_token = create_refresh_token(user)
+    return {"token": token, "refresh_token": refresh_token, "user": user}
 
 
 @router.post("/auth/google")
@@ -143,7 +147,14 @@ def google_login(payload: GoogleTokenPayload, x_league_id: str | None = None) ->
     requested_league_id = int(x_league_id) if x_league_id and x_league_id.isdigit() else None
     user = authenticate_google(payload.credential, requested_league_id=requested_league_id)
     token = create_token(user)
-    return {"token": token, "user": user}
+    refresh_token = create_refresh_token(user)
+    return {"token": token, "refresh_token": refresh_token, "user": user}
+
+
+@router.post("/auth/refresh")
+def auth_refresh(payload: RefreshTokenPayload, x_league_id: str | None = None) -> dict[str, Any]:
+    requested_league_id = int(x_league_id) if x_league_id and x_league_id.isdigit() else None
+    return refresh_session(payload.refresh_token, requested_league_id=requested_league_id)
 
 
 @router.post("/auth/forgot-password")

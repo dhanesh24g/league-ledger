@@ -53,6 +53,10 @@ class GoogleTokenPayload(BaseModel):
     credential: str = Field(min_length=20, max_length=4096)
 
 
+class RefreshTokenPayload(BaseModel):
+    refresh_token: str = Field(min_length=20, max_length=4096)
+
+
 class JoinRequestPayload(BaseModel):
     league_id: int | None = None
     invite_code: str | None = Field(default=None, max_length=160)

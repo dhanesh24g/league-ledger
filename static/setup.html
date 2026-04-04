@@ -97,8 +97,8 @@
       <p class="muted">Define your default rules once. Refreshing this page keeps your draft instead of resetting the
         workflow.</p>
 
-      <form id="league-form" class="grid">
-        <label>Sport
+      <form id="league-form" class="grid setup-form-grid">
+        <label class="setup-field setup-field-sport">Sport
           <select name="sport" required>
             <option value="Cricket">Cricket</option>
             <option value="Football">Football</option>
@@ -110,26 +110,42 @@
             <option value="Other">Other</option>
           </select>
         </label>
-        <label>League Name
+        <label class="setup-field setup-field-name">League Name
           <input name="name" placeholder="Friday IPL Crew" required>
         </label>
-        <label>Tournament
+        <label class="setup-field setup-field-tournament">Tournament
           <input name="tournament" value="IPL" required>
         </label>
-        <label>Entry Fee (per person / per match)
-          <input type="number" name="entry_fee" value="100" min="1" required>
+        <label class="setup-field setup-field-entry-fee">Entry Fee
+          <input type="number" name="entry_fee" value="100" min="1" required aria-label="Entry fee per person per match">
         </label>
-        <label>Active League Players
-          <input type="number" name="active_player_count" value="5" min="2" required>
+        <label class="setup-field setup-field-active-players">Players
+          <input type="number" name="active_player_count" value="5" min="2" required aria-label="Active league players">
         </label>
 
-        <div class="full">
-          <div class="line-head">
-            <h3>Default Winner Payouts</h3>
+        <div class="full setup-utility-grid">
+          <div class="setup-payout-card">
+            <div class="line-head">
+              <h3>Default Winner Payouts</h3>
+            </div>
+            <div id="default-payouts" class="stack"></div>
+            <button type="button" id="add-default-payout-bottom" class="ghost full">+ Add Winner</button>
+            <p id="default-payout-total" class="payout-total muted small"></p>
           </div>
-          <div id="default-payouts" class="stack"></div>
-          <button type="button" id="add-default-payout-bottom" class="ghost full">+ Add Winner</button>
-          <p id="default-payout-total" class="payout-total muted small"></p>
+          <aside class="setup-members-sidebar info-card">
+            <div class="line-head setup-sidebar-head">
+              <h3>League Members</h3>
+              <span class="muted small">Roster</span>
+            </div>
+            <div class="setup-sidebar-actions">
+              <button type="button" id="toggle-members-btn" class="ghost small full" aria-expanded="false">Show League Members</button>
+              <button type="button" id="toggle-invite-btn" class="ghost small full hidden" aria-expanded="false">Invite Members</button>
+            </div>
+            <div id="members-zone" class="stack setup-sidebar-body">
+              <p class="muted small">Members will appear here once the league roster is available.</p>
+            </div>
+            <div id="invite-zone" class="stack hidden"></div>
+          </aside>
         </div>
 
         <div class="actions full">
@@ -137,9 +153,7 @@
         </div>
       </form>
       <p id="league-state" class="muted small"></p>
-      <div id="invite-zone" class="stack hidden"></div>
       <div id="join-requests-zone" class="stack hidden"></div>
-      <div id="members-zone" class="stack hidden"></div>
       <div class="flow-controls setup-flow-controls">
         <a class="button-link ghost" href="/welcome">← Back to Welcome</a>
         <a class="button-link primary" data-workflow-link href="/players">Continue to Players</a>
