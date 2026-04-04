@@ -553,6 +553,7 @@ function bindJoinModal(user) {
 }
 
 function renderHome(user) {
+  welcomeTitle.classList.remove('loading');
   welcomeTitle.textContent = `Welcome, ${user.first_name}.`;
   welcomeCopy.textContent = 'Create a fresh league, open an invite link, or jump into any league you already belong to.';
   welcomeActions.innerHTML = `
@@ -683,10 +684,7 @@ function clearUserCache() {
 function renderLoadingState() {
   // Show loading skeleton for user name with shimmer
   welcomeTitle.classList.add('loading');
-  welcomeTitle.innerHTML = `
-    <span class="shimmer"></span>
-    <span>Loading</span>
-  `;
+  welcomeTitle.textContent = 'Loading your league access...';
 
   welcomeCopy.innerHTML = `
     <div class="status-loading">
@@ -754,6 +752,7 @@ function renderImmediateUI(user) {
 
 function updateUIWithUserData(user) {
   // Update welcome message with fresh data
+  welcomeTitle.classList.remove('loading');
   welcomeTitle.textContent = `Welcome, ${user.first_name}.`;
 
   // Update memberships if they changed
