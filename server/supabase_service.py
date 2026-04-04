@@ -639,28 +639,35 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
             .execute()
         )
         winnings = winnings_response.data or []
-    
+
+    by_match_winnings: dict[int, list[dict[str, Any]]] = {}
+    for item in winnings:
+        by_match_winnings.setdefault(int(item["match_id"]), []).append(
+            {
+                "match_id": int(item["match_id"]),
+                "player_id": int(item["player_id"]),
+                "amount": float(item["amount"]),
+            }
+        )
+
     entry_fee = float(league["entry_fee"])
     fallback_participants = [int(player["id"]) for player in players]
     match_counts_by_player: dict[int, int] = {}
-    winner_match_ids = {int(item["match_id"]) for item in winnings}
+    winnings_map: dict[int, float] = {}
 
     for match in matches:
         match_id = int(match["id"])
         participant_ids = parse_participant_ids(match.get("participant_ids_json")) or fallback_participants
-        if str(match["status"]) == "canceled" and match_id not in winner_match_ids:
-            winnings.extend(_build_refund_rows(match_id, participant_ids, entry_fee))
-
-    winnings_map: dict[int, float] = {}
-    for item in winnings:
-        player_id = int(item["player_id"])
-        amount = float(item["amount"])
-        winnings_map[player_id] = round(winnings_map.get(player_id, 0.0) + amount, 2)
-
-    for match in matches:
-        participant_ids = parse_participant_ids(match.get("participant_ids_json")) or fallback_participants
+        effective_rows = (
+            _build_refund_rows(match_id, participant_ids, entry_fee)
+            if str(match["status"]) == "canceled"
+            else by_match_winnings.get(match_id, [])
+        )
         for player_id in participant_ids:
             match_counts_by_player[player_id] = match_counts_by_player.get(player_id, 0) + 1
+        for item in effective_rows:
+            player_id = int(item["player_id"])
+            winnings_map[player_id] = round(winnings_map.get(player_id, 0.0) + float(item["amount"]), 2)
     
     rows = []
     for player in players:
@@ -712,6 +719,9 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
             .execute()
         )
         winners = winners_response.data or []
+
+    canceled_match_ids = {int(match["id"]) for match in matches if str(match["status"]) == "canceled"}
+    winners = [row for row in winners if int(row["match_id"]) not in canceled_match_ids]
 
     player_name_by_id = {int(p["id"]): str(p["name"]) for p in players}
     player_stats: dict[int, dict[str, Any]] = {
@@ -778,11 +788,11 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
 
     for match in matches:
         match_id = int(match["id"])
+        if str(match["status"]) != "canceled":
+            continue
         participant_ids = _normalize_participant_ids(parse_participant_ids(match.get("participant_ids_json")))
         if not participant_ids:
             participant_ids = _normalize_participant_ids(list(player_name_by_id.keys()))
-        if str(match["status"]) != "canceled" or by_match.get(match_id):
-            continue
 
         synthetic_rows = _build_refund_rows(match_id, participant_ids, entry_fee=float(league.get("entry_fee") or 0))
         for row in synthetic_rows:
