@@ -392,6 +392,8 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
         }
         if not match_row or not league_row:
             raise HTTPException(status_code=404, detail="League or match not found")
+        if str(match_row["status"] or "").lower() == "canceled":
+            raise HTTPException(status_code=409, detail="This match is already marked as washout/cancelled")
 
         payouts = parse_payouts(match_row["payouts_json"]) or parse_payouts(league_row["payouts_json"])
         winner_limit = int(match_row["winner_count"] or league_row["default_winner_count"])
