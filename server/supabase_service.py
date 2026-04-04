@@ -611,6 +611,27 @@ def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     return {"message": "Match marked as canceled and refund distributed equally"}
 
 
+def reopen_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    match_response = supabase.table("matches").select("*").eq("id", match_id).eq("league_id", league_id).execute()
+    if not match_response.data:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    match = match_response.data[0]
+    if str(match.get("status") or "").lower() != "canceled":
+        raise HTTPException(status_code=409, detail="Only washout/cancelled matches can be reopened")
+
+    supabase.table("winner_entries").delete().eq("match_id", match_id).execute()
+    supabase.table("matches").update({"status": "pending"}).eq("id", match_id).execute()
+    _invalidate_league_cache(league_id)
+
+    return {"message": "Match reopened for winner assignment"}
+
+
 def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     supabase = get_supabase_client()
     if not supabase:

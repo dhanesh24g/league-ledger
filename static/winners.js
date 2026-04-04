@@ -21,6 +21,7 @@ import { rankIcon } from '/static/payouts.js';
 
 const matchSelect = document.getElementById('match-select');
 const loadWinnerBtn = document.getElementById('load-winner-form');
+const reopenMatchBtn = document.getElementById('reopen-match');
 const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
 const winnersForm = document.getElementById('winners-form');
@@ -109,6 +110,10 @@ function updateMatchActionState() {
 
   loadWinnerBtn.disabled = !isAdmin || !match || isCanceled;
   cancelMatchBtn.disabled = !isAdmin || !match || isCanceled;
+  reopenMatchBtn?.classList.toggle('hidden', !isCanceled || !isAdmin || !match);
+  if (reopenMatchBtn) {
+    reopenMatchBtn.disabled = !isAdmin || !match || !isCanceled;
+  }
 
   if (!match || !isAdmin) return;
   loadWinnerBtn.textContent = isCompleted ? 'Edit Assignment' : 'Load Assignment';
@@ -514,7 +519,7 @@ function renderWinnerForm(matchId) {
   }
 
   if (String(match.status || '').toLowerCase() === 'canceled') {
-    winnersForm.innerHTML = '<p class="muted">This match is marked as washout/cancelled. Refund has been distributed equally and winner assignment is locked.</p>';
+    winnersForm.innerHTML = '<p class="muted">This match is marked as washout/cancelled. Refund has been distributed equally. Continue to ledger or reopen the match to restore winner assignment.</p>';
     return;
   }
 
@@ -694,6 +699,46 @@ cancelMatchBtn.addEventListener('click', async () => {
   }
 });
 
+reopenMatchBtn?.addEventListener('click', async () => {
+  if (authUser.league_role !== 'admin') {
+    showError('Only admin can reopen a match.');
+    return;
+  }
+  if (!matchSelect.value) {
+    showError('Choose a match first.');
+    return;
+  }
+
+  const proceed = window.confirm('Reopen this washout/cancelled match? Refund rows will be cleared and you can assign winners again.');
+  if (!proceed) return;
+
+  let closeLoading = null;
+  let restoreReopenButton = null;
+  try {
+    restoreReopenButton = setButtonLoading(reopenMatchBtn, 'Reopening...');
+    closeLoading = showLoading('Reopening match...');
+    const targetMatchId = String(matchSelect.value);
+    await callApi(`/api/matches/${targetMatchId}/reopen`, { method: 'POST' });
+    appState = await callApi('/api/state');
+    const refreshedMatch = (appState.matches || []).find((item) => String(item.id) === targetMatchId);
+    if (!refreshedMatch || String(refreshedMatch.status || '').toLowerCase() === 'canceled') {
+      throw new Error('The match could not be reopened. Please refresh and try again.');
+    }
+    renderMatchSelect();
+    matchSelect.value = targetMatchId;
+    updateMatchActionState();
+    renderMatchSummary(targetMatchId);
+    clearWinnerDraft(targetMatchId);
+    renderWinnerForm(targetMatchId);
+    showSuccess('Match reopened. You can assign winners again.');
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (restoreReopenButton) restoreReopenButton();
+    if (closeLoading) closeLoading();
+  }
+});
+
 continueLedgerBtn.addEventListener('click', async () => {
   if (authUser.league_role !== 'admin') {
     navigateTo('/ledger');
@@ -703,6 +748,12 @@ continueLedgerBtn.addEventListener('click', async () => {
   const match = appState.matches.find((item) => String(item.id) === String(matchSelect.value));
   if (!match) {
     showError('Choose a match first.');
+    return;
+  }
+
+  if (String(match.status || '').toLowerCase() === 'canceled') {
+    setCurrentWorkflowPage('/ledger');
+    navigateTo('/ledger');
     return;
   }
 
