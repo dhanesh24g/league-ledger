@@ -494,6 +494,10 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
 
     league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
+        league = c.execute(
+            "SELECT entry_fee FROM league WHERE id = ? LIMIT 1",
+            (league_id,),
+        ).fetchone()
         players = _sync_active_members_to_players(c, league_id)
         matches = c.execute(
             "SELECT id, title, match_date, status, participant_ids_json FROM matches WHERE league_id = ? ORDER BY id DESC",
@@ -645,11 +649,13 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
         player_stats.values(),
         key=lambda item: (-item["wins_total"], -item["total_amount"], item["name"].lower()),
     )
+    entry_fee = round(float(league["entry_fee"]), 2) if league and league["entry_fee"] is not None else 0.0
     total_matches = len(matches)
     played_matches = sum(1 for match in matches if str(match["status"]) == "completed")
     canceled_matches = sum(1 for match in matches if str(match["status"]) == "canceled")
     return {
         "summary": {
+            "entry_fee": entry_fee,
             "total_matches": total_matches,
             "played_matches": played_matches,
             "canceled_matches": canceled_matches,

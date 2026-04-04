@@ -818,11 +818,13 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
         player_stats.values(),
         key=lambda item: (-item["wins_total"], -item["total_amount"], item["name"].lower()),
     )
+    entry_fee = round(float(league.get("entry_fee") or 0), 2)
     total_matches = len(matches)
     played_matches = sum(1 for match in matches if str(match["status"]) == "completed")
     canceled_matches = sum(1 for match in matches if str(match["status"]) == "canceled")
     response = {
         "summary": {
+            "entry_fee": entry_fee,
             "total_matches": total_matches,
             "played_matches": played_matches,
             "canceled_matches": canceled_matches,

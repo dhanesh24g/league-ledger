@@ -1433,7 +1433,11 @@ def update_membership_role(member_user_id: int, role: str, user: dict[str, Any])
         raise HTTPException(status_code=403, detail="Admin role required")
 
     league_id = int(user["active_league_id"])
+    target_user_id = int(member_user_id)
     normalized_role = _normalize_membership_role(role)
+
+    if int(user.get("id") or 0) == target_user_id:
+        raise HTTPException(status_code=400, detail="Use another admin account to change your own role")
 
     if get_supabase_client():
         supabase = get_supabase_client()
@@ -1442,25 +1446,56 @@ def update_membership_role(member_user_id: int, role: str, user: dict[str, Any])
             supabase.table("league_memberships")
             .select("*")
             .eq("league_id", league_id)
-            .eq("user_id", int(member_user_id))
+            .eq("user_id", target_user_id)
             .eq("status", "active")
             .limit(1)
             .execute()
         )
         if not response.data:
             raise HTTPException(status_code=404, detail="League member not found")
-        supabase.table("league_memberships").update({"role": normalized_role}).eq("league_id", league_id).eq("user_id", int(member_user_id)).execute()
+
+        current_role = _normalize_membership_role(response.data[0].get("role", "read"))
+        if current_role == "admin" and normalized_role != "admin":
+            admin_count_response = (
+                supabase.table("league_memberships")
+                .select("user_id", count="exact")
+                .eq("league_id", league_id)
+                .eq("status", "active")
+                .eq("role", "admin")
+                .execute()
+            )
+            admin_count = int(admin_count_response.count or 0)
+            if admin_count <= 1:
+                raise HTTPException(status_code=400, detail="At least one admin must remain in the league")
+
+        supabase.table("league_memberships").update({"role": normalized_role}).eq("league_id", league_id).eq("user_id", target_user_id).execute()
         _invalidate_members_cache(league_id)
         return {"message": "Member role updated"}
 
     with DatabaseManager() as connection:
+        existing = connection.execute(
+            "SELECT role FROM league_memberships WHERE league_id = ? AND user_id = ? AND status = 'active' LIMIT 1",
+            (league_id, target_user_id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="League member not found")
+
+        current_role = _normalize_membership_role(existing["role"])
+        if current_role == "admin" and normalized_role != "admin":
+            admin_count = connection.execute(
+                "SELECT COUNT(*) AS count FROM league_memberships WHERE league_id = ? AND status = 'active' AND role = 'admin'",
+                (league_id,),
+            ).fetchone()["count"]
+            if int(admin_count) <= 1:
+                raise HTTPException(status_code=400, detail="At least one admin must remain in the league")
+
         cursor = connection.execute(
             """
             UPDATE league_memberships
             SET role = ?
             WHERE league_id = ? AND user_id = ? AND status = 'active'
             """,
-            (normalized_role, league_id, int(member_user_id)),
+            (normalized_role, league_id, target_user_id),
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="League member not found")

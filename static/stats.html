@@ -89,29 +89,33 @@
       </div>
     </section>
 
-    <section class="panel active stats-panel">
-      <h2>Match Winners</h2>
-      <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
-      <div class="inline-form">
-        <select id="match-filter"></select>
-      </div>
-      <div id="match-winners-card" class="feed"></div>
-    </section>
+    <div class="stats-duo-layout">
+      <section class="panel active stats-panel">
+        <h2>Match Winners</h2>
+        <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
+        <div class="inline-form">
+          <select id="match-filter"></select>
+        </div>
+        <div id="match-winners-card" class="feed"></div>
+      </section>
 
-    <section class="panel active stats-panel stats-panel-spaced">
-      <h2>League Ladder</h2>
-      <p class="muted">Compare the entire table side by side across wins and winnings.</p>
-      <div id="leaderboard-chart" class="leaderboard-chart"></div>
-    </section>
+      <section class="panel active stats-panel stats-panel-spaced">
+        <h2>League Ladder</h2>
+        <p class="muted">Read the payout split at a glance. Hover on desktop, tap on mobile, and open the full deep dive when you want player-by-player detail.</p>
+        <div id="leaderboard-chart" class="leaderboard-chart"></div>
+      </section>
+    </div>
 
-    <section class="panel active stats-panel stats-panel-spaced">
-      <h2>Player Performance</h2>
-      <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
-      <div class="inline-form">
-        <select id="player-filter"></select>
-      </div>
-      <div id="player-stats-card" class="feed"></div>
-    </section>
+    <div class="stats-duo-layout stats-duo-layout-single">
+      <section class="panel active stats-panel stats-panel-spaced">
+        <h2>Player Performance</h2>
+        <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
+        <div class="inline-form">
+          <select id="player-filter"></select>
+        </div>
+        <div id="player-stats-card" class="feed"></div>
+      </section>
+    </div>
   </main>
 
   <div id="earners-modal" class="dashboard-modal hidden" aria-hidden="true">
@@ -125,6 +129,34 @@
         <button id="close-earners-modal" type="button" class="ghost">Close</button>
       </div>
       <div id="earners-modal-body" class="dashboard-modal-body"></div>
+    </section>
+  </div>
+
+  <div id="ladder-modal" class="dashboard-modal hidden" aria-hidden="true">
+    <div class="dashboard-modal-backdrop" data-close-ladder></div>
+    <section class="dashboard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="ladder-modal-title">
+      <div class="dashboard-modal-head">
+        <div>
+          <h2 id="ladder-modal-title">League Ladder Deep Dive</h2>
+          <p class="muted">A full payout-share chart with every player listed beside it.</p>
+        </div>
+        <button id="close-ladder-modal" type="button" class="ghost">Close</button>
+      </div>
+      <div id="ladder-modal-body" class="dashboard-modal-body"></div>
+    </section>
+  </div>
+
+  <div id="history-modal" class="dashboard-modal hidden" aria-hidden="true">
+    <div class="dashboard-modal-backdrop" data-close-history></div>
+    <section class="dashboard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+      <div class="dashboard-modal-head">
+        <div>
+          <h2 id="history-modal-title">Match History</h2>
+          <p class="muted">A full timeline of the selected player's recent results.</p>
+        </div>
+        <button id="close-history-modal" type="button" class="ghost">Close</button>
+      </div>
+      <div id="history-modal-body" class="dashboard-modal-body"></div>
     </section>
   </div>
 
