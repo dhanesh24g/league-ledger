@@ -22,6 +22,7 @@ try:
         get_ledger as supabase_get_ledger,
         get_state as supabase_get_state,
         get_stats as supabase_get_stats,
+        reopen_match as supabase_reopen_match,
         upsert_league as supabase_upsert_league,
         save_winners as supabase_save_winners,
     )
@@ -469,6 +470,24 @@ def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     return {"message": "Match marked as canceled and refund distributed equally"}
 
 
+def reopen_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_reopen_match(match_id, user)
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        match_row = c.execute("SELECT * FROM matches WHERE id = ? AND league_id = ?", (match_id, league_id)).fetchone()
+        if not match_row:
+            raise HTTPException(status_code=404, detail="Match not found")
+        if str(match_row["status"] or "").lower() != "canceled":
+            raise HTTPException(status_code=409, detail="Only washout/cancelled matches can be reopened")
+
+        c.execute("DELETE FROM winner_entries WHERE match_id = ?", (match_id,))
+        c.execute("UPDATE matches SET status = 'pending' WHERE id = ?", (match_id,))
+
+    return {"message": "Match reopened for winner assignment"}
+
+
 def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     if user.get("league_role") != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
@@ -484,7 +503,7 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
 
         players = _sync_active_members_to_players(c, league_id)
         matches = c.execute(
-            "SELECT id, participant_ids_json FROM matches WHERE league_id = ? AND status IN ('completed', 'canceled') ORDER BY id DESC",
+            "SELECT id, status, participant_ids_json FROM matches WHERE league_id = ? AND status IN ('completed', 'canceled') ORDER BY id DESC",
             (league_id,),
         ).fetchall()
         winnings = c.execute(

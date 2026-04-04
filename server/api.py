@@ -36,6 +36,7 @@ from .service import (
     cancel_match,
     delete_player,
     get_ledger,
+    reopen_match,
     get_stats,
     get_state,
     save_winners,
@@ -84,6 +85,11 @@ def set_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any] = D
 @router.post("/matches/{match_id}/cancel")
 def set_match_canceled(match_id: int, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
     return cancel_match(match_id, user)
+
+
+@router.post("/matches/{match_id}/reopen")
+def set_match_reopened(match_id: int, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
+    return reopen_match(match_id, user)
 
 
 @router.get("/ledger")
