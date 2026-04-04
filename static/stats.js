@@ -300,7 +300,7 @@ function bindInteractivePie(container, shares, onSelect) {
 
 function renderMetricStack(metrics) {
   return metrics.map((metric) => `
-    <div class="player-metric-row ${escapeHtml(metric.accent || '')} ${metric.featured ? 'player-metric-row-featured' : ''}">
+    <div class="player-metric-row ${escapeHtml(metric.accent || '')} ${metric.featured ? 'player-metric-row-featured' : ''} ${escapeHtml(metric.toneClass || '')}">
       <div>
         <span>${escapeHtml(metric.label)}</span>
         <small>${escapeHtml(metric.helper || '')}</small>
@@ -669,7 +669,7 @@ function renderOverview() {
 	          <div class="stats-current-user-metric"><span>Winning Matches</span><strong>${Number(currentPlayer.matches_won || 0)}</strong></div>
 	          <div class="stats-current-user-metric"><span>Best</span><strong>${escapeHtml(getBestFinish(currentPlayer))}</strong></div>
 	          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
-	          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
+	          <div class="stats-current-user-metric stats-current-user-metric-wide stats-current-user-metric-wide-${eligiblePayoutTone}"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
 	        </div>
 	      ` : `
 	        <div class="stats-current-user-empty">
@@ -854,12 +854,17 @@ function renderSelectedPlayer() {
   const winRate = matchesPlayed ? Math.round((matchesWon / matchesPlayed) * 100) : 0;
   const entryFee = Number(stats.summary?.entry_fee || 0);
   const eligiblePayout = Number(player.total_amount || 0) - (matchesPlayed * entryFee);
+  const eligiblePayoutToneClass = eligiblePayout > 0
+    ? 'player-metric-row-featured-positive'
+    : eligiblePayout < 0
+      ? 'player-metric-row-featured-negative'
+      : 'player-metric-row-featured-neutral';
   const metricStack = renderMetricStack([
     { label: 'Played', value: String(matchesPlayed), helper: 'League matches joined', accent: 'accent-cyan' },
     { label: 'Wins', value: String(player.wins_total), helper: 'First-place finishes', accent: 'accent-pink' },
     { label: 'Winning Matches', value: String(matchesWon), helper: 'Paid finishes', accent: 'accent-gold' },
     { label: 'Total Won', value: formatCurrency(player.total_amount), helper: 'Amount collected', accent: 'accent-green' },
-    { label: 'Eligible Payout', value: formatCurrency(eligiblePayout), helper: 'Won minus entry fees', accent: 'accent-amber', featured: true },
+    { label: 'Eligible Payout', value: formatCurrency(eligiblePayout), helper: 'Won minus entry fees', accent: 'accent-amber', featured: true, toneClass: eligiblePayoutToneClass },
     { label: 'Washouts', value: String(Number(player.washout_matches || 0)), helper: 'Refund-style results', accent: 'accent-slate' },
   ]);
 
