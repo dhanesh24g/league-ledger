@@ -6748,6 +6748,21 @@ th {
   gap: 6px;
 }
 
+.stats-page .rank-distribution-list {
+  display: grid;
+}
+
+.stats-page .rank-distribution-list-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stats-page .rank-distribution-column {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
 .stats-page .rank-distribution-row {
   grid-template-columns: minmax(108px, auto) minmax(84px, 1fr) auto;
   gap: 6px;
@@ -6755,6 +6770,15 @@ th {
 
 .stats-page .rank-distribution-label {
   font-size: 11px;
+}
+
+.stats-page .rank-distribution-list-modal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stats-page .rank-distribution-modal-card {
+  padding: 14px;
 }
 
 .stats-page .player-compact-side .history-list {
@@ -7324,6 +7348,11 @@ th {
 
   .stats-page .player-metric-stack {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-page .rank-distribution-list-columns,
+  .stats-page .rank-distribution-list-modal {
+    grid-template-columns: 1fr;
   }
 
   .stats-page .player-compact-side .history-list {

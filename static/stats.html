@@ -160,6 +160,20 @@
     </section>
   </div>
 
+  <div id="rank-modal" class="dashboard-modal hidden" aria-hidden="true">
+    <div class="dashboard-modal-backdrop" data-close-rank></div>
+    <section class="dashboard-modal-panel" role="dialog" aria-modal="true" aria-labelledby="rank-modal-title">
+      <div class="dashboard-modal-head">
+        <div>
+          <h2 id="rank-modal-title">Rank Distribution Deep Dive</h2>
+          <p class="muted">A full placement breakdown for the selected player.</p>
+        </div>
+        <button id="close-rank-modal" type="button" class="ghost">Close</button>
+      </div>
+      <div id="rank-modal-body" class="dashboard-modal-body"></div>
+    </section>
+  </div>
+
   <script type="module" src="/static/stats.js"></script>
 </body>
 

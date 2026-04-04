@@ -26,6 +26,9 @@ const closeLadderModalBtn = document.getElementById('close-ladder-modal');
 const historyModal = document.getElementById('history-modal');
 const historyModalBody = document.getElementById('history-modal-body');
 const closeHistoryModalBtn = document.getElementById('close-history-modal');
+const rankModal = document.getElementById('rank-modal');
+const rankModalBody = document.getElementById('rank-modal-body');
+const closeRankModalBtn = document.getElementById('close-rank-modal');
 
 let stats = {
   summary: {
@@ -329,6 +332,74 @@ function openHistoryModal() {
 
 function closeHistoryModal() {
   setModalState(historyModal, false);
+}
+
+function openRankModal() {
+  setModalState(rankModal, true);
+}
+
+function closeRankModal() {
+  setModalState(rankModal, false);
+}
+
+function buildRankDistributionRows(rankCounts, maxCount) {
+  return Object.keys(rankCounts || {})
+    .sort((a, b) => Number(a) - Number(b))
+    .map((rank) => {
+      const rankNumber = Number(rank);
+      const visual = getRankVisual(rankNumber);
+      const count = Number(rankCounts[rank]);
+      return `
+        <div class="rank-distribution-row">
+          <span class="rank-distribution-label">${visual.icon} ${escapeHtml(visual.label)}</span>
+          <div class="rank-distribution-bar">
+            <span class="rank-distribution-fill" style="width: ${barWidth(count, maxCount)};"></span>
+          </div>
+          <strong>${count}</strong>
+        </div>
+      `;
+    });
+}
+
+function renderRankDistributionColumns(rows, columnCount) {
+  if (!rows.length) {
+    return '<p class="muted">No rank placements yet.</p>';
+  }
+
+  const safeColumnCount = Math.max(1, Number(columnCount || 1));
+  const rowsPerColumn = Math.ceil(rows.length / safeColumnCount);
+  const columns = [];
+  for (let i = 0; i < safeColumnCount; i += 1) {
+    const start = i * rowsPerColumn;
+    const columnRows = rows.slice(start, start + rowsPerColumn);
+    if (columnRows.length) {
+      columns.push(`<div class="rank-distribution-column">${columnRows.join('')}</div>`);
+    }
+  }
+  return columns.join('');
+}
+
+function renderRankModal(player, rankRows) {
+  if (!rankModalBody) return;
+
+  rankModalBody.innerHTML = `
+    <div class="zoom-board">
+      <article class="zoom-board-row">
+        <div class="zoom-board-head">
+          <div class="chart-player-avatar">${escapeHtml(getInitials(player?.name || 'LL'))}</div>
+          <div>
+            <strong>${escapeHtml(player?.name || 'Selected player')}</strong>
+            <p class="muted">Every finishing position recorded in this league.</p>
+          </div>
+        </div>
+      </article>
+      <div class="player-breakdown-card player-breakdown-card-compact rank-distribution-modal-card">
+        <div class="rank-distribution-list rank-distribution-list-columns rank-distribution-list-modal">
+          ${renderRankDistributionColumns(rankRows, rankRows.length > 6 ? 2 : 1)}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderEarnersModal() {
@@ -754,22 +825,12 @@ function renderSelectedPlayer() {
 
   const rankCounts = Object.values(player.rank_counts || {}).map((value) => Number(value));
   const maxCount = Math.max(...rankCounts, 1);
-  const rankLines = Object.keys(player.rank_counts || {})
-    .sort((a, b) => Number(a) - Number(b))
-    .map((rank) => {
-      const rankNumber = Number(rank);
-      const visual = getRankVisual(rankNumber);
-      const count = Number(player.rank_counts[rank]);
-      return `
-        <div class="rank-distribution-row">
-          <span class="rank-distribution-label">${visual.icon} ${escapeHtml(visual.label)}</span>
-          <div class="rank-distribution-bar">
-            <span class="rank-distribution-fill" style="width: ${barWidth(count, maxCount)};"></span>
-          </div>
-          <strong>${count}</strong>
-        </div>
-      `;
-    }).join('') || '<p class="muted">No rank placements yet.</p>';
+  const rankRows = buildRankDistributionRows(player.rank_counts || {}, maxCount);
+  const useRankColumns = rankRows.length > 6;
+  const visibleRankRows = useRankColumns ? rankRows.slice(0, 6) : rankRows;
+  const rankLines = visibleRankRows.length
+    ? renderRankDistributionColumns(visibleRankRows, useRankColumns ? 2 : 1)
+    : '<p class="muted">No rank placements yet.</p>';
 
   const history = [...(player.match_history || [])]
     .sort((a, b) => String(b.match_date || '').localeCompare(String(a.match_date || '')));
@@ -827,8 +888,11 @@ function renderSelectedPlayer() {
         </div>
         <div class="player-compact-side">
           <div class="player-breakdown-card player-breakdown-card-compact">
-            <h4>Rank Distribution</h4>
-            <div class="rank-distribution-list">${rankLines}</div>
+            <div class="player-history-head">
+              <h4>Rank Distribution</h4>
+              ${rankRows.length > 6 ? '<button id="open-rank-modal" type="button" class="ghost stats-action-button">View Full Distribution</button>' : ''}
+            </div>
+            <div class="rank-distribution-list ${useRankColumns ? 'rank-distribution-list-columns' : ''}">${rankLines}</div>
           </div>
           <div class="player-breakdown-card player-breakdown-card-compact">
             <div class="player-history-head">
@@ -845,6 +909,11 @@ function renderSelectedPlayer() {
   if (hasMoreHistory) {
     renderHistoryModal(player);
     document.getElementById('open-history-modal')?.addEventListener('click', openHistoryModal);
+  }
+
+  if (rankRows.length > 6) {
+    renderRankModal(player, rankRows);
+    document.getElementById('open-rank-modal')?.addEventListener('click', openRankModal);
   }
 }
 
@@ -864,6 +933,7 @@ function setupModal() {
   closeEarnersModalBtn?.addEventListener('click', closeEarnersModal);
   closeLadderModalBtn?.addEventListener('click', closeLadderModal);
   closeHistoryModalBtn?.addEventListener('click', closeHistoryModal);
+  closeRankModalBtn?.addEventListener('click', closeRankModal);
 
   earnersModal?.querySelectorAll('[data-close-earners]').forEach((node) => {
     node.addEventListener('click', closeEarnersModal);
@@ -874,9 +944,16 @@ function setupModal() {
   historyModal?.querySelectorAll('[data-close-history]').forEach((node) => {
     node.addEventListener('click', closeHistoryModal);
   });
+  rankModal?.querySelectorAll('[data-close-rank]').forEach((node) => {
+    node.addEventListener('click', closeRankModal);
+  });
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (rankModal && !rankModal.classList.contains('hidden')) {
+      closeRankModal();
+      return;
+    }
     if (historyModal && !historyModal.classList.contains('hidden')) {
       closeHistoryModal();
       return;
