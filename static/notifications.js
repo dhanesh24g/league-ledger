@@ -64,7 +64,7 @@ class NotificationManager {
   }
 
   shouldUseViewportDropdownPosition() {
-    return window.matchMedia('(max-width: 1100px)').matches;
+    return window.matchMedia('(max-width: 760px)').matches;
   }
 
   resetNotificationDropdownPosition() {

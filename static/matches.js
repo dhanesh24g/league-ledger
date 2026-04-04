@@ -195,13 +195,30 @@ function renderMatches(matches) {
         .filter((player) => match.participant_ids.includes(Number(player.id)))
         .map((player) => player.name)
       : [];
+    const participantPreview = participantNames.slice(0, 4).join(', ');
+    const extraCount = Math.max(0, participantNames.length - 4);
+    const statusTone = String(match.status || '').toLowerCase() === 'completed'
+      ? 'status-good'
+      : String(match.status || '').toLowerCase() === 'canceled'
+        ? 'status-bad'
+        : 'status-neutral';
 
     const feedItem = document.createElement('div');
-    feedItem.className = 'feed-item';
+    feedItem.className = 'feed-item workflow-feed-item';
     feedItem.innerHTML = `
-      <strong>${match.title}</strong><br>
-      ${match.match_date} • Winners: ${count} • ${payoutMode} • Status: ${match.status}<br>
-      <span class="muted">Participants (${participantNames.length || 0}): ${participantNames.join(', ') || 'Not captured'}</span>
+      <div class="workflow-feed-head">
+        <strong>${match.title}</strong>
+        <div class="workflow-chip-row">
+          <span class="status-chip ${statusTone}">${match.status}</span>
+          <span class="status-chip">${match.match_date}</span>
+          <span class="status-chip">${participantNames.length || 0} players</span>
+        </div>
+      </div>
+      <div class="workflow-feed-meta">
+        <span>Winners: ${count}</span>
+        <span>${payoutMode}</span>
+      </div>
+      <p class="muted small">Participants: ${participantPreview || 'Not captured'}${extraCount ? ` +${extraCount} more` : ''}</p>
     `;
     matchFeed.appendChild(feedItem);
   });
@@ -331,6 +348,7 @@ matchForm.addEventListener('submit', async (event) => {
 
 async function init() {
   initNotifications();
+  matchFeed.innerHTML = '<div class="feed-item">Loading matches...</div>';
   authUser = await initWorkflowShell('/matches');
   if (!authUser) return;
   applyRoleBasedUI();
