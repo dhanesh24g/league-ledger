@@ -93,6 +93,11 @@ def _build_refund_rows(match_id: int, participant_ids: list[int], entry_fee: flo
     return rows
 
 
+def _build_match_number_map(matches: list[Any]) -> dict[int, int]:
+    ordered_ids = sorted(int(match["id"]) for match in matches)
+    return {match_id: index + 1 for index, match_id in enumerate(ordered_ids)}
+
+
 def _generate_invite_code(name: str, league_id: int) -> str:
     import re
 
@@ -197,6 +202,7 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
         matches = c.execute("SELECT * FROM matches WHERE league_id = ? ORDER BY id DESC", (league_id,)).fetchall()
 
     fallback_participant_ids = [int(player["id"]) for player in players]
+    match_number_map = _build_match_number_map(matches)
     return {
         "league": {
             "id": int(league["id"]),
@@ -216,6 +222,7 @@ def get_state(user: dict[str, Any]) -> dict[str, Any]:
         "matches": [
             {
                 **dict(m),
+                "match_number": match_number_map.get(int(m["id"]), 0),
                 "payouts": parse_payouts(m["payouts_json"]),
                 "participant_ids": parse_participant_ids(m["participant_ids_json"]) or fallback_participant_ids,
             }
@@ -564,6 +571,7 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     winners = [row for row in winners if int(row["match_id"]) not in canceled_match_ids]
 
     player_name_by_id = {int(player["id"]): str(player["name"]) for player in players}
+    match_number_map = _build_match_number_map(matches)
     player_stats: dict[int, dict[str, Any]] = {
         p["id"]: {
             "player_id": p["id"],
@@ -710,6 +718,7 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
         match_stats.append(
             {
                 "match_id": match_id,
+                "match_number": match_number_map.get(match_id, 0),
                 "title": match["title"],
                 "match_date": match["match_date"],
                 "status": match["status"],

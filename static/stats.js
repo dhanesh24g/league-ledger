@@ -720,7 +720,7 @@ function renderMatchFilter() {
   stats.matches.forEach((match) => {
     const option = document.createElement('option');
     option.value = String(match.match_id);
-    option.textContent = `Match #${match.match_id} · ${match.title} (${match.match_date})`;
+    option.textContent = `Match #${Number(match.match_number || 0)} · ${match.title} (${match.match_date})`;
     matchFilter.appendChild(option);
   });
 }
@@ -751,7 +751,7 @@ function renderSelectedMatch() {
   }
 
   if (!match.winners.length) {
-    matchWinnersCard.innerHTML = `<div class="feed-item"><strong>Match #${match.match_id} · ${match.title}</strong><br>No winners saved for this match yet.</div>`;
+    matchWinnersCard.innerHTML = `<div class="feed-item"><strong>Match #${Number(match.match_number || 0)} · ${match.title}</strong><br>No winners saved for this match yet.</div>`;
     return;
   }
 
@@ -794,7 +794,7 @@ function renderSelectedMatch() {
         <div class="match-spotlight-main">
           <div class="match-spotlight-head">
             <div>
-              <span class="match-kicker">Match #${match.match_id}</span>
+              <span class="match-kicker">Match #${Number(match.match_number || 0)}</span>
               <h3>${escapeHtml(match.title)}</h3>
             </div>
             <div class="match-spotlight-meta">
