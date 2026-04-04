@@ -7547,4 +7547,14 @@ th {
     padding: 12px;
     border-radius: 14px;
   }
+
+  .stats-page .player-tag-row {
+    gap: 8px;
+    row-gap: 8px;
+  }
+
+  .stats-page .player-tag {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
 }
