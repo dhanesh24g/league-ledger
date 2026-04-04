@@ -38,7 +38,14 @@ def get_supabase_client() -> Client | None:
     try:
         signature = (supabase_url, supabase_key)
         if _supabase_client is None or _supabase_signature != signature:
-            _supabase_client = create_client(supabase_url, supabase_key)
+            # Add timeout configuration to prevent hanging requests
+            _supabase_client = create_client(
+                supabase_url, 
+                supabase_key,
+                options={
+                    "timeout": 10  # 10 second timeout for all requests
+                }
+            )
             _supabase_signature = signature
         return _supabase_client
     except Exception:

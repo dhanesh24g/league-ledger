@@ -18,6 +18,12 @@ from fastapi import Depends, Header, HTTPException
 from .database import DatabaseManager, get_supabase_client
 
 ACCESS_TOKEN_TTL_SECONDS = int(os.getenv("APP_ACCESS_TOKEN_TTL_SECONDS", str(60 * 60)))
+
+# Simple in-memory cache for user profiles (5-minute TTL)
+_profile_cache: dict[str, dict[str, Any]] = {}
+_profile_cache_timestamps: dict[str, float] = {}
+_cache_lock = Lock()
+PROFILE_CACHE_TTL_SECONDS = 300  # 5 minutes
 REFRESH_TOKEN_TTL_SECONDS = int(os.getenv("APP_REFRESH_TOKEN_TTL_SECONDS", str(60 * 60 * 24 * 30)))
 TOKEN_TTL_SECONDS = ACCESS_TOKEN_TTL_SECONDS
 PBKDF2_ITERATIONS = 120_000
@@ -708,82 +714,166 @@ def _supabase_profile_query(user_id_value: int | None = None, user_id_label: str
     if not supabase:
         return None
 
-    if user_id_value is not None:
-        response = supabase.table("users").select("*").eq("id", int(user_id_value)).limit(1).execute()
-    else:
-        response = supabase.table("users").select("*").eq("user_id", _normalize_user_id(str(user_id_label or ""))).limit(1).execute()
+    try:
+        if user_id_value is not None:
+            response = supabase.table("users").select("*").eq("id", int(user_id_value)).limit(1).execute()
+        else:
+            response = supabase.table("users").select("*").eq("user_id", _normalize_user_id(str(user_id_label or ""))).limit(1).execute()
 
-    if not response.data:
-        return None
+        if not response.data:
+            return None
 
-    user = response.data[0]
-    memberships = (
-        supabase.table("league_memberships")
-        .select("id, user_id, league_id, role, status, created_at")
-        .eq("user_id", int(user["id"]))
-        .order("created_at")
-        .order("id")
-        .execute()
-        .data
-        or []
-    )
-    requests = (
-        supabase.table("league_join_requests")
-        .select("id, user_id, league_id, status, created_at, reviewed_at")
-        .eq("user_id", int(user["id"]))
-        .order("created_at")
-        .order("id")
-        .execute()
-        .data
-        or []
-    )
+        user = response.data[0]
+        
+        # Add error handling for memberships query
+        try:
+            memberships = (
+                supabase.table("league_memberships")
+                .select("id, user_id, league_id, role, status, created_at")
+                .eq("user_id", int(user["id"]))
+                .order("created_at")
+                .order("id")
+                .execute()
+                .data
+                or []
+            )
+        except Exception as e:
+            # Log error but continue with empty memberships
+            print(f"Error fetching memberships: {e}")
+            memberships = []
+        
+        # Add error handling for requests query
+        try:
+            requests = (
+                supabase.table("league_join_requests")
+                .select("id, user_id, league_id, status, created_at, reviewed_at")
+                .eq("user_id", int(user["id"]))
+                .order("created_at")
+                .order("id")
+                .execute()
+                .data
+                or []
+            )
+        except Exception as e:
+            # Log error but continue with empty requests
+            print(f"Error fetching join requests: {e}")
+            requests = []
 
-    league_ids = {
-        int(row["league_id"])
-        for row in [*memberships, *requests]
-        if row.get("league_id") is not None
-    }
-    if requested_league_id is not None:
-        league_ids.add(int(requested_league_id))
+        league_ids = {
+            int(row["league_id"])
+            for row in [*memberships, *requests]
+            if row.get("league_id") is not None
+        }
+        if requested_league_id is not None:
+            league_ids.add(int(requested_league_id))
 
-    leagues: list[dict[str, Any]] = []
-    if league_ids:
-        leagues = (
-            supabase.table("league")
-            .select("*")
-            .in_("id", sorted(league_ids))
-            .order("created_at")
-            .order("id")
-            .execute()
-            .data
-            or []
+        leagues: list[dict[str, Any]] = []
+        if league_ids:
+            try:
+                leagues = (
+                    supabase.table("league")
+                    .select("*")
+                    .in_("id", sorted(league_ids))
+                    .order("created_at")
+                    .order("id")
+                    .execute()
+                    .data
+                    or []
+                )
+            except Exception as e:
+                # Log error but continue with empty leagues
+                print(f"Error fetching leagues: {e}")
+                leagues = []
+
+        league_exists = bool(leagues)
+        if not league_exists:
+            try:
+                any_league_row = supabase.table("league").select("id").limit(1).execute().data or []
+                league_exists = bool(any_league_row)
+            except Exception as e:
+                # Log error but default to False
+                print(f"Error checking league existence: {e}")
+                league_exists = False
+
+        return _build_profile(
+            user,
+            leagues,
+            memberships,
+            requests,
+            requested_league_id=requested_league_id,
+            league_exists_override=league_exists,
         )
-
-    league_exists = bool(leagues)
-    if not league_exists:
-        any_league_row = supabase.table("league").select("id").limit(1).execute().data or []
-        league_exists = bool(any_league_row)
-
-    return _build_profile(
-        user,
-        leagues,
-        memberships,
-        requests,
-        requested_league_id=requested_league_id,
-        league_exists_override=league_exists,
-    )
+    except Exception as e:
+        # Log detailed error information for debugging Supabase issues
+        import traceback
+        
+        error_details = {
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+            "user_id_value": user_id_value,
+            "user_id_label": user_id_label,
+            "requested_league_id": requested_league_id,
+            "traceback": traceback.format_exc()
+        }
+        
+        # Check if it's a PostgREST API error
+        if hasattr(e, '__dict__'):
+            error_details.update(e.__dict__)
+        
+        print(f"Supabase Query Error Details: {error_details}")
+        return None
 
 
 def get_user_profile_by_user_id(user_id_value: str, requested_league_id: int | None = None) -> dict[str, Any] | None:
+    cache_key = f"uid_{user_id_value}_league_{requested_league_id or 'none'}"
+    current_time = time.time()
+    
+    with _cache_lock:
+        # Check if we have a cached result that's still valid
+        if cache_key in _profile_cache and cache_key in _profile_cache_timestamps:
+            if current_time - _profile_cache_timestamps[cache_key] < PROFILE_CACHE_TTL_SECONDS:
+                return _profile_cache[cache_key]
+    
+    # Cache miss or expired, fetch from database
+    profile = None
     if get_supabase_client():
-        return _supabase_profile_query(user_id_label=user_id_value, requested_league_id=requested_league_id)
-    return _sqlite_profile_query(user_id_label=user_id_value, requested_league_id=requested_league_id)
+        profile = _supabase_profile_query(user_id_label=user_id_value, requested_league_id=requested_league_id)
+    else:
+        profile = _sqlite_profile_query(user_id_label=user_id_value, requested_league_id=requested_league_id)
+    
+    # Cache the result
+    if profile:
+        with _cache_lock:
+            _profile_cache[cache_key] = profile
+            _profile_cache_timestamps[cache_key] = current_time
+    
+    return profile
 
 
 def get_user_profile_by_id(user_id_value: int, requested_league_id: int | None = None) -> dict[str, Any] | None:
+    cache_key = f"id_{user_id_value}_league_{requested_league_id or 'none'}"
+    current_time = time.time()
+    
+    with _cache_lock:
+        # Check if we have a cached result that's still valid
+        if cache_key in _profile_cache and cache_key in _profile_cache_timestamps:
+            if current_time - _profile_cache_timestamps[cache_key] < PROFILE_CACHE_TTL_SECONDS:
+                return _profile_cache[cache_key]
+    
+    # Cache miss or expired, fetch from database
+    profile = None
     if get_supabase_client():
-        return _supabase_profile_query(user_id_value=user_id_value, requested_league_id=requested_league_id)
-    return _sqlite_profile_query(user_id_value=user_id_value, requested_league_id=requested_league_id)
+        profile = _supabase_profile_query(user_id_value=user_id_value, requested_league_id=requested_league_id)
+    else:
+        profile = _sqlite_profile_query(user_id_value=user_id_value, requested_league_id=requested_league_id)
+    
+    # Cache the result
+    if profile:
+        with _cache_lock:
+            _profile_cache[cache_key] = profile
+            _profile_cache_timestamps[cache_key] = current_time
+    
+    return profile
 
 
 def auth_config() -> dict[str, Any]:
