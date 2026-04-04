@@ -297,7 +297,7 @@ function bindInteractivePie(container, shares, onSelect) {
 
 function renderMetricStack(metrics) {
   return metrics.map((metric) => `
-    <div class="player-metric-row ${escapeHtml(metric.accent || '')}">
+    <div class="player-metric-row ${escapeHtml(metric.accent || '')} ${metric.featured ? 'player-metric-row-featured' : ''}">
       <div>
         <span>${escapeHtml(metric.label)}</span>
         <small>${escapeHtml(metric.helper || '')}</small>
@@ -463,6 +463,8 @@ function renderLadderModal() {
 
 function renderHistoryModal(player) {
   if (!historyModalBody) return;
+  const sortedHistory = [...(player?.match_history || [])]
+    .sort((a, b) => String(b.match_date || '').localeCompare(String(a.match_date || '')));
 
   historyModalBody.innerHTML = `
     <div class="zoom-board">
@@ -471,11 +473,11 @@ function renderHistoryModal(player) {
           <div class="chart-player-avatar">${escapeHtml(getInitials(player?.name || 'LL'))}</div>
           <div>
             <strong>${escapeHtml(player?.name || 'Selected player')}</strong>
-            <p class="muted">Full result timeline for this player.</p>
+            <p class="muted">Full result timeline for this player, newest first.</p>
           </div>
         </div>
       </article>
-      ${(player?.match_history || []).length ? player.match_history.map((entry) => `
+      ${sortedHistory.length ? sortedHistory.map((entry) => `
         <article class="history-row">
           <div>
             <strong>${escapeHtml(entry.title)}</strong>
@@ -769,9 +771,10 @@ function renderSelectedPlayer() {
       `;
     }).join('') || '<p class="muted">No rank placements yet.</p>';
 
-  const history = player.match_history || [];
-  const recentHistory = history.slice(0, 3);
-  const hasMoreHistory = history.length > 3;
+  const history = [...(player.match_history || [])]
+    .sort((a, b) => String(b.match_date || '').localeCompare(String(a.match_date || '')));
+  const recentHistory = history.slice(0, 2);
+  const hasMoreHistory = history.length > 2;
   const historyRows = recentHistory.map((entry) => `
     <article class="history-row">
       <div>
@@ -788,28 +791,31 @@ function renderSelectedPlayer() {
   const matchesPlayed = Number(player.matches_played || 0);
   const matchesWon = Number(player.matches_won || 0);
   const winRate = matchesPlayed ? Math.round((matchesWon / matchesPlayed) * 100) : 0;
+  const entryFee = Number(stats.summary?.entry_fee || 0);
+  const eligiblePayout = Number(player.total_amount || 0) - (matchesPlayed * entryFee);
   const metricStack = renderMetricStack([
-    { label: 'Matches Played', value: String(matchesPlayed), helper: 'Recorded participant history', accent: 'accent-cyan' },
-    { label: 'Matches Won', value: String(matchesWon), helper: 'Finished inside payouts', accent: 'accent-gold' },
-    { label: 'Total Wins', value: String(player.wins_total), helper: 'First-place finishes', accent: 'accent-pink' },
+    { label: 'Played', value: String(matchesPlayed), helper: 'League matches joined', accent: 'accent-cyan' },
+    { label: 'Wins', value: String(player.wins_total), helper: 'First-place finishes', accent: 'accent-pink' },
+    { label: 'Winning Matches', value: String(matchesWon), helper: 'Paid finishes', accent: 'accent-gold' },
     { label: 'Total Won', value: formatCurrency(player.total_amount), helper: 'Amount collected', accent: 'accent-green' },
-    { label: 'Washout / Canceled', value: String(Number(player.washout_matches || 0)), helper: 'Refund-style results', accent: 'accent-slate' },
+    { label: 'Eligible Payout', value: formatCurrency(eligiblePayout), helper: 'Won minus entry fees', accent: 'accent-amber', featured: true },
+    { label: 'Washouts', value: String(Number(player.washout_matches || 0)), helper: 'Refund-style results', accent: 'accent-slate' },
   ]);
 
   playerStatsCard.innerHTML = `
     <article class="player-spotlight">
-      <div class="player-compact-layout">
-        <div class="player-compact-main">
-          <div class="player-hero">
-            <div class="player-avatar">${escapeHtml(getInitials(player.name))}</div>
-            <div>
-              <h3>${escapeHtml(player.name)}</h3>
-              <p class="muted">Performance fingerprint based on who played, who placed, and where the money landed.</p>
-            </div>
-          </div>
-          <div class="player-metric-stack">${metricStack}</div>
-          <div class="player-breakdown-card player-breakdown-card-compact">
-            <h4>Quick Read</h4>
+	      <div class="player-compact-layout">
+	        <div class="player-compact-main">
+	          <div class="player-hero">
+	            <div class="player-avatar">${escapeHtml(getInitials(player.name))}</div>
+	            <div class="player-hero-copy">
+	              <h3>${escapeHtml(player.name)}</h3>
+	              <p class="muted">Compact read of results, winnings, and recent form.</p>
+	            </div>
+	          </div>
+	          <div class="player-metric-stack">${metricStack}</div>
+	          <div class="player-breakdown-card player-breakdown-card-compact">
+	            <h4>Quick Read</h4>
             <div class="player-tag-row">
               <span class="player-tag">Win rate: ${winRate}%</span>
               <span class="player-tag">Best finish: ${escapeHtml(getBestFinish(player))}</span>
@@ -824,14 +830,14 @@ function renderSelectedPlayer() {
             <h4>Rank Distribution</h4>
             <div class="rank-distribution-list">${rankLines}</div>
           </div>
+          <div class="player-breakdown-card player-breakdown-card-compact">
+            <div class="player-history-head">
+              <h4>Latest 2 Matches</h4>
+              ${hasMoreHistory ? '<button id="open-history-modal" type="button" class="ghost stats-action-button">View All Matches</button>' : ''}
+            </div>
+            <div class="history-list">${historyRows}</div>
+          </div>
         </div>
-      </div>
-      <div class="player-breakdown-card player-breakdown-card-compact">
-        <div class="player-history-head">
-          <h4>Latest Matches</h4>
-          ${hasMoreHistory ? '<button id="open-history-modal" type="button" class="ghost stats-action-button">See Full History</button>' : ''}
-        </div>
-        <div class="history-list">${historyRows}</div>
       </div>
     </article>
   `;
