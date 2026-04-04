@@ -14,7 +14,7 @@ try:
 except ImportError:
     APIError = None
 
-from .auth import get_supabase_client
+from .auth import get_supabase_client, invalidate_profile_cache
 from .database import parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
@@ -364,6 +364,12 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
         logger.info(f"Deleted {len(delete_result.data or [])} join requests for user {user['id']}, league {league_id}")
         
         _sync_active_members_to_players(supabase, league_id)
+
+        if create_new:
+            invalidate_profile_cache(
+                user_id_value=int(user["id"]),
+                user_id_label=str(user.get("user_id") or ""),
+            )
 
         if not invite_code:
             lookup = supabase.table("league").select("invite_code").eq("id", league_id).limit(1).execute()

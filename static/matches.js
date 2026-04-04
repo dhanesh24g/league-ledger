@@ -1,8 +1,10 @@
 import {
+  buildWorkflowRoute,
   callApi,
   clearMatchDraft,
   getMatchDraft,
   initWorkflowShell,
+  isDirectAdminFlow,
   navigateTo,
   queueToast,
   setButtonLoading,
@@ -25,6 +27,9 @@ const participantPicker = document.getElementById('participant-picker');
 const participantCount = document.getElementById('participant-count');
 const participantBasket = document.getElementById('participant-basket');
 const selectAllParticipantsBtn = document.getElementById('select-all-participants');
+const matchesBackLink = document.getElementById('matches-back-link');
+const matchesNextLink = document.getElementById('matches-next-link');
+const pageBrand = document.getElementById('page-brand');
 
 let authUser = { username: '', role: 'read' };
 let suppressDraftSync = false;
@@ -87,6 +92,47 @@ function syncParticipantSummary() {
     : 'Select at least two players for this match.';
 
   renderParticipantBasket(selectedIds);
+}
+
+function applyEntryModeUI() {
+  const directFlow = isDirectAdminFlow('/matches');
+  document.body.classList.toggle('direct-admin-flow', directFlow);
+  if (pageBrand) {
+    pageBrand.classList.toggle('brand-home-link', directFlow);
+    pageBrand.tabIndex = directFlow ? 0 : -1;
+    pageBrand.setAttribute('role', directFlow ? 'link' : 'presentation');
+    pageBrand.setAttribute('aria-label', directFlow ? 'Back to welcome page' : 'Page brand');
+    pageBrand.onclick = directFlow ? () => window.location.assign('/welcome') : null;
+    pageBrand.onkeydown = directFlow
+      ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          window.location.assign('/welcome');
+        }
+      }
+      : null;
+  }
+
+  if (!matchesBackLink || !matchesNextLink) return;
+
+  if (directFlow) {
+    matchesBackLink.textContent = 'Back to Welcome';
+    matchesBackLink.removeAttribute('data-workflow-link');
+    matchesBackLink.href = '/welcome';
+
+    matchesNextLink.textContent = 'Open Winner Assignment';
+    matchesNextLink.removeAttribute('data-workflow-link');
+    matchesNextLink.href = buildWorkflowRoute('/winners', { preserveDirectAdminFlow: true });
+    return;
+  }
+
+  matchesBackLink.textContent = 'Back to Players';
+  matchesBackLink.setAttribute('data-workflow-link', '');
+  matchesBackLink.href = '/players';
+
+  matchesNextLink.textContent = 'Continue to Winners';
+  matchesNextLink.setAttribute('data-workflow-link', '');
+  matchesNextLink.href = '/winners';
 }
 
 function applyParticipantSelection(participantIds, options = {}) {
@@ -351,6 +397,7 @@ async function init() {
   matchFeed.innerHTML = '<div class="feed-item">Loading matches...</div>';
   authUser = await initWorkflowShell('/matches');
   if (!authUser) return;
+  applyEntryModeUI();
   applyRoleBasedUI();
 
   const state = await callApi('/api/state');

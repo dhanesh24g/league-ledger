@@ -164,13 +164,17 @@ function openRouteChoiceModal(membership) {
   const leagueId = membership.league_id;
   const isAdmin = membership.role === 'admin';
   const allowedRoutes = isAdmin
-    ? ['/stats', '/league-details', '/setup', '/league-settings']
+    ? ['/stats', '/league-details', '/setup', '/matches', '/winners', '/league-settings']
     : ['/stats', '/league-details'];
   const lastRoute = getLastRouteForLeague(leagueId);
 
   if (allowedRoutes.includes(lastRoute)) {
     const lastLabel = lastRoute === '/setup'
       ? 'League Setup'
+      : lastRoute === '/matches'
+        ? 'Match Entry'
+        : lastRoute === '/winners'
+          ? 'Winner Assignment'
       : lastRoute === '/league-settings'
         ? 'League Settings'
         : lastRoute === '/league-details'
@@ -211,6 +215,26 @@ function openRouteChoiceModal(membership) {
   );
 
   if (isAdmin) {
+    routeChoiceActions.appendChild(
+      createRouteCard({
+        title: 'Open Match Entry',
+        description: 'Log today\'s fixture, roster, and match-level exception settings directly.',
+        route: '/matches?flow=match-update',
+        variant: 'ghost',
+        leagueId,
+      })
+    );
+
+    routeChoiceActions.appendChild(
+      createRouteCard({
+        title: 'Open Winner Assignment',
+        description: 'Pick a saved match and assign payout ranks without reopening setup steps.',
+        route: '/winners?flow=match-update',
+        variant: 'ghost',
+        leagueId,
+      })
+    );
+
     routeChoiceActions.appendChild(
       createRouteCard({
         title: 'Open League Setup',

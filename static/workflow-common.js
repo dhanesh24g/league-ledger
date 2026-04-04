@@ -16,6 +16,7 @@ let refreshTimerId = null;
 
 const PROACTIVE_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 const MIN_PROACTIVE_REFRESH_DELAY_MS = 15 * 1000;
+const DIRECT_ADMIN_FLOW_PARAM = 'match-update';
 
 function parseTokenPayload(token) {
   if (!token || typeof token !== 'string') return null;
@@ -111,6 +112,21 @@ export function updateWorkflowState(updater) {
 export function setCurrentWorkflowPage(pathname = window.location.pathname) {
   if (!WORKFLOW_ROUTES.includes(pathname)) return;
   updateWorkflowState((state) => ({ ...state, currentPage: pathname }));
+}
+
+export function isDirectAdminFlow(pathname = window.location.pathname) {
+  if (!['/matches', '/winners'].includes(pathname)) return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('flow') === DIRECT_ADMIN_FLOW_PARAM;
+}
+
+export function buildWorkflowRoute(target, options = {}) {
+  const { preserveDirectAdminFlow = false } = options;
+  const url = new URL(target, window.location.origin);
+  if (preserveDirectAdminFlow && isDirectAdminFlow() && ['/matches', '/winners'].includes(url.pathname)) {
+    url.searchParams.set('flow', DIRECT_ADMIN_FLOW_PARAM);
+  }
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 export function getCurrentWorkflowPage() {
@@ -610,6 +626,12 @@ export async function initWorkflowShell(currentPath) {
 
   const isAdmin = effectiveRole === 'admin';
   setAdminNavigationVisibility(isAdmin);
+  const directAdminFlow = isAdmin && isDirectAdminFlow(currentPath);
+  document.body.classList.toggle('direct-admin-flow', directAdminFlow);
+  const stepNav = document.querySelector('.step-nav');
+  if (stepNav) {
+    stepNav.classList.toggle('hidden', !isAdmin || directAdminFlow);
+  }
   const canReadPlayers = currentPath === '/players';
   if (!isAdmin && !canCreateFirstLeague && !canReadPlayers) {
     window.location.replace('/welcome');
@@ -628,5 +650,5 @@ export async function initWorkflowShell(currentPath) {
 
 export function navigateTo(target) {
   if (WORKFLOW_ROUTES.includes(target)) setCurrentWorkflowPage(target);
-  window.location.assign(target);
+  window.location.assign(buildWorkflowRoute(target, { preserveDirectAdminFlow: true }));
 }

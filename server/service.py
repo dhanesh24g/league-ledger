@@ -7,6 +7,7 @@ from typing import Any
 
 from fastapi import HTTPException
 
+from .auth import invalidate_profile_cache
 from .database import DatabaseManager, get_supabase_client, parse_participant_ids, parse_payouts
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 
@@ -248,6 +249,7 @@ def upsert_league(payload: LeaguePayload, user: dict[str, Any], create_new: bool
                 "DELETE FROM league_join_requests WHERE user_id = ? AND league_id = ?",
                 (int(user["id"]), league_id),
             )
+            invalidate_profile_cache(user_id_value=int(user["id"]), user_id_label=str(user.get("user_id") or ""))
             return {"message": "League created", "league_id": league_id, "invite_code": invite_code}
 
         league_id = int(payload.league_id)

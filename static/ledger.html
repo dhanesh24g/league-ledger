@@ -33,7 +33,7 @@
   </script>
 </head>
 
-<body>
+<body class="ledger-page">
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
     <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
     <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
@@ -48,12 +48,16 @@
           <span class="app-name">Ledger</span>
         </div>
       </div>
-      <div class="header-actions">
+
+      <div class="header-center">
         <select id="top-nav" aria-label="Quick navigation">
           <option value="/ledger">League Workflow</option>
           <option value="/stats">Stats Dashboard</option>
           <option value="/league-settings">League Settings</option>
         </select>
+      </div>
+
+      <div class="header-actions">
         <div class="notification-wrapper">
           <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
             <span class="notification-icon">🔔</span>
