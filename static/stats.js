@@ -580,29 +580,28 @@ function renderOverview() {
         <button id="open-earners-modal" type="button" class="ghost stats-action-button">Click For Deep Dive</button>
       </div>
     </article>
-    <article class="spotlight-card stats-current-user-card">
-      <span class="spotlight-label">Your League Snapshot</span>
-      ${currentPlayer ? `
-        <div class="stats-current-user-head">
-          <div class="chart-player-avatar">${escapeHtml(getInitials(currentPlayer.name))}</div>
-          <div>
-            <strong>${escapeHtml(currentPlayer.name)}</strong>
-            <p class="muted small">Your current league snapshot</p>
-          </div>
-        </div>
-        <div class="stats-current-user-grid">
-          <div class="stats-current-user-metric"><span>Played</span><strong>${Number(currentPlayer.matches_played || 0)}</strong></div>
-          <div class="stats-current-user-metric"><span>Wins</span><strong>${Number(currentPlayer.wins_total || 0)}</strong></div>
-          <div class="stats-current-user-metric"><span>Best Finish</span><strong>${escapeHtml(getBestFinish(currentPlayer))}</strong></div>
-          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
-          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
-        </div>
-        <div class="player-tag-row stats-current-user-tags">
-          <span class="player-tag">Winning matches: ${Number(currentPlayer.matches_won || 0)}</span>
-          <span class="player-tag">Washouts: ${Number(currentPlayer.washout_matches || 0)}</span>
-          <span class="player-tag">Entry fee: ${formatCurrency(entry_fee)}</span>
-        </div>
-      ` : `
+	    <article class="spotlight-card stats-current-user-card">
+	      <span class="spotlight-label">Your League Snapshot</span>
+	      ${currentPlayer ? `
+	        <div class="stats-current-user-head">
+	          <div class="chart-player-avatar">${escapeHtml(getInitials(currentPlayer.name))}</div>
+	          <div>
+	            <strong>${escapeHtml(currentPlayer.name)}</strong>
+	          </div>
+	        </div>
+	        <div class="stats-current-user-grid">
+	          <div class="stats-current-user-metric"><span>Played</span><strong>${Number(currentPlayer.matches_played || 0)}</strong></div>
+	          <div class="stats-current-user-metric"><span>Wins</span><strong>${Number(currentPlayer.wins_total || 0)}</strong></div>
+	          <div class="stats-current-user-metric"><span>Best</span><strong>${escapeHtml(getBestFinish(currentPlayer))}</strong></div>
+	          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
+	          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
+	        </div>
+	        <div class="player-tag-row stats-current-user-tags">
+	          <span class="player-tag">Winning matches ${Number(currentPlayer.matches_won || 0)}</span>
+	          <span class="player-tag">Washouts ${Number(currentPlayer.washout_matches || 0)}</span>
+	          <span class="player-tag">Entry fee ${formatCurrency(entry_fee)}</span>
+	        </div>
+	      ` : `
         <div class="stats-current-user-empty">
           <strong>Your League Snapshot</strong>
           <p class="muted">We will show your compact player overview here once your stats are available in the league table.</p>
