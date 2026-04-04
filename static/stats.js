@@ -106,7 +106,16 @@ function closeMobileSelect() {
 function ensureMobileSelectProxy(select, config = {}) {
   if (!select) return null;
 
-  let proxy = select.parentElement?.querySelector(`.stats-mobile-select-proxy[data-select-id="${select.id}"]`);
+  let shell = select.closest(`.stats-mobile-select-shell[data-select-id="${select.id}"]`);
+  if (!shell) {
+    shell = document.createElement('div');
+    shell.className = 'stats-mobile-select-shell';
+    shell.dataset.selectId = select.id;
+    select.insertAdjacentElement('afterend', shell);
+    shell.appendChild(select);
+  }
+
+  let proxy = shell.querySelector(`.stats-mobile-select-proxy[data-select-id="${select.id}"]`);
   if (!proxy) {
     proxy = document.createElement('button');
     proxy.type = 'button';
@@ -116,7 +125,7 @@ function ensureMobileSelectProxy(select, config = {}) {
       <span class="stats-mobile-select-proxy-copy"></span>
       <span class="stats-mobile-select-proxy-icon" aria-hidden="true">⌄</span>
     `;
-    select.insertAdjacentElement('afterend', proxy);
+    shell.appendChild(proxy);
   }
 
   const syncProxy = () => {
@@ -168,8 +177,10 @@ function syncMobileSelectVisibility() {
   const mobile = isMobileStatsViewport();
   [topNav, matchFilter, playerFilter].forEach((select) => {
     if (!select) return;
-    const proxy = select.parentElement?.querySelector(`.stats-mobile-select-proxy[data-select-id="${select.id}"]`);
+    const shell = select.closest(`.stats-mobile-select-shell[data-select-id="${select.id}"]`);
+    const proxy = shell?.querySelector(`.stats-mobile-select-proxy[data-select-id="${select.id}"]`);
     select.classList.toggle('stats-mobile-select-source', mobile);
+    shell?.classList.toggle('stats-mobile-select-shell-active', mobile);
     proxy?.classList.toggle('hidden', !mobile);
   });
 }
