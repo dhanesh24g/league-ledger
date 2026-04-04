@@ -6035,6 +6035,35 @@ th {
   gap: 12px;
 }
 
+.stats-page .stats-kpi-card-loading {
+  min-height: 72px;
+  align-content: center;
+}
+
+.stats-page .stats-loading-card,
+.stats-page .stats-loading-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.stats-page .stats-loading-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.stats-page .stats-loading-copy,
+.stats-page .stats-loading-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.stats-page .stats-loading-chart {
+  min-height: 260px;
+  border-radius: 20px;
+}
+
 .stats-page .stats-kpi-card {
   min-height: 0;
 }

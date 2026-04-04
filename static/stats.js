@@ -995,10 +995,92 @@ function setReadNavigationMode() {
   topNav.value = '/stats';
 }
 
+function renderLoadingState() {
+  statsSummaryStrip.innerHTML = `
+    <div class="summary-chip stats-kpi-card stats-kpi-card-loading">
+      <div class="skeleton skeleton-text small"></div>
+      <div class="skeleton skeleton-text large"></div>
+    </div>
+    <div class="summary-chip stats-kpi-card stats-kpi-card-loading">
+      <div class="skeleton skeleton-text small"></div>
+      <div class="skeleton skeleton-text large"></div>
+    </div>
+    <div class="summary-chip stats-kpi-card stats-kpi-card-loading">
+      <div class="skeleton skeleton-text small"></div>
+      <div class="skeleton skeleton-text large"></div>
+    </div>
+    <div class="summary-chip stats-kpi-card stats-kpi-card-loading">
+      <div class="skeleton skeleton-text small"></div>
+      <div class="skeleton skeleton-text large"></div>
+    </div>
+  `;
+
+  statsOverview.innerHTML = `
+    <article class="spotlight-card stats-loading-card">
+      <div class="stats-loading-head">
+        <div class="skeleton skeleton-avatar"></div>
+        <div class="stats-loading-copy">
+          <div class="skeleton skeleton-text"></div>
+          <div class="skeleton skeleton-text small"></div>
+        </div>
+      </div>
+      <div class="stats-loading-stack">
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+      </div>
+      <div class="status-loading">Loading league pulse</div>
+    </article>
+    <article class="spotlight-card stats-loading-card">
+      <div class="stats-loading-stack">
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text small"></div>
+      </div>
+    </article>
+    <article class="spotlight-card stats-loading-card">
+      <div class="stats-loading-stack">
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text"></div>
+        <div class="skeleton skeleton-text large"></div>
+      </div>
+    </article>
+  `;
+
+  leaderboardChart.innerHTML = `
+    <div class="stats-loading-panel">
+      <div class="status-loading">Loading payout breakdown</div>
+      <div class="skeleton skeleton-card stats-loading-chart"></div>
+    </div>
+  `;
+
+  matchWinnersCard.innerHTML = `
+    <div class="stats-loading-panel">
+      <div class="status-loading">Loading match results</div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
+  `;
+
+  playerStatsCard.innerHTML = `
+    <div class="stats-loading-panel">
+      <div class="status-loading">Loading player performance</div>
+      <div class="skeleton skeleton-card"></div>
+    </div>
+  `;
+
+  matchFilter.innerHTML = '<option>Loading matches...</option>';
+  playerFilter.innerHTML = '<option>Loading players...</option>';
+  matchFilter.disabled = true;
+  playerFilter.disabled = true;
+}
+
 async function init() {
   initNotifications();
   setupHeader();
   setupModal();
+  renderLoadingState();
 
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
@@ -1028,6 +1110,8 @@ async function init() {
   renderLeaderboardChart();
   renderMatchFilter();
   renderPlayerFilter();
+  matchFilter.disabled = false;
+  playerFilter.disabled = false;
 
   if (stats.matches.length) {
     matchFilter.value = String(stats.matches[0].match_id);
