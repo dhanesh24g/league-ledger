@@ -666,7 +666,7 @@ function renderOverview() {
 	        </div>
 	        <div class="stats-current-user-grid">
 	          <div class="stats-current-user-metric"><span>Played</span><strong>${Number(currentPlayer.matches_played || 0)}</strong></div>
-	          <div class="stats-current-user-metric"><span>Wins</span><strong>${Number(currentPlayer.wins_total || 0)}</strong></div>
+	          <div class="stats-current-user-metric"><span>Winning Matches</span><strong>${Number(currentPlayer.matches_won || 0)}</strong></div>
 	          <div class="stats-current-user-metric"><span>Best</span><strong>${escapeHtml(getBestFinish(currentPlayer))}</strong></div>
 	          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
 	          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>

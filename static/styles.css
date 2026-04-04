@@ -6268,6 +6268,22 @@ th {
   white-space: nowrap;
 }
 
+.stats-page .player-breakdown-card h4 {
+  margin-bottom: 10px;
+}
+
+.stats-page .player-tag-row {
+  gap: 10px;
+  row-gap: 10px;
+}
+
+.stats-page .player-tag {
+  padding: 7px 12px;
+  font-size: 12px;
+  border-radius: 999px;
+  line-height: 1.25;
+}
+
 .stats-page .winner-rank-grid {
   display: flex;
   flex-direction: column;
@@ -6728,6 +6744,10 @@ th {
 .stats-page .player-breakdown-card-compact {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-page .player-compact-main .player-breakdown-card-compact {
+  padding: 14px 16px;
 }
 
 .stats-page .player-compact-side {
@@ -7248,8 +7268,47 @@ th {
 }
 
 [data-theme="light"] .stats-page .player-breakdown-card {
-  background: rgba(241, 245, 249, 0.7);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.88));
   border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+[data-theme="light"] .stats-page .player-spotlight {
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="light"] .stats-page .player-hero-copy h3,
+[data-theme="light"] .stats-page .player-history-head h4,
+[data-theme="light"] .stats-page .rank-distribution-label,
+[data-theme="light"] .stats-page .history-row strong,
+[data-theme="light"] .stats-page .player-metric-row strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .stats-page .player-hero-copy .muted,
+[data-theme="light"] .stats-page .player-metric-row span,
+[data-theme="light"] .stats-page .player-metric-row small,
+[data-theme="light"] .stats-page .history-row p {
+  color: #475569;
+}
+
+[data-theme="light"] .stats-page .player-metric-row {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(241, 245, 249, 0.82));
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.04);
+}
+
+[data-theme="light"] .stats-page .player-compact-side .history-row {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.88));
+}
+
+[data-theme="light"] .stats-page .player-tag {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(148, 163, 184, 0.38);
+  color: #334155;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 [data-theme="light"] .stats-page .player-metric-row-featured {
