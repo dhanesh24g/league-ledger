@@ -1109,8 +1109,20 @@ def list_join_requests(user: dict[str, Any]) -> dict[str, Any]:
             .order("created_at")
             .execute()
         )
-        users_response = supabase.table("users").select("id, first_name, last_name, user_id, email").execute()
+        
+        # CRITICAL FIX: Only fetch users who have requests for this specific league
+        request_user_ids = [int(request["user_id"]) for request in requests_response.data]
+        if not request_user_ids:
+            return {"requests": []}
+            
+        users_response = (
+            supabase.table("users")
+            .select("id, first_name, last_name, user_id, email")
+            .in_("id", request_user_ids)
+            .execute()
+        )
         users_by_id = {int(row["id"]): row for row in users_response.data}
+        
         rows = []
         for request in requests_response.data:
             req_user = users_by_id.get(int(request["user_id"]))
@@ -1295,6 +1307,10 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=403, detail="Active league membership required")
 
     league_id = int(user["active_league_id"])
+    
+    # Clear any existing cache to ensure data integrity
+    _invalidate_members_cache(league_id)
+    
     cached = _members_cache_get(league_id)
     if cached is not None:
         return cached
@@ -1302,9 +1318,10 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
+        # CRITICAL FIX: Only fetch users who are members of this specific league
         memberships = (
             supabase.table("league_memberships")
-            .select("*")
+            .select("user_id, role, status")
             .eq("league_id", league_id)
             .eq("status", "active")
             .order("created_at")
@@ -1312,8 +1329,20 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
             .data
             or []
         )
-        users_response = supabase.table("users").select("id, first_name, last_name, user_id, email").execute()
+        
+        # Only fetch user details for members of this league, not ALL users
+        member_user_ids = [int(membership["user_id"]) for membership in memberships]
+        if not member_user_ids:
+            return {"members": []}
+            
+        users_response = (
+            supabase.table("users")
+            .select("id, first_name, last_name, user_id, email")
+            .in_("id", member_user_ids)
+            .execute()
+        )
         users_by_id = {int(row["id"]): row for row in users_response.data}
+        
         rows = []
         for membership in memberships:
             member = users_by_id.get(int(membership["user_id"]))

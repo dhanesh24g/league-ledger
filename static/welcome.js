@@ -681,9 +681,12 @@ function clearUserCache() {
 }
 
 function renderLoadingState() {
-  // Show loading skeleton for user name
+  // Show loading skeleton for user name with shimmer
   welcomeTitle.classList.add('loading');
-  welcomeTitle.textContent = 'Loading';
+  welcomeTitle.innerHTML = `
+    <span class="shimmer"></span>
+    <span>Loading</span>
+  `;
 
   welcomeCopy.innerHTML = `
     <div class="status-loading">
@@ -711,6 +714,7 @@ function renderLoadingState() {
 function renderImmediateUI(user) {
   // Remove loading states
   welcomeTitle.classList.remove('loading');
+  welcomeTitle.innerHTML = '';
 
   // Show welcome message immediately with fallback
   welcomeTitle.textContent = `Welcome, ${user?.first_name || 'back'}.`;
