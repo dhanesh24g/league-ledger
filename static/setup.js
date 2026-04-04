@@ -265,6 +265,12 @@ async function renderJoinRequests() {
 }
 
 async function renderMembers() {
+  if (isCreateMode && !currentLeague?.id) {
+    membersZone.classList.remove('hidden');
+    membersZone.innerHTML = '<p class="muted small">League members will appear here after you create the new league.</p>';
+    return;
+  }
+
   if (authUser.league_role !== 'admin') {
     membersZone.classList.remove('hidden');
     membersZone.innerHTML = '<p class="muted small">League members become visible here for the admin view.</p>';
@@ -493,6 +499,9 @@ async function init() {
   if (!authUser) return;
   applyRoleBasedUI();
   if (isCreateMode) {
+    setActiveLeagueId('');
+    membersLoaded = false;
+    membersCache = [];
     renderLeague(null);
     return;
   }

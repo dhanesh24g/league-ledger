@@ -13,28 +13,84 @@ async function callApi(url, options = {}) {
     ...options,
   });
   if (!res.ok) {
-    let errorMessage = 'Request failed';
+    let errorMessage = `Error ${res.status}: ${res.statusText || 'Request failed'}`;
     try {
       const data = await res.json();
-      // Extract error message from various possible fields
-      if (data.detail) {
-        errorMessage = data.detail;
-      } else if (data.message) {
-        errorMessage = data.message;
-      } else if (data.error) {
-        errorMessage = data.error;
-      } else if (data.errors && Array.isArray(data.errors) && data.errors.length > 0) {
-        errorMessage = data.errors[0].message || data.errors[0];
-      } else {
-        errorMessage = `Error ${res.status}: ${res.statusText}`;
-      }
+      errorMessage = toErrorMessage(data, errorMessage);
     } catch (e) {
-      // If JSON parsing fails, use status text
-      errorMessage = `Error ${res.status}: ${res.statusText}`;
+      // keep fallback message
     }
     throw new Error(errorMessage);
   }
   return res.json();
+}
+
+function toErrorMessage(data, fallback = 'Request failed') {
+  if (!data) return fallback;
+  if (typeof data === 'string') return data;
+
+  if (Array.isArray(data)) {
+    const parts = data
+      .map((item) => toErrorMessage(item, ''))
+      .filter(Boolean);
+    return parts.length ? parts.join(', ') : fallback;
+  }
+
+  if (typeof data !== 'object') return String(data);
+
+  const detail = data.detail;
+  if (typeof detail === 'string' && detail.trim()) return detail.trim();
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const loc = Array.isArray(item.loc) ? item.loc.join('.') : '';
+          const msg = typeof item.msg === 'string' ? item.msg : '';
+          return [loc, msg].filter(Boolean).join(': ');
+        }
+        return '';
+      })
+      .filter(Boolean);
+    if (parts.length) return parts.join(', ');
+  }
+
+  if (typeof data.message === 'string' && data.message.trim()) return data.message.trim();
+  if (typeof data.error === 'string' && data.error.trim()) return data.error.trim();
+
+  return fallback;
+}
+
+function setLoginHintState(text, kind = 'neutral') {
+  loginHint.textContent = text;
+  loginHint.classList.toggle('auth-text-error', kind === 'error');
+  loginHint.classList.toggle('auth-text-success', kind === 'success');
+}
+
+function toFriendlyLoginError(message) {
+  const msg = String(message || '').toLowerCase();
+  if (!msg) return 'Login failed. Please try again.';
+  if (msg.includes('invalid user id or password') || msg.includes('invalid credentials')) {
+    return 'Invalid username or password. Please try again.';
+  }
+  if (
+    (msg.includes('body.user_id') && msg.includes('at least 1 character'))
+    || (msg.includes('body.password') && msg.includes('at least 1 character'))
+    || msg.includes('string should have at least 1 character')
+    || msg.includes('value_error.any_str.min_length')
+  ) {
+    return 'Username and password are required.';
+  }
+  if (msg.includes('user not found')) {
+    return 'Account not found. Please check your username.';
+  }
+  if (msg.includes('network') || msg.includes('fetch')) {
+    return 'Network error. Please check your connection and try again.';
+  }
+  if (msg.includes('value_error.missing') || msg.includes('field required')) {
+    return 'Username and password are required.';
+  }
+  return message;
 }
 
 function applyAuthResult(result) {
@@ -181,25 +237,31 @@ async function initLogin() {
 
   try {
     authConfig = await callApi('/api/auth/config');
-    loginHint.textContent = `Use your username to sign in. Sessions stay valid for ${authConfig.session_ttl_hours || 4} hours.`;
+    setLoginHintState(`Use your username to sign in. Sessions stay valid for ${authConfig.session_ttl_hours || 4} hours.`);
     initGoogleLogin();
   } catch (err) {
-    loginHint.textContent = '';
+    setLoginHintState('');
   }
 }
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  // Show immediate loading state
+  const formData = new FormData(loginForm);
+  const payload = {
+    user_id: String(formData.get('user_id') || '').trim(),
+    password: String(formData.get('password') || ''),
+  };
+
+  if (!payload.user_id || !payload.password) {
+    setLoginHintState('Username and password are required.', 'error');
+    return;
+  }
+
   showLoginLoading();
+  setLoginHintState('Signing you in...');
 
   try {
-    const formData = new FormData(loginForm);
-    const payload = {
-      user_id: String(formData.get('user_id') || '').trim(),
-      password: String(formData.get('password') || ''),
-    };
     const result = await callApi('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -207,33 +269,10 @@ loginForm.addEventListener('submit', async (event) => {
     applyAuthResult(result);
   } catch (err) {
     hideLoginLoading();
-
-    // Properly extract error message
-    let errorMessage = 'Login failed. Please try again.';
-
-    if (err instanceof Error) {
-      errorMessage = err.message;
-    } else if (typeof err === 'object' && err !== null) {
-      // Handle object errors
-      errorMessage = err.detail || err.message || err.error || JSON.stringify(err);
-    } else {
-      errorMessage = String(err);
-    }
-
-    console.error('Login error:', err); // Log full error for debugging
-
-    // Show user-friendly error message
-    if (errorMessage.includes('Invalid user ID or password') || errorMessage.includes('Invalid credentials')) {
-      window.alert('Invalid username or password. Please check your credentials and try again.');
-    } else if (errorMessage.includes('User not found')) {
-      window.alert('Account not found. Please check your username or contact support.');
-    } else if (errorMessage.includes('network') || errorMessage.includes('fetch')) {
-      window.alert('Network error. Please check your connection and try again.');
-    } else if (errorMessage.includes('[object Object]')) {
-      window.alert('Login failed. Please check your credentials and try again.');
-    } else {
-      window.alert(errorMessage || 'Login failed. Please try again.');
-    }
+    const rawMessage = err instanceof Error ? err.message : toErrorMessage(err, 'Login failed. Please try again.');
+    const friendlyMessage = toFriendlyLoginError(rawMessage);
+    setLoginHintState(friendlyMessage, 'error');
+    console.error('Login error:', err);
   }
 });
 
@@ -270,17 +309,6 @@ function hideLoginLoading() {
   usernameField.classList.remove('loading');
   passwordField.classList.remove('loading');
 }
-
-['user_id', 'password'].forEach((fieldName) => {
-  const field = loginForm.elements[fieldName];
-  if (!(field instanceof HTMLElement)) return;
-  field.addEventListener('keydown', (event) => {
-    if (event.key !== 'Enter') return;
-    // Allow default form submission behavior
-    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-    loginForm.dispatchEvent(submitEvent);
-  });
-});
 
 initLogin().catch((err) => {
   console.error('Login initialization failed:', err);
