@@ -586,10 +586,14 @@ async function init() {
     return;
   }
 
-  // Show immediate UI with cached data while API loads
+  // Show modern loading state immediately
+  renderLoadingState();
+
+  // Try to get cached data for instant display
   const cachedUser = getCachedUser();
   if (cachedUser) {
-    renderImmediateUI(cachedUser);
+    // Small delay to show loading state for better UX
+    setTimeout(() => renderImmediateUI(cachedUser), 300);
   }
 
   try {
@@ -627,10 +631,16 @@ async function init() {
     renderRequestHistory(user);
   } catch (error) {
     console.error('Failed to load user data:', error);
-    // Keep showing cached UI if available
-    if (!cachedUser) {
-      window.alert(error instanceof Error ? error.message : String(error));
-    }
+    // Show fallback UI with error indication
+    setTimeout(() => {
+      renderImmediateUI(null);
+      welcomeCopy.innerHTML = `
+        Create a fresh league, open an invite link, or jump into any league you already belong to.
+        <div style="margin-top: 8px; color: var(--warning); font-size: 13px;">
+          ⚠️ Some features may be unavailable due to connection issues
+        </div>
+      `;
+    }, 500);
   }
 }
 
@@ -670,33 +680,69 @@ function clearUserCache() {
   }
 }
 
-function renderImmediateUI(user) {
-  // Show welcome message immediately
-  welcomeTitle.textContent = `Welcome, ${user.first_name || 'back'}.`;
-  welcomeCopy.textContent = 'Create a fresh league, open an invite link, or jump into any league you already belong to.';
+function renderLoadingState() {
+  // Show loading skeleton for user name
+  welcomeTitle.classList.add('loading');
+  welcomeTitle.textContent = 'Loading';
 
-  // Show the choice cards immediately
-  welcomeActions.innerHTML = `
-    <div class="welcome-choice-grid">
-      <a class="welcome-choice-card" href="/setup?mode=create">
-        <span class="welcome-choice-eyebrow create">Create</span>
-        <strong>Create A New League</strong>
-        <p class="muted">Start a new league, become its admin, and share the invite link with your friends.</p>
-        <span class="welcome-choice-cta">Launch setup</span>
-      </a>
-      <button type="button" class="welcome-choice-card welcome-choice-join-card" data-open-join-modal>
-        <span class="welcome-choice-eyebrow join">Join</span>
-        <strong>Join With Invite Link</strong>
-        <p class="muted">Use a league invite link or code. Requests stay tied to that specific league.</p>
-        <span class="welcome-choice-cta">Click for invite access</span>
-      </button>
+  welcomeCopy.innerHTML = `
+    <div class="status-loading">
+      Setting up your league access
+      <div class="loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
     </div>
   `;
 
+  // Show skeleton cards for the choice options
+  welcomeActions.innerHTML = `
+    <div class="progress-bar">
+      <div class="progress-bar-fill"></div>
+    </div>
+    <div class="welcome-loading-skeleton">
+      <div class="skeleton-card"></div>
+      <div class="skeleton-card"></div>
+    </div>
+  `;
+}
+
+function renderImmediateUI(user) {
+  // Remove loading states
+  welcomeTitle.classList.remove('loading');
+
+  // Show welcome message immediately with fallback
+  welcomeTitle.textContent = `Welcome, ${user?.first_name || 'back'}.`;
+  welcomeCopy.textContent = 'Create a fresh league, open an invite link, or jump into any league you already belong to.';
+
+  // Always show the choice cards immediately, even without user data
+  if (!welcomeActions.innerHTML.includes('welcome-choice-grid')) {
+    welcomeActions.innerHTML = `
+      <div class="welcome-choice-grid">
+        <a class="welcome-choice-card" href="/setup?mode=create">
+          <span class="welcome-choice-eyebrow create">Create</span>
+          <strong>Create A New League</strong>
+          <p class="muted">Start a new league, become its admin, and share the invite link with your friends.</p>
+          <span class="welcome-choice-cta">Launch setup</span>
+        </a>
+        <button type="button" class="welcome-choice-card welcome-choice-join-card" data-open-join-modal>
+          <span class="welcome-choice-eyebrow join">Join</span>
+          <strong>Join With Invite Link</strong>
+          <p class="muted">Use a league invite link or code. Requests stay tied to that specific league.</p>
+          <span class="welcome-choice-cta">Click for invite access</span>
+        </button>
+      </div>
+    `;
+  }
+
   // Show cached memberships if available
-  if (user.memberships && user.memberships.length > 0) {
-    welcomeActions.innerHTML += renderMembershipCards(user);
-    bindMembershipCards(user);
+  if (user?.memberships && user.memberships.length > 0) {
+    // Don't duplicate if already showing memberships
+    if (!welcomeActions.innerHTML.includes('Your Leagues')) {
+      welcomeActions.innerHTML += renderMembershipCards(user);
+      bindMembershipCards(user);
+    }
   }
 
   bindJoinModal(user);
