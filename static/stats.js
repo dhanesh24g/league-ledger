@@ -1270,6 +1270,7 @@ async function init() {
   }
   matchFilter.disabled = false;
   playerFilter.disabled = false;
+  syncMobileSelectVisibility();
 
   if (stats.matches.length) {
     matchFilter.value = String(stats.matches[0].match_id);
