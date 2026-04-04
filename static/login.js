@@ -172,6 +172,10 @@ async function initLogin() {
 
 loginForm.addEventListener('submit', async (event) => {
   event.preventDefault();
+
+  // Show immediate loading state
+  showLoginLoading();
+
   try {
     const formData = new FormData(loginForm);
     const payload = {
@@ -184,9 +188,57 @@ loginForm.addEventListener('submit', async (event) => {
     });
     applyAuthResult(result);
   } catch (err) {
+    hideLoginLoading();
     window.alert(err instanceof Error ? err.message : String(err));
   }
 });
+
+function showLoginLoading() {
+  const submitBtn = loginForm.querySelector('button[type="submit"]');
+  const usernameField = loginForm.elements.user_id;
+  const passwordField = loginForm.elements.password;
+
+  // Disable form elements
+  submitBtn.disabled = true;
+  usernameField.disabled = true;
+  passwordField.disabled = true;
+
+  // Show loading state on submit button
+  submitBtn.innerHTML = `
+    <span class="status-loading">
+      Signing in
+      <div class="loading-dots">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </span>
+  `;
+  submitBtn.classList.add('loading');
+
+  // Add loading indication to fields
+  usernameField.classList.add('loading');
+  passwordField.classList.add('loading');
+}
+
+function hideLoginLoading() {
+  const submitBtn = loginForm.querySelector('button[type="submit"]');
+  const usernameField = loginForm.elements.user_id;
+  const passwordField = loginForm.elements.password;
+
+  // Re-enable form elements
+  submitBtn.disabled = false;
+  usernameField.disabled = false;
+  passwordField.disabled = false;
+
+  // Restore submit button text
+  submitBtn.innerHTML = 'Sign In';
+  submitBtn.classList.remove('loading');
+
+  // Remove loading indication from fields
+  usernameField.classList.remove('loading');
+  passwordField.classList.remove('loading');
+}
 
 ['user_id', 'password'].forEach((fieldName) => {
   const field = loginForm.elements[fieldName];
