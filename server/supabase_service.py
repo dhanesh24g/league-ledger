@@ -518,6 +518,8 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
     
     match = match_response.data[0]
     league = league_response.data[0]
+    if str(match.get("status") or "").lower() == "canceled":
+        raise HTTPException(status_code=409, detail="This match is already marked as washout/cancelled")
     
     payouts = parse_payouts(match["payouts_json"]) or parse_payouts(league["payouts_json"])
     winner_limit = int(match["winner_count"] or league["default_winner_count"])
@@ -629,7 +631,7 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     league = league_response.data[0]
     
     # Get completed matches count
-    matches_response = supabase.table("matches").select("id, participant_ids_json").eq("league_id", league_id).in_("status", ["completed", "canceled"]).order("id", desc=True).execute()
+    matches_response = supabase.table("matches").select("id, status, participant_ids_json").eq("league_id", league_id).in_("status", ["completed", "canceled"]).order("id", desc=True).execute()
     matches = matches_response.data
     completed_matches = len(matches)
     

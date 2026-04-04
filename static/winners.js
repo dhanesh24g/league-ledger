@@ -100,6 +100,21 @@ function ensureWinnerFeedback() {
   return winnerFeedbackEl;
 }
 
+function updateMatchActionState() {
+  const match = appState.matches.find((item) => String(item.id) === String(matchSelect.value));
+  const isAdmin = authUser.league_role === 'admin';
+  const status = String(match?.status || '').toLowerCase();
+  const isCanceled = status === 'canceled';
+  const isCompleted = status === 'completed';
+
+  loadWinnerBtn.disabled = !isAdmin || !match || isCanceled;
+  cancelMatchBtn.disabled = !isAdmin || !match || isCanceled;
+
+  if (!match || !isAdmin) return;
+  loadWinnerBtn.textContent = isCompleted ? 'Edit Assignment' : 'Load Assignment';
+  cancelMatchBtn.textContent = isCanceled ? 'Washout Recorded' : 'Washout / Cancelled';
+}
+
 function renderMatchSelect() {
   matchSelect.innerHTML = '';
 
@@ -128,8 +143,7 @@ function renderMatchSelect() {
   const activeMatchId = selectedMatch ? String(selectedMatch.id) : String(appState.matches[0].id);
   matchSelect.value = activeMatchId;
   setSelectedMatchId(activeMatchId);
-  loadWinnerBtn.disabled = authUser.league_role !== 'admin';
-  cancelMatchBtn.disabled = authUser.league_role !== 'admin';
+  updateMatchActionState();
 }
 
 function renderMatchSummary(matchId) {
@@ -499,6 +513,11 @@ function renderWinnerForm(matchId) {
     return;
   }
 
+  if (String(match.status || '').toLowerCase() === 'canceled') {
+    winnersForm.innerHTML = '<p class="muted">This match is marked as washout/cancelled. Refund has been distributed equally and winner assignment is locked.</p>';
+    return;
+  }
+
   activeParticipantIds = Array.isArray(match.participant_ids) && match.participant_ids.length
     ? match.participant_ids.map((value) => Number(value))
     : appState.players.map((player) => Number(player.id));
@@ -621,11 +640,13 @@ loadWinnerBtn.addEventListener('click', () => {
     return;
   }
   setSelectedMatchId(matchSelect.value);
+  updateMatchActionState();
   renderWinnerForm(matchSelect.value);
 });
 
 matchSelect.addEventListener('change', () => {
   setSelectedMatchId(matchSelect.value);
+  updateMatchActionState();
   renderMatchSummary(matchSelect.value);
   if (authUser.league_role === 'admin') {
     renderWinnerForm(matchSelect.value);
@@ -659,6 +680,7 @@ cancelMatchBtn.addEventListener('click', async () => {
     }
     renderMatchSelect();
     matchSelect.value = targetMatchId;
+    updateMatchActionState();
     renderMatchSummary(targetMatchId);
     clearWinnerDraft(targetMatchId);
     winnersForm.innerHTML = '<p class="muted">Match marked as washout/cancelled. Refund distributed equally.</p>';
@@ -708,6 +730,7 @@ async function init() {
   applyRoleBasedUI();
   appState = await callApi('/api/state');
   renderMatchSelect();
+  updateMatchActionState();
   renderMatchSummary(matchSelect.value);
 
   if (authUser.league_role === 'admin' && matchSelect.value) {
