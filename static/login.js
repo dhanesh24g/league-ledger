@@ -193,8 +193,9 @@ loginForm.addEventListener('submit', async (event) => {
   if (!(field instanceof HTMLElement)) return;
   field.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter') return;
-    event.preventDefault();
-    loginForm.requestSubmit();
+    // Allow default form submission behavior
+    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+    loginForm.dispatchEvent(submitEvent);
   });
 });
 
