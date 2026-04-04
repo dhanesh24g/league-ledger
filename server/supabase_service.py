@@ -660,6 +660,9 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     if cached is not None:
         return cached
 
+    league_response = supabase.table("league").select("entry_fee").eq("id", league_id).limit(1).execute()
+    league = league_response.data[0] if league_response.data else {"entry_fee": 0}
+
     players = _sync_active_members_to_players(supabase, league_id)
 
     matches_response = supabase.table("matches").select("id, title, match_date, status, participant_ids_json").eq("league_id", league_id).order("id", desc=True).execute()
