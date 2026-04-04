@@ -33,7 +33,7 @@
   </script>
 </head>
 
-<body>
+<body class="matches-page">
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
     <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
     <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
@@ -143,11 +143,17 @@
           <p id="override-payout-total" class="payout-total muted small"></p>
         </div>
 
-        <div class="actions full">
+      <div class="actions full">
           <button type="submit">Add Match</button>
         </div>
       </form>
 
+      <div class="workflow-section-head">
+        <div>
+          <h3>Recent Matches</h3>
+          <p class="muted small">Latest fixtures and status in one compact list.</p>
+        </div>
+      </div>
       <div id="match-feed" class="feed"></div>
 
       <div class="flow-controls">

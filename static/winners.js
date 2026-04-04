@@ -22,6 +22,7 @@ const loadWinnerBtn = document.getElementById('load-winner-form');
 const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
 const winnersForm = document.getElementById('winners-form');
+const winnerMatchSummary = document.getElementById('winner-match-summary');
 
 let authUser = { username: '', role: 'read' };
 let appState = { league: null, players: [], matches: [] };
@@ -70,13 +71,18 @@ function renderMatchSelect() {
     option.value = '';
     option.textContent = 'No matches yet';
     matchSelect.appendChild(option);
+    loadWinnerBtn.disabled = true;
+    cancelMatchBtn.disabled = true;
+    if (winnerMatchSummary) {
+      winnerMatchSummary.innerHTML = '<div class="feed-item">Create a match first, then assign winners here.</div>';
+    }
     return;
   }
 
   appState.matches.forEach((match) => {
     const option = document.createElement('option');
     option.value = String(match.id);
-    option.textContent = `${match.match_date} - ${match.title} (${(match.participant_ids || []).length || appState.players.length} players)`;
+    option.textContent = `${match.title} · ${match.match_date}`;
     matchSelect.appendChild(option);
   });
 
@@ -85,6 +91,40 @@ function renderMatchSelect() {
   const activeMatchId = selectedMatch ? String(selectedMatch.id) : String(appState.matches[0].id);
   matchSelect.value = activeMatchId;
   setSelectedMatchId(activeMatchId);
+  loadWinnerBtn.disabled = authUser.league_role !== 'admin';
+  cancelMatchBtn.disabled = authUser.league_role !== 'admin';
+}
+
+function renderMatchSummary(matchId) {
+  if (!winnerMatchSummary) return;
+
+  const match = appState.matches.find((item) => String(item.id) === String(matchId));
+  if (!match) {
+    winnerMatchSummary.innerHTML = '';
+    return;
+  }
+
+  const participantCount = (match.participant_ids || []).length || appState.players.length;
+  const winnerCount = getWinnerCount(match);
+  const status = String(match.status || 'pending');
+  const statusTone = status === 'completed' ? 'status-good' : status === 'canceled' ? 'status-bad' : 'status-neutral';
+
+  winnerMatchSummary.innerHTML = `
+    <article class="feed-item workflow-match-summary-card">
+      <div class="workflow-feed-head">
+        <div>
+          <span class="match-kicker">Selected Match</span>
+          <strong>${match.title}</strong>
+        </div>
+        <div class="workflow-chip-row">
+          <span class="status-chip ${statusTone}">${status}</span>
+          <span class="status-chip">${match.match_date}</span>
+          <span class="status-chip">${participantCount} players</span>
+          <span class="status-chip">${winnerCount} winner${winnerCount === 1 ? '' : 's'}</span>
+        </div>
+      </div>
+    </article>
+  `;
 }
 
 function getWinnerCount(match) {
@@ -414,6 +454,7 @@ function applyWinnerDraft(match, onWinnerChange) {
 function renderWinnerForm(matchId) {
   winnersForm.innerHTML = '';
   clearWinnerFeedback();
+  renderMatchSummary(matchId);
 
   const match = appState.matches.find((item) => String(item.id) === String(matchId));
   if (!match || !appState.league || !appState.players.length) {
@@ -430,10 +471,13 @@ function renderWinnerForm(matchId) {
     .map((player) => player.name);
 
   const participantSummary = document.createElement('div');
-  participantSummary.className = 'feed-item';
+  participantSummary.className = 'feed-item workflow-feed-item workflow-feed-item-soft';
   participantSummary.innerHTML = `
-    <strong>Eligible Players</strong><br>
-    <span class="muted">${participantNames.join(', ') || 'No participants captured for this match.'}</span>
+    <div class="workflow-feed-head">
+      <strong>Eligible Players</strong>
+      <span class="status-chip">${participantNames.length} available</span>
+    </div>
+    <p class="muted small">${participantNames.join(', ') || 'No participants captured for this match.'}</p>
   `;
   winnersForm.appendChild(participantSummary);
 
@@ -545,6 +589,7 @@ loadWinnerBtn.addEventListener('click', () => {
 
 matchSelect.addEventListener('change', () => {
   setSelectedMatchId(matchSelect.value);
+  renderMatchSummary(matchSelect.value);
   if (authUser.league_role === 'admin') {
     renderWinnerForm(matchSelect.value);
   }
@@ -569,6 +614,9 @@ cancelMatchBtn.addEventListener('click', async () => {
     restoreCancelButton = setButtonLoading(cancelMatchBtn, 'Cancelling...');
     closeLoading = showLoading('Cancelling match...');
     await callApi(`/api/matches/${matchSelect.value}/cancel`, { method: 'POST' });
+    appState = await callApi('/api/state');
+    renderMatchSelect();
+    renderMatchSummary(matchSelect.value);
     clearWinnerDraft(matchSelect.value);
     winnersForm.innerHTML = '<p class="muted">Match marked as washout/cancelled. Refund distributed equally.</p>';
     clearWinnerFeedback();
@@ -609,11 +657,14 @@ continueLedgerBtn.addEventListener('click', async () => {
 
 async function init() {
   initNotifications();
+  matchSelect.innerHTML = '<option>Loading matches...</option>';
+  winnersForm.innerHTML = '<div class="feed-item">Loading winner assignment...</div>';
   authUser = await initWorkflowShell('/winners');
   if (!authUser) return;
   applyRoleBasedUI();
   appState = await callApi('/api/state');
   renderMatchSelect();
+  renderMatchSummary(matchSelect.value);
 
   if (authUser.league_role === 'admin' && matchSelect.value) {
     renderWinnerForm(matchSelect.value);
