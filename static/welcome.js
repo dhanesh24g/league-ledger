@@ -586,30 +586,133 @@ async function init() {
     return;
   }
 
-  const profile = await callApi('/api/auth/me');
-  const user = profile.user;
-  document.body.classList.toggle('welcome-read-mode', user.league_role !== 'admin');
-  localStorage.setItem('dhaneshlabs-login-role-hint', user.league_role === 'admin' ? 'admin' : 'read');
-  authRole.textContent = `${user.user_id}`;
-  clearPostAuthPath();
-
-  logoutBtn.addEventListener('click', () => {
-    clearAuthStorage();
-    window.location.replace('/login');
-  });
-
-  const inviteCode = getInviteCodeFromLocation();
-  if (inviteCode) {
-    await renderInvitePreview(user, inviteCode);
-  } else {
-    if (user.active_league_id) {
-      setActiveLeagueId(user.active_league_id);
-    }
-    renderHome(user);
+  // Show immediate UI with cached data while API loads
+  const cachedUser = getCachedUser();
+  if (cachedUser) {
+    renderImmediateUI(cachedUser);
   }
 
-  await renderJoinRequests(user);
-  renderRequestHistory(user);
+  try {
+    const profile = await callApi('/api/auth/me');
+    const user = profile.user;
+
+    // Cache the user data for future visits
+    cacheUser(user);
+
+    // Update UI with fresh data
+    updateUIWithUserData(user);
+
+    document.body.classList.toggle('welcome-read-mode', user.league_role !== 'admin');
+    localStorage.setItem('dhaneshlabs-login-role-hint', user.league_role === 'admin' ? 'admin' : 'read');
+    authRole.textContent = `${user.user_id}`;
+    clearPostAuthPath();
+
+    logoutBtn.addEventListener('click', () => {
+      clearAuthStorage();
+      clearUserCache();
+      window.location.replace('/login');
+    });
+
+    const inviteCode = getInviteCodeFromLocation();
+    if (inviteCode) {
+      await renderInvitePreview(user, inviteCode);
+    } else {
+      if (user.active_league_id) {
+        setActiveLeagueId(user.active_league_id);
+      }
+      renderHome(user);
+    }
+
+    await renderJoinRequests(user);
+    renderRequestHistory(user);
+  } catch (error) {
+    console.error('Failed to load user data:', error);
+    // Keep showing cached UI if available
+    if (!cachedUser) {
+      window.alert(error instanceof Error ? error.message : String(error));
+    }
+  }
+}
+
+function getCachedUser() {
+  try {
+    const cached = localStorage.getItem('league-ledger-user-cache');
+    if (cached) {
+      const data = JSON.parse(cached);
+      const now = Date.now();
+      // Cache for 5 minutes
+      if (now - data.timestamp < 300000) {
+        return data.user;
+      }
+    }
+  } catch (e) {
+    // Ignore cache errors
+  }
+  return null;
+}
+
+function cacheUser(user) {
+  try {
+    localStorage.setItem('league-ledger-user-cache', JSON.stringify({
+      user,
+      timestamp: Date.now()
+    }));
+  } catch (e) {
+    // Ignore cache errors
+  }
+}
+
+function clearUserCache() {
+  try {
+    localStorage.removeItem('league-ledger-user-cache');
+  } catch (e) {
+    // Ignore cache errors
+  }
+}
+
+function renderImmediateUI(user) {
+  // Show welcome message immediately
+  welcomeTitle.textContent = `Welcome, ${user.first_name || 'back'}.`;
+  welcomeCopy.textContent = 'Create a fresh league, open an invite link, or jump into any league you already belong to.';
+
+  // Show the choice cards immediately
+  welcomeActions.innerHTML = `
+    <div class="welcome-choice-grid">
+      <a class="welcome-choice-card" href="/setup?mode=create">
+        <span class="welcome-choice-eyebrow create">Create</span>
+        <strong>Create A New League</strong>
+        <p class="muted">Start a new league, become its admin, and share the invite link with your friends.</p>
+        <span class="welcome-choice-cta">Launch setup</span>
+      </a>
+      <button type="button" class="welcome-choice-card welcome-choice-join-card" data-open-join-modal>
+        <span class="welcome-choice-eyebrow join">Join</span>
+        <strong>Join With Invite Link</strong>
+        <p class="muted">Use a league invite link or code. Requests stay tied to that specific league.</p>
+        <span class="welcome-choice-cta">Click for invite access</span>
+      </button>
+    </div>
+  `;
+
+  // Show cached memberships if available
+  if (user.memberships && user.memberships.length > 0) {
+    welcomeActions.innerHTML += renderMembershipCards(user);
+    bindMembershipCards(user);
+  }
+
+  bindJoinModal(user);
+}
+
+function updateUIWithUserData(user) {
+  // Update welcome message with fresh data
+  welcomeTitle.textContent = `Welcome, ${user.first_name}.`;
+
+  // Update memberships if they changed
+  const membershipSection = welcomeActions.querySelector('.welcome-card');
+  if (membershipSection) {
+    membershipSection.remove();
+  }
+  welcomeActions.innerHTML += renderMembershipCards(user);
+  bindMembershipCards(user);
 }
 
 init().catch((error) => {

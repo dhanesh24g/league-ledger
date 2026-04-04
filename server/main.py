@@ -105,6 +105,65 @@ def health_check() -> dict[str, str]:
         return {"status": "healthy", "database": "sqlite"}
 
 
+@app.get("/debug/supabase")
+def debug_supabase() -> dict[str, Any]:
+    """Detailed Supabase connectivity check for debugging"""
+    from .database import get_supabase_client
+    from .auth import _supabase_profile_query
+    import os
+    import traceback
+    
+    debug_info = {
+        "supabase_url_configured": bool(os.getenv("SUPABASE_URL")),
+        "supabase_key_configured": bool(os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")),
+        "client_available": False,
+        "connection_test": False,
+        "query_test": False,
+        "errors": []
+    }
+    
+    try:
+        supabase_client = get_supabase_client()
+        debug_info["client_available"] = supabase_client is not None
+        
+        if supabase_client:
+            # Test basic connection
+            try:
+                result = supabase_client.table("users").select("id").limit(1).execute()
+                debug_info["connection_test"] = True
+                debug_info["connection_result"] = f"Success: {len(result.data) if result.data else 0} users found"
+            except Exception as e:
+                debug_info["errors"].append(f"Connection test failed: {type(e).__name__}: {str(e)}")
+                debug_info["connection_error"] = {
+                    "type": type(e).__name__,
+                    "message": str(e),
+                    "traceback": traceback.format_exc()
+                }
+            
+            # Test profile query
+            try:
+                profile = _supabase_profile_query(user_id_value=1)
+                debug_info["query_test"] = profile is not None
+                debug_info["query_result"] = "Success" if profile else "No user found"
+            except Exception as e:
+                debug_info["errors"].append(f"Query test failed: {type(e).__name__}: {str(e)}")
+                debug_info["query_error"] = {
+                    "type": type(e).__name__,
+                    "message": str(e),
+                    "traceback": traceback.format_exc()
+                }
+    
+    except Exception as e:
+        debug_info["errors"].append(f"Setup failed: {type(e).__name__}: {str(e)}")
+        debug_info["setup_error"] = {
+            "type": type(e).__name__,
+            "message": str(e),
+            "traceback": traceback.format_exc()
+        }
+    
+    return debug_info
+
+
 @app.get("/logo.png")
 def logo() -> FileResponse:
     """Serve logo"""
