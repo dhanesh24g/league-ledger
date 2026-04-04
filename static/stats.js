@@ -29,6 +29,11 @@ const closeHistoryModalBtn = document.getElementById('close-history-modal');
 const rankModal = document.getElementById('rank-modal');
 const rankModalBody = document.getElementById('rank-modal-body');
 const closeRankModalBtn = document.getElementById('close-rank-modal');
+const mobileSelectModal = document.getElementById('mobile-select-modal');
+const mobileSelectTitle = document.getElementById('mobile-select-title');
+const mobileSelectSubtitle = document.getElementById('mobile-select-subtitle');
+const mobileSelectOptions = document.getElementById('mobile-select-options');
+const closeMobileSelectModalBtn = document.getElementById('close-mobile-select-modal');
 
 let stats = {
   summary: {
@@ -41,6 +46,7 @@ let stats = {
   players: [],
 };
 let currentUser = null;
+let mobileSelectResizeBound = false;
 
 const RANK_VISUALS = {
   0: { icon: '🌧️', label: 'Washout / Refund' },
@@ -93,6 +99,81 @@ function isMobileStatsViewport() {
   return Boolean(window.matchMedia && window.matchMedia('(max-width: 760px)').matches);
 }
 
+function closeMobileSelect() {
+  setModalState(mobileSelectModal, false);
+}
+
+function ensureMobileSelectProxy(select, config = {}) {
+  if (!select) return null;
+
+  let proxy = select.parentElement?.querySelector(`.stats-mobile-select-proxy[data-select-id="${select.id}"]`);
+  if (!proxy) {
+    proxy = document.createElement('button');
+    proxy.type = 'button';
+    proxy.className = 'stats-mobile-select-proxy hidden';
+    proxy.dataset.selectId = select.id;
+    proxy.innerHTML = `
+      <span class="stats-mobile-select-proxy-copy"></span>
+      <span class="stats-mobile-select-proxy-icon" aria-hidden="true">⌄</span>
+    `;
+    select.insertAdjacentElement('afterend', proxy);
+  }
+
+  const syncProxy = () => {
+    const selectedOption = select.options[select.selectedIndex];
+    const label = selectedOption?.textContent?.trim() || config.placeholder || 'Choose an option';
+    const copy = proxy.querySelector('.stats-mobile-select-proxy-copy');
+    if (copy) copy.textContent = label;
+    proxy.disabled = Boolean(select.disabled);
+  };
+
+  if (!proxy.dataset.bound) {
+    proxy.addEventListener('click', () => {
+      if (!mobileSelectModal || !mobileSelectOptions) return;
+      mobileSelectTitle.textContent = config.title || 'Choose an option';
+      mobileSelectSubtitle.textContent = config.subtitle || 'Pick the item you want to view.';
+      mobileSelectOptions.innerHTML = [...select.options].map((option) => {
+        const isActive = String(option.value) === String(select.value);
+        return `
+          <button type="button" class="stats-mobile-select-option${isActive ? ' is-active' : ''}" data-mobile-select-value="${escapeHtml(option.value)}" data-mobile-select-id="${select.id}">
+            <span>${escapeHtml(option.textContent || '')}</span>
+          </button>
+        `;
+      }).join('') || '<div class="feed-item">No options available.</div>';
+
+      mobileSelectOptions.querySelectorAll(`[data-mobile-select-id="${select.id}"]`).forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextValue = button.getAttribute('data-mobile-select-value') || '';
+          select.value = nextValue;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          closeMobileSelect();
+        });
+      });
+
+      setModalState(mobileSelectModal, true);
+    });
+    proxy.dataset.bound = 'true';
+  }
+
+  if (!select.dataset.proxyBound) {
+    select.addEventListener('change', syncProxy);
+    select.dataset.proxyBound = 'true';
+  }
+
+  syncProxy();
+  return proxy;
+}
+
+function syncMobileSelectVisibility() {
+  const mobile = isMobileStatsViewport();
+  [topNav, matchFilter, playerFilter].forEach((select) => {
+    if (!select) return;
+    const proxy = select.parentElement?.querySelector(`.stats-mobile-select-proxy[data-select-id="${select.id}"]`);
+    select.classList.toggle('stats-mobile-select-source', mobile);
+    proxy?.classList.toggle('hidden', !mobile);
+  });
+}
+
 function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
   const angleInRadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
   return {
@@ -118,7 +199,7 @@ function setModalState(modal, isOpen) {
   if (!modal) return;
   modal.classList.toggle('hidden', !isOpen);
   modal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-  const anyModalOpen = [earnersModal, ladderModal, historyModal, rankModal].some((node) => node && !node.classList.contains('hidden'));
+  const anyModalOpen = [earnersModal, ladderModal, historyModal, rankModal, mobileSelectModal].some((node) => node && !node.classList.contains('hidden'));
   document.body.classList.toggle('modal-open', anyModalOpen);
 }
 
@@ -975,6 +1056,12 @@ function setupHeader() {
     clearAuthStorage();
     window.location.replace('/login');
   });
+
+  ensureMobileSelectProxy(topNav, {
+    title: 'Navigate',
+    subtitle: 'Choose where you want to go next.',
+    placeholder: 'Navigate',
+  });
 }
 
 function setupModal() {
@@ -982,6 +1069,7 @@ function setupModal() {
   closeLadderModalBtn?.addEventListener('click', closeLadderModal);
   closeHistoryModalBtn?.addEventListener('click', closeHistoryModal);
   closeRankModalBtn?.addEventListener('click', closeRankModal);
+  closeMobileSelectModalBtn?.addEventListener('click', closeMobileSelect);
 
   earnersModal?.querySelectorAll('[data-close-earners]').forEach((node) => {
     node.addEventListener('click', closeEarnersModal);
@@ -995,9 +1083,16 @@ function setupModal() {
   rankModal?.querySelectorAll('[data-close-rank]').forEach((node) => {
     node.addEventListener('click', closeRankModal);
   });
+  mobileSelectModal?.querySelectorAll('[data-close-mobile-select]').forEach((node) => {
+    node.addEventListener('click', closeMobileSelect);
+  });
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (mobileSelectModal && !mobileSelectModal.classList.contains('hidden')) {
+      closeMobileSelect();
+      return;
+    }
     if (rankModal && !rankModal.classList.contains('hidden')) {
       closeRankModal();
       return;
@@ -1036,6 +1131,11 @@ function setReadNavigationMode() {
   topNav.appendChild(homeOption);
 
   topNav.value = '/stats';
+  ensureMobileSelectProxy(topNav, {
+    title: 'Navigate',
+    subtitle: 'Choose where you want to go next.',
+    placeholder: 'Navigate',
+  });
 }
 
 function renderLoadingState() {
@@ -1153,6 +1253,21 @@ async function init() {
   renderLeaderboardChart();
   renderMatchFilter();
   renderPlayerFilter();
+  ensureMobileSelectProxy(matchFilter, {
+    title: 'Select Match',
+    subtitle: 'Choose the match you want to inspect.',
+    placeholder: 'Choose a match',
+  });
+  ensureMobileSelectProxy(playerFilter, {
+    title: 'Select Player',
+    subtitle: 'Choose the player you want to inspect.',
+    placeholder: 'Choose a player',
+  });
+  syncMobileSelectVisibility();
+  if (!mobileSelectResizeBound) {
+    window.addEventListener('resize', syncMobileSelectVisibility);
+    mobileSelectResizeBound = true;
+  }
   matchFilter.disabled = false;
   playerFilter.disabled = false;
 
