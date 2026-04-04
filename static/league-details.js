@@ -211,7 +211,7 @@ function renderMatches(matches, statsMatches) {
       return `
         <article class="feed-item match-card league-match-card">
           <div class="match-head">
-            <strong>#${escapeHtml(matchId)} • ${escapeHtml(match.title)}</strong>
+            <strong>#${escapeHtml(String(match.match_number || stat?.match_number || 0))} • ${escapeHtml(match.title)}</strong>
             <span class="status-chip ${statusClass(match.status)}">${escapeHtml(String(match.status || 'pending').toUpperCase())}</span>
           </div>
           <div class="league-match-meta">
