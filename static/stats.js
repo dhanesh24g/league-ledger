@@ -26,6 +26,9 @@ const closeLadderModalBtn = document.getElementById('close-ladder-modal');
 const historyModal = document.getElementById('history-modal');
 const historyModalBody = document.getElementById('history-modal-body');
 const closeHistoryModalBtn = document.getElementById('close-history-modal');
+const rankModal = document.getElementById('rank-modal');
+const rankModalBody = document.getElementById('rank-modal-body');
+const closeRankModalBtn = document.getElementById('close-rank-modal');
 
 let stats = {
   summary: {
@@ -232,6 +235,9 @@ function renderLadderSliceDetails(share) {
     `;
   }
 
+  const entryFee = Number(stats.summary?.entry_fee || 0);
+  const eligiblePayout = Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee);
+
   return `
     <div class="pie-slice-detail-card">
       <div class="pie-slice-detail-head">
@@ -245,6 +251,10 @@ function renderLadderSliceDetails(share) {
         <div class="stats-current-user-metric">
           <span>Payout Won</span>
           <strong>${formatCurrency(share.total_amount)}</strong>
+        </div>
+        <div class="stats-current-user-metric">
+          <span>Eligible Payout</span>
+          <strong>${formatCurrency(eligiblePayout)}</strong>
         </div>
         <div class="stats-current-user-metric">
           <span>Matches Played</span>
@@ -290,7 +300,7 @@ function bindInteractivePie(container, shares, onSelect) {
 
 function renderMetricStack(metrics) {
   return metrics.map((metric) => `
-    <div class="player-metric-row ${escapeHtml(metric.accent || '')}">
+    <div class="player-metric-row ${escapeHtml(metric.accent || '')} ${metric.featured ? 'player-metric-row-featured' : ''}">
       <div>
         <span>${escapeHtml(metric.label)}</span>
         <small>${escapeHtml(metric.helper || '')}</small>
@@ -322,6 +332,74 @@ function openHistoryModal() {
 
 function closeHistoryModal() {
   setModalState(historyModal, false);
+}
+
+function openRankModal() {
+  setModalState(rankModal, true);
+}
+
+function closeRankModal() {
+  setModalState(rankModal, false);
+}
+
+function buildRankDistributionRows(rankCounts, maxCount) {
+  return Object.keys(rankCounts || {})
+    .sort((a, b) => Number(a) - Number(b))
+    .map((rank) => {
+      const rankNumber = Number(rank);
+      const visual = getRankVisual(rankNumber);
+      const count = Number(rankCounts[rank]);
+      return `
+        <div class="rank-distribution-row">
+          <span class="rank-distribution-label">${visual.icon} ${escapeHtml(visual.label)}</span>
+          <div class="rank-distribution-bar">
+            <span class="rank-distribution-fill" style="width: ${barWidth(count, maxCount)};"></span>
+          </div>
+          <strong>${count}</strong>
+        </div>
+      `;
+    });
+}
+
+function renderRankDistributionColumns(rows, columnCount) {
+  if (!rows.length) {
+    return '<p class="muted">No rank placements yet.</p>';
+  }
+
+  const safeColumnCount = Math.max(1, Number(columnCount || 1));
+  const rowsPerColumn = Math.ceil(rows.length / safeColumnCount);
+  const columns = [];
+  for (let i = 0; i < safeColumnCount; i += 1) {
+    const start = i * rowsPerColumn;
+    const columnRows = rows.slice(start, start + rowsPerColumn);
+    if (columnRows.length) {
+      columns.push(`<div class="rank-distribution-column">${columnRows.join('')}</div>`);
+    }
+  }
+  return columns.join('');
+}
+
+function renderRankModal(player, rankRows) {
+  if (!rankModalBody) return;
+
+  rankModalBody.innerHTML = `
+    <div class="zoom-board">
+      <article class="zoom-board-row">
+        <div class="zoom-board-head">
+          <div class="chart-player-avatar">${escapeHtml(getInitials(player?.name || 'LL'))}</div>
+          <div>
+            <strong>${escapeHtml(player?.name || 'Selected player')}</strong>
+            <p class="muted">Every finishing position recorded in this league.</p>
+          </div>
+        </div>
+      </article>
+      <div class="player-breakdown-card player-breakdown-card-compact rank-distribution-modal-card">
+        <div class="rank-distribution-list rank-distribution-list-columns rank-distribution-list-modal">
+          ${renderRankDistributionColumns(rankRows, rankRows.length > 6 ? 2 : 1)}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 function renderEarnersModal() {
@@ -408,6 +486,7 @@ function renderEarnersModal() {
 function renderLadderModal() {
   if (!ladderModalBody) return;
   const { shares, totalAmount } = buildPayoutShares(stats.players);
+  const entryFee = Number(stats.summary?.entry_fee || 0);
 
   ladderModalBody.innerHTML = `
     <div class="ladder-modal-layout">
@@ -422,7 +501,7 @@ function renderLadderModal() {
               <div class="pie-legend-chip" style="--slice-color:${share.color};"></div>
               <div>
                 <strong>${escapeHtml(share.name)}</strong>
-                <p class="muted">${share.matches_played} played • ${share.wins_total} titles</p>
+                <p class="muted">${share.matches_played} played • ${share.wins_total} titles • Eligible ${formatCurrency(Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee))}</p>
               </div>
               <div class="pie-detail-meta">
                 <strong>${formatCurrency(share.total_amount)}</strong>
@@ -455,6 +534,8 @@ function renderLadderModal() {
 
 function renderHistoryModal(player) {
   if (!historyModalBody) return;
+  const sortedHistory = [...(player?.match_history || [])]
+    .sort((a, b) => String(b.match_date || '').localeCompare(String(a.match_date || '')));
 
   historyModalBody.innerHTML = `
     <div class="zoom-board">
@@ -463,11 +544,11 @@ function renderHistoryModal(player) {
           <div class="chart-player-avatar">${escapeHtml(getInitials(player?.name || 'LL'))}</div>
           <div>
             <strong>${escapeHtml(player?.name || 'Selected player')}</strong>
-            <p class="muted">Full result timeline for this player.</p>
+            <p class="muted">Full result timeline for this player, newest first.</p>
           </div>
         </div>
       </article>
-      ${(player?.match_history || []).length ? player.match_history.map((entry) => `
+      ${sortedHistory.length ? sortedHistory.map((entry) => `
         <article class="history-row">
           <div>
             <strong>${escapeHtml(entry.title)}</strong>
@@ -524,13 +605,6 @@ function renderOverview() {
     </div>
   `).join('');
 
-  const topEarnerRowsCompact = topEarnerNames.map((player) => `
-    <div class="stats-leader-row">
-      <strong>${escapeHtml(player.name)}</strong>
-      <span>${formatCurrency(player.total_amount)}</span>
-    </div>
-  `).join('');
-
   const topEarnerRows = topEarners.map((player, index) => `
     <div class="top-earner-row">
       <span class="top-earner-rank">${TROPHIES[index] || `#${index + 1}`}</span>
@@ -540,18 +614,24 @@ function renderOverview() {
   `).join('');
 
   const currentPlayer = findCurrentPlayer();
+  const matchesYouPlayed = currentPlayer ? Number(currentPlayer.matches_played || 0) : Number(played_matches || 0);
   const eligiblePayoutAmount = currentPlayer
     ? Number(currentPlayer.total_amount || 0) - (Number(currentPlayer.matches_played || 0) * Number(entry_fee || 0))
     : 0;
+  const eligiblePayoutTone = eligiblePayoutAmount > 0 ? 'positive' : eligiblePayoutAmount < 0 ? 'negative' : 'neutral';
 
   statsSummaryStrip.innerHTML = `
+    <div class="summary-chip stats-kpi-card stats-kpi-card-payout stats-kpi-card-payout-${eligiblePayoutTone}">
+      <span class="summary-chip-label">Eligible Payout</span>
+      <strong>${formatCurrency(eligiblePayoutAmount)}</strong>
+    </div>
     <div class="summary-chip stats-kpi-card">
       <span class="summary-chip-label">Total Matches</span>
       <strong>${Number(total_matches || 0)}</strong>
     </div>
     <div class="summary-chip stats-kpi-card">
-      <span class="summary-chip-label">Matches Played</span>
-      <strong>${Number(played_matches || 0)}</strong>
+      <span class="summary-chip-label">Matches You Played</span>
+      <strong>${matchesYouPlayed}</strong>
     </div>
     <div class="summary-chip stats-kpi-card">
       <span class="summary-chip-label">Washout / Canceled</span>
@@ -566,11 +646,6 @@ function renderOverview() {
         <div class="stats-leader-list">${topWinnerRows}</div>
         <p>First-place finishes collected so far.</p>
       </article>
-      <article class="spotlight-card earner stats-feature-card">
-        <span class="spotlight-label">Top Earner</span>
-        <div class="stats-leader-list">${topEarnerRowsCompact}</div>
-        <p>Total amount won across all recorded results.</p>
-      </article>
     </div>
     <article id="top-earners-card" class="stats-page spotlight-card leaders stats-right-card" style="cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;">
       <span class="spotlight-label">Top 3 Earners</span>
@@ -580,30 +655,24 @@ function renderOverview() {
         <button id="open-earners-modal" type="button" class="ghost stats-action-button">Click For Deep Dive</button>
       </div>
     </article>
-    <article class="spotlight-card stats-current-user-card">
-      <span class="spotlight-label">Your League Snapshot</span>
-      ${currentPlayer ? `
-        <div class="stats-current-user-head">
-          <div class="chart-player-avatar">${escapeHtml(getInitials(currentPlayer.name))}</div>
-          <div>
-            <strong>${escapeHtml(currentPlayer.name)}</strong>
-            <p class="muted small">Your current league snapshot</p>
-          </div>
-        </div>
-        <div class="stats-current-user-grid">
-          <div class="stats-current-user-metric"><span>Played</span><strong>${Number(currentPlayer.matches_played || 0)}</strong></div>
-          <div class="stats-current-user-metric"><span>Wins</span><strong>${Number(currentPlayer.wins_total || 0)}</strong></div>
-          <div class="stats-current-user-metric"><span>Best Finish</span><strong>${escapeHtml(getBestFinish(currentPlayer))}</strong></div>
-          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
-          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
-        </div>
-        <div class="player-tag-row stats-current-user-tags">
-          <span class="player-tag">Winning matches: ${Number(currentPlayer.matches_won || 0)}</span>
-          <span class="player-tag">Washouts: ${Number(currentPlayer.washout_matches || 0)}</span>
-          <span class="player-tag">Entry fee: ${formatCurrency(entry_fee)}</span>
-        </div>
-      ` : `
-        <div class="stats-current-user-empty">
+	    <article class="spotlight-card stats-current-user-card">
+	      <span class="spotlight-label">Your League Snapshot</span>
+	      ${currentPlayer ? `
+	        <div class="stats-current-user-head">
+	          <div class="chart-player-avatar">${escapeHtml(getInitials(currentPlayer.name))}</div>
+	          <div>
+	            <strong>${escapeHtml(currentPlayer.name)}</strong>
+	          </div>
+	        </div>
+	        <div class="stats-current-user-grid">
+	          <div class="stats-current-user-metric"><span>Played</span><strong>${Number(currentPlayer.matches_played || 0)}</strong></div>
+	          <div class="stats-current-user-metric"><span>Winning Matches</span><strong>${Number(currentPlayer.matches_won || 0)}</strong></div>
+	          <div class="stats-current-user-metric"><span>Best</span><strong>${escapeHtml(getBestFinish(currentPlayer))}</strong></div>
+	          <div class="stats-current-user-metric"><span>Total Won</span><strong>${formatCurrency(currentPlayer.total_amount)}</strong></div>
+	          <div class="stats-current-user-metric stats-current-user-metric-wide"><span>Eligible Payout</span><strong>${formatCurrency(eligiblePayoutAmount)}</strong></div>
+	        </div>
+	      ` : `
+	        <div class="stats-current-user-empty">
           <strong>Your League Snapshot</strong>
           <p class="muted">We will show your compact player overview here once your stats are available in the league table.</p>
         </div>
@@ -756,26 +825,17 @@ function renderSelectedPlayer() {
 
   const rankCounts = Object.values(player.rank_counts || {}).map((value) => Number(value));
   const maxCount = Math.max(...rankCounts, 1);
-  const rankLines = Object.keys(player.rank_counts || {})
-    .sort((a, b) => Number(a) - Number(b))
-    .map((rank) => {
-      const rankNumber = Number(rank);
-      const visual = getRankVisual(rankNumber);
-      const count = Number(player.rank_counts[rank]);
-      return `
-        <div class="rank-distribution-row">
-          <span class="rank-distribution-label">${visual.icon} ${escapeHtml(visual.label)}</span>
-          <div class="rank-distribution-bar">
-            <span class="rank-distribution-fill" style="width: ${barWidth(count, maxCount)};"></span>
-          </div>
-          <strong>${count}</strong>
-        </div>
-      `;
-    }).join('') || '<p class="muted">No rank placements yet.</p>';
+  const rankRows = buildRankDistributionRows(player.rank_counts || {}, maxCount);
+  const useRankColumns = rankRows.length > 6;
+  const visibleRankRows = useRankColumns ? rankRows.slice(0, 6) : rankRows;
+  const rankLines = visibleRankRows.length
+    ? renderRankDistributionColumns(visibleRankRows, useRankColumns ? 2 : 1)
+    : '<p class="muted">No rank placements yet.</p>';
 
-  const history = player.match_history || [];
-  const recentHistory = history.slice(0, 3);
-  const hasMoreHistory = history.length > 3;
+  const history = [...(player.match_history || [])]
+    .sort((a, b) => String(b.match_date || '').localeCompare(String(a.match_date || '')));
+  const recentHistory = history.slice(0, 2);
+  const hasMoreHistory = history.length > 2;
   const historyRows = recentHistory.map((entry) => `
     <article class="history-row">
       <div>
@@ -792,28 +852,31 @@ function renderSelectedPlayer() {
   const matchesPlayed = Number(player.matches_played || 0);
   const matchesWon = Number(player.matches_won || 0);
   const winRate = matchesPlayed ? Math.round((matchesWon / matchesPlayed) * 100) : 0;
+  const entryFee = Number(stats.summary?.entry_fee || 0);
+  const eligiblePayout = Number(player.total_amount || 0) - (matchesPlayed * entryFee);
   const metricStack = renderMetricStack([
-    { label: 'Matches Played', value: String(matchesPlayed), helper: 'Recorded participant history', accent: 'accent-cyan' },
-    { label: 'Matches Won', value: String(matchesWon), helper: 'Finished inside payouts', accent: 'accent-gold' },
-    { label: 'Total Wins', value: String(player.wins_total), helper: 'First-place finishes', accent: 'accent-pink' },
+    { label: 'Played', value: String(matchesPlayed), helper: 'League matches joined', accent: 'accent-cyan' },
+    { label: 'Wins', value: String(player.wins_total), helper: 'First-place finishes', accent: 'accent-pink' },
+    { label: 'Winning Matches', value: String(matchesWon), helper: 'Paid finishes', accent: 'accent-gold' },
     { label: 'Total Won', value: formatCurrency(player.total_amount), helper: 'Amount collected', accent: 'accent-green' },
-    { label: 'Washout / Canceled', value: String(Number(player.washout_matches || 0)), helper: 'Refund-style results', accent: 'accent-slate' },
+    { label: 'Eligible Payout', value: formatCurrency(eligiblePayout), helper: 'Won minus entry fees', accent: 'accent-amber', featured: true },
+    { label: 'Washouts', value: String(Number(player.washout_matches || 0)), helper: 'Refund-style results', accent: 'accent-slate' },
   ]);
 
   playerStatsCard.innerHTML = `
     <article class="player-spotlight">
-      <div class="player-compact-layout">
-        <div class="player-compact-main">
-          <div class="player-hero">
-            <div class="player-avatar">${escapeHtml(getInitials(player.name))}</div>
-            <div>
-              <h3>${escapeHtml(player.name)}</h3>
-              <p class="muted">Performance fingerprint based on who played, who placed, and where the money landed.</p>
-            </div>
-          </div>
-          <div class="player-metric-stack">${metricStack}</div>
-          <div class="player-breakdown-card player-breakdown-card-compact">
-            <h4>Quick Read</h4>
+	      <div class="player-compact-layout">
+	        <div class="player-compact-main">
+	          <div class="player-hero">
+	            <div class="player-avatar">${escapeHtml(getInitials(player.name))}</div>
+	            <div class="player-hero-copy">
+	              <h3>${escapeHtml(player.name)}</h3>
+	              <p class="muted">Compact read of results, winnings, and recent form.</p>
+	            </div>
+	          </div>
+	          <div class="player-metric-stack">${metricStack}</div>
+	          <div class="player-breakdown-card player-breakdown-card-compact">
+	            <h4>Quick Read</h4>
             <div class="player-tag-row">
               <span class="player-tag">Win rate: ${winRate}%</span>
               <span class="player-tag">Best finish: ${escapeHtml(getBestFinish(player))}</span>
@@ -825,17 +888,20 @@ function renderSelectedPlayer() {
         </div>
         <div class="player-compact-side">
           <div class="player-breakdown-card player-breakdown-card-compact">
-            <h4>Rank Distribution</h4>
-            <div class="rank-distribution-list">${rankLines}</div>
+            <div class="player-history-head">
+              <h4>Rank Distribution</h4>
+              ${rankRows.length > 6 ? '<button id="open-rank-modal" type="button" class="ghost stats-action-button">View Full Distribution</button>' : ''}
+            </div>
+            <div class="rank-distribution-list ${useRankColumns ? 'rank-distribution-list-columns' : ''}">${rankLines}</div>
+          </div>
+          <div class="player-breakdown-card player-breakdown-card-compact">
+            <div class="player-history-head">
+              <h4>Latest 2 Matches</h4>
+              ${hasMoreHistory ? '<button id="open-history-modal" type="button" class="ghost stats-action-button">View All Matches</button>' : ''}
+            </div>
+            <div class="history-list">${historyRows}</div>
           </div>
         </div>
-      </div>
-      <div class="player-breakdown-card player-breakdown-card-compact">
-        <div class="player-history-head">
-          <h4>Latest Matches</h4>
-          ${hasMoreHistory ? '<button id="open-history-modal" type="button" class="ghost stats-action-button">See Full History</button>' : ''}
-        </div>
-        <div class="history-list">${historyRows}</div>
       </div>
     </article>
   `;
@@ -843,6 +909,11 @@ function renderSelectedPlayer() {
   if (hasMoreHistory) {
     renderHistoryModal(player);
     document.getElementById('open-history-modal')?.addEventListener('click', openHistoryModal);
+  }
+
+  if (rankRows.length > 6) {
+    renderRankModal(player, rankRows);
+    document.getElementById('open-rank-modal')?.addEventListener('click', openRankModal);
   }
 }
 
@@ -862,6 +933,7 @@ function setupModal() {
   closeEarnersModalBtn?.addEventListener('click', closeEarnersModal);
   closeLadderModalBtn?.addEventListener('click', closeLadderModal);
   closeHistoryModalBtn?.addEventListener('click', closeHistoryModal);
+  closeRankModalBtn?.addEventListener('click', closeRankModal);
 
   earnersModal?.querySelectorAll('[data-close-earners]').forEach((node) => {
     node.addEventListener('click', closeEarnersModal);
@@ -872,9 +944,16 @@ function setupModal() {
   historyModal?.querySelectorAll('[data-close-history]').forEach((node) => {
     node.addEventListener('click', closeHistoryModal);
   });
+  rankModal?.querySelectorAll('[data-close-rank]').forEach((node) => {
+    node.addEventListener('click', closeRankModal);
+  });
 
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
+    if (rankModal && !rankModal.classList.contains('hidden')) {
+      closeRankModal();
+      return;
+    }
     if (historyModal && !historyModal.classList.contains('hidden')) {
       closeHistoryModal();
       return;
