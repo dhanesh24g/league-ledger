@@ -41,19 +41,23 @@
 
   <header class="app-header">
     <div class="header-content">
-      <div class="brand">
+      <div id="page-brand" class="brand">
         <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
         <div class="brand-text">
           <span class="brand-name">Dhanesh Labs</span>
           <span class="app-name">Matches</span>
         </div>
       </div>
-      <div class="header-actions">
+
+      <div class="header-center">
         <select id="top-nav" aria-label="Quick navigation">
           <option value="/matches">League Workflow</option>
           <option value="/stats">Stats Dashboard</option>
           <option value="/league-settings">League Settings</option>
         </select>
+      </div>
+
+      <div class="header-actions">
         <div class="notification-wrapper">
           <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
             <span class="notification-icon">🔔</span>
@@ -157,8 +161,8 @@
       <div id="match-feed" class="feed"></div>
 
       <div class="flow-controls">
-        <a class="button-link ghost" data-workflow-link href="/players">Back to Players</a>
-        <a class="button-link primary" data-workflow-link href="/winners">Continue to Winners</a>
+        <a id="matches-back-link" class="button-link ghost" data-workflow-link href="/players">Back to Players</a>
+        <a id="matches-next-link" class="button-link primary" data-workflow-link href="/winners">Continue to Winners</a>
       </div>
     </section>
   </main>

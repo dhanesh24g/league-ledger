@@ -2374,40 +2374,59 @@ button {
   color: var(--muted);
 }
 
+.setup-page .shell-header,
+.players-page .shell-header,
 .matches-page .shell-header,
-.winners-page .shell-header {
+.winners-page .shell-header,
+.ledger-page .shell-header {
   padding: 14px 24px 8px;
 }
 
+.setup-page .shell-header p,
+.players-page .shell-header p,
 .matches-page .shell-header p,
-.winners-page .shell-header p {
+.winners-page .shell-header p,
+.ledger-page .shell-header p {
   font-size: 13px;
 }
 
+.setup-page .shell-main,
+.players-page .shell-main,
 .matches-page .shell-main,
-.winners-page .shell-main {
+.winners-page .shell-main,
+.ledger-page .shell-main {
   padding-top: 10px;
 }
 
+.setup-page .step-nav,
+.players-page .step-nav,
 .matches-page .step-nav,
-.winners-page .step-nav {
+.winners-page .step-nav,
+.ledger-page .step-nav {
   margin-bottom: 14px;
 }
 
+.setup-page .step-pill,
+.players-page .step-pill,
 .matches-page .step-pill,
-.winners-page .step-pill {
+.winners-page .step-pill,
+.ledger-page .step-pill {
   min-width: 168px;
   padding: 10px 16px 10px 14px;
   font-size: 13px;
 }
 
+.players-page .panel,
 .matches-page .panel,
-.winners-page .panel {
+.winners-page .panel,
+.ledger-page .panel {
   padding: 18px;
 }
 
+.players-page .panel > .muted,
 .matches-page .panel > .muted,
-.winners-page .panel > .muted {
+.winners-page .panel > .muted,
+.ledger-page .panel > .muted {
   margin-bottom: 10px;
 }
 
@@ -5053,6 +5072,7 @@ th {
   align-items: center;
   text-decoration: none;
   border-radius: 8px;
+  cursor: pointer;
   transition: all 0.2s ease;
   padding: 4px;
 }

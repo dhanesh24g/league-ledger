@@ -41,19 +41,23 @@
 
   <header class="app-header">
     <div class="header-content">
-      <div class="brand">
+      <div id="page-brand" class="brand">
         <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
         <div class="brand-text">
           <span class="brand-name">Dhanesh Labs</span>
           <span class="app-name">Winners</span>
         </div>
       </div>
-      <div class="header-actions">
+
+      <div class="header-center">
         <select id="top-nav" aria-label="Quick navigation">
           <option value="/winners">League Workflow</option>
           <option value="/stats">Stats Dashboard</option>
           <option value="/league-settings">League Settings</option>
         </select>
+      </div>
+
+      <div class="header-actions">
         <div class="notification-wrapper">
           <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
             <span class="notification-icon">🔔</span>
@@ -102,7 +106,7 @@
       <form id="winners-form" class="stack"></form>
 
       <div class="flow-controls">
-        <a class="button-link ghost" data-workflow-link href="/matches">Back to Matches</a>
+        <a id="winners-back-link" class="button-link ghost" data-workflow-link href="/matches">Back to Matches</a>
         <button id="continue-ledger" type="button" class="primary">Continue to Ledger</button>
       </div>
     </section>

@@ -1,9 +1,11 @@
 import {
+  buildWorkflowRoute,
   callApi,
   clearWinnerDraft,
   getSelectedMatchId,
   getWinnerDraft,
   initWorkflowShell,
+  isDirectAdminFlow,
   navigateTo,
   queueToast,
   setButtonLoading,
@@ -23,6 +25,8 @@ const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
 const winnersForm = document.getElementById('winners-form');
 const winnerMatchSummary = document.getElementById('winner-match-summary');
+const winnersBackLink = document.getElementById('winners-back-link');
+const pageBrand = document.getElementById('page-brand');
 
 let authUser = { username: '', role: 'read' };
 let appState = { league: null, players: [], matches: [] };
@@ -53,6 +57,39 @@ function applyRoleBasedUI() {
   if (!isAdmin) {
     winnersForm.innerHTML = '<p class="muted">Viewer mode: winners can only be updated by admin.</p>';
   }
+}
+
+function applyEntryModeUI() {
+  const directFlow = isDirectAdminFlow('/winners');
+  document.body.classList.toggle('direct-admin-flow', directFlow);
+  if (pageBrand) {
+    pageBrand.classList.toggle('brand-home-link', directFlow);
+    pageBrand.tabIndex = directFlow ? 0 : -1;
+    pageBrand.setAttribute('role', directFlow ? 'link' : 'presentation');
+    pageBrand.setAttribute('aria-label', directFlow ? 'Back to welcome page' : 'Page brand');
+    pageBrand.onclick = directFlow ? () => window.location.assign('/welcome') : null;
+    pageBrand.onkeydown = directFlow
+      ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          window.location.assign('/welcome');
+        }
+      }
+      : null;
+  }
+
+  if (!winnersBackLink) return;
+
+  if (directFlow) {
+    winnersBackLink.textContent = 'Back to Match Entry';
+    winnersBackLink.removeAttribute('data-workflow-link');
+    winnersBackLink.href = buildWorkflowRoute('/matches', { preserveDirectAdminFlow: true });
+    return;
+  }
+
+  winnersBackLink.textContent = 'Back to Matches';
+  winnersBackLink.setAttribute('data-workflow-link', '');
+  winnersBackLink.href = '/matches';
 }
 
 function ensureWinnerFeedback() {
@@ -661,6 +698,7 @@ async function init() {
   winnersForm.innerHTML = '<div class="feed-item">Loading winner assignment...</div>';
   authUser = await initWorkflowShell('/winners');
   if (!authUser) return;
+  applyEntryModeUI();
   applyRoleBasedUI();
   appState = await callApi('/api/state');
   renderMatchSelect();
