@@ -33,7 +33,7 @@
   </script>
 </head>
 
-<body>
+<body class="league-details-page">
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
     <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
     <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
@@ -80,24 +80,47 @@
   </header>
 
   <main class="shell-main">
-    <section class="panel active league-details-hero">
+    <section class="panel active league-details-hero league-details-panel">
       <div id="league-hero" class="league-hero-content"></div>
     </section>
 
-    <section class="panel active league-details-section">
-      <h2>League Rules</h2>
-      <div id="league-overview" class="settings-grid"></div>
-      <div id="league-payouts" class="league-payout-grid"></div>
+    <section class="panel active league-details-section league-details-panel">
+      <div class="league-details-section-head">
+        <div>
+          <h2>League Rules</h2>
+          <p class="muted small">Compact configuration summary with the payout ladder alongside it.</p>
+        </div>
+      </div>
+      <div class="league-rules-layout">
+        <div id="league-overview" class="settings-grid league-details-overview-grid"></div>
+        <div class="league-details-payout-panel">
+          <div class="line-head">
+            <h3>Default Payouts</h3>
+            <span class="muted small">Winner split</span>
+          </div>
+          <div id="league-payouts" class="league-payout-grid league-details-payout-grid"></div>
+        </div>
+      </div>
     </section>
 
-    <section class="panel active league-details-section">
-      <h2>Players</h2>
-      <div id="players-list" class="feed"></div>
+    <section class="panel active league-details-section league-details-panel">
+      <div class="league-details-section-head">
+        <div>
+          <h2>Players</h2>
+          <p class="muted small">Roster cards kept compact so the whole league is easier to scan.</p>
+        </div>
+      </div>
+      <div id="players-list" class="feed league-details-players-grid"></div>
     </section>
 
-    <section class="panel active league-details-section">
-      <h2>Matches & Winners</h2>
-      <div id="matches-list" class="feed"></div>
+    <section class="panel active league-details-section league-details-panel">
+      <div class="league-details-section-head">
+        <div>
+          <h2>Matches & Winners</h2>
+          <p class="muted small">Recent outcomes, statuses, and payout summaries without the extra bulk.</p>
+        </div>
+      </div>
+      <div id="matches-list" class="feed league-match-feed"></div>
     </section>
   </main>
 

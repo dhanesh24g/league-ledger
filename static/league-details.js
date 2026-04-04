@@ -62,14 +62,33 @@ function renderHero(league, playerCount, matchCount) {
 
   const prizePool = Number(league.entry_fee || 0) * Number(league.active_player_count || 0);
   leagueHero.innerHTML = `
-    <div>
-      <span class="summary-chip-label">League Overview</span>
-      <h2>${escapeHtml(league.name)}</h2>
-      <p class="muted">${escapeHtml(league.sport || 'Cricket')} • ${escapeHtml(league.tournament || 'League')}</p>
-      <div class="league-hero-chips">
-        <span class="status-chip">Players: ${playerCount}</span>
-        <span class="status-chip">Matches: ${matchCount}</span>
-        <span class="status-chip">Prize Pool: ${prizePool.toFixed(2)}</span>
+    <div class="league-details-hero-shell">
+      <div class="league-details-hero-main">
+        <span class="summary-chip-label">League Overview</span>
+        <h2>${escapeHtml(league.name)}</h2>
+        <p class="muted">${escapeHtml(league.sport || 'Cricket')} • ${escapeHtml(league.tournament || 'League')}</p>
+        <div class="league-hero-chips">
+          <span class="status-chip">Players: ${playerCount}</span>
+          <span class="status-chip">Matches: ${matchCount}</span>
+          <span class="status-chip">Prize Pool: ${prizePool.toFixed(2)}</span>
+        </div>
+      </div>
+      <div class="league-details-hero-stats">
+        <article class="league-details-stat-card">
+          <span class="summary-chip-label">Entry Fee</span>
+          <strong>${Number(league.entry_fee || 0).toFixed(2)}</strong>
+          <small class="muted">Per player, per match</small>
+        </article>
+        <article class="league-details-stat-card">
+          <span class="summary-chip-label">Configured Players</span>
+          <strong>${Number(league.active_player_count || 0)}</strong>
+          <small class="muted">Target roster size</small>
+        </article>
+        <article class="league-details-stat-card">
+          <span class="summary-chip-label">Winner Slots</span>
+          <strong>${Number(league.default_winner_count || 0)}</strong>
+          <small class="muted">Default payout places</small>
+        </article>
       </div>
     </div>
   `;
@@ -141,11 +160,14 @@ function renderPlayers(members) {
       const displayName = fullName || String(member.user_id_label || '').trim();
       const roleLabel = String(member.role || '').toLowerCase() === 'admin' ? 'Admin' : 'Read';
       return `
-      <article class="feed-item settings-member-item">
+      <article class="feed-item settings-member-item league-player-card compact-member-card">
         <span class="player-avatar">${escapeHtml(String(displayName || '').trim().charAt(0).toUpperCase() || 'P')}</span>
-        <div>
+        <div class="compact-member-meta">
           <strong>${escapeHtml(displayName)}</strong>
           <p class="muted">@${escapeHtml(String(member.user_id_label || ''))} · ${escapeHtml(roleLabel)}</p>
+        </div>
+        <div class="settings-member-meta compact-member-role-actions">
+          <span class="status-chip">${escapeHtml(roleLabel)}</span>
         </div>
       </article>
     `;
@@ -187,13 +209,16 @@ function renderMatches(matches, statsMatches) {
         : 'Default league payouts';
 
       return `
-        <article class="feed-item match-card">
+        <article class="feed-item match-card league-match-card">
           <div class="match-head">
             <strong>#${escapeHtml(matchId)} • ${escapeHtml(match.title)}</strong>
             <span class="status-chip ${statusClass(match.status)}">${escapeHtml(String(match.status || 'pending').toUpperCase())}</span>
           </div>
-          <p class="muted">Date: ${escapeHtml(match.match_date)}</p>
-          <p class="muted">Winner Slots: ${Number(match.winner_count || 0) || 'Default'} • Payouts: ${escapeHtml(overrides)}</p>
+          <div class="league-match-meta">
+            <span class="muted small">Date: ${escapeHtml(match.match_date)}</span>
+            <span class="muted small">Winner Slots: ${Number(match.winner_count || 0) || 'Default'}</span>
+          </div>
+          <p class="muted league-match-payouts">Payouts: ${escapeHtml(overrides)}</p>
           <ul class="muted small match-winner-list">${winnerSummary}</ul>
         </article>
       `;

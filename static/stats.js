@@ -168,31 +168,54 @@ function renderEarnersModal() {
 function renderOverview() {
   const { total_matches, played_matches, canceled_matches } = stats.summary || {};
 
-  statsSummaryStrip.innerHTML = `
-    <div class="summary-chip">
-      <span class="summary-chip-label">Total Matches</span>
-      <strong>${Number(total_matches || 0)}</strong>
-    </div>
-    <div class="summary-chip">
-      <span class="summary-chip-label">Matches Played</span>
-      <strong>${Number(played_matches || 0)}</strong>
-    </div>
-    <div class="summary-chip">
-      <span class="summary-chip-label">Washout / Canceled</span>
-      <strong>${Number(canceled_matches || 0)}</strong>
-    </div>
-  `;
-
   if (!stats.players.length) {
+    statsSummaryStrip.innerHTML = `
+      <div class="summary-chip stats-kpi-card">
+        <span class="summary-chip-label">Total Matches</span>
+        <strong>${Number(total_matches || 0)}</strong>
+      </div>
+      <div class="summary-chip stats-kpi-card">
+        <span class="summary-chip-label">Matches Played</span>
+        <strong>${Number(played_matches || 0)}</strong>
+      </div>
+      <div class="summary-chip stats-kpi-card">
+        <span class="summary-chip-label">Washout / Canceled</span>
+        <strong>${Number(canceled_matches || 0)}</strong>
+      </div>
+    `;
     statsOverview.innerHTML = '<div class="feed-item">No stats yet. Add results to light this dashboard up.</div>';
     return;
   }
 
-  const topWinner = [...stats.players].sort((a, b) => (b.wins_total - a.wins_total) || a.name.localeCompare(b.name))[0];
-  const topEarner = [...stats.players].sort((a, b) => (b.total_amount - a.total_amount) || a.name.localeCompare(b.name))[0];
+  const topWinsValue = Math.max(...stats.players.map((player) => Number(player.wins_total || 0)), 0);
+  const topWinnerNames = [...stats.players]
+    .filter((player) => Number(player.wins_total || 0) === topWinsValue)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const topEarnerValue = Math.max(...stats.players.map((player) => Number(player.total_amount || 0)), 0);
+  const topEarnerNames = [...stats.players]
+    .filter((player) => Number(player.total_amount || 0) === topEarnerValue)
+    .sort((a, b) => a.name.localeCompare(b.name));
   const topEarners = [...stats.players]
     .sort((a, b) => (b.total_amount - a.total_amount) || a.name.localeCompare(b.name))
     .slice(0, 3);
+
+  const topWinnerRows = topWinnerNames
+    .map((player) => `
+      <div class="stats-leader-row">
+        <strong>${escapeHtml(player.name)}</strong>
+        <span>${Number(player.wins_total || 0)}</span>
+      </div>
+    `)
+    .join('');
+
+  const topEarnerRowsCompact = topEarnerNames
+    .map((player) => `
+      <div class="stats-leader-row">
+        <strong>${escapeHtml(player.name)}</strong>
+        <span>${formatCurrency(player.total_amount)}</span>
+      </div>
+    `)
+    .join('');
 
   const topEarnerRows = topEarners
     .map((player, index) => `
@@ -204,20 +227,35 @@ function renderOverview() {
     `)
     .join('');
 
+  statsSummaryStrip.innerHTML = `
+    <div class="summary-chip stats-kpi-card">
+      <span class="summary-chip-label">Total Matches</span>
+      <strong>${Number(total_matches || 0)}</strong>
+    </div>
+    <div class="summary-chip stats-kpi-card">
+      <span class="summary-chip-label">Matches Played</span>
+      <strong>${Number(played_matches || 0)}</strong>
+    </div>
+    <div class="summary-chip stats-kpi-card">
+      <span class="summary-chip-label">Washout / Canceled</span>
+      <strong>${Number(canceled_matches || 0)}</strong>
+    </div>
+  `;
+
   statsOverview.innerHTML = `
-    <article class="spotlight-card winner">
-      <span class="spotlight-label">Most Wins</span>
-      <strong>${escapeHtml(topWinner.name)}</strong>
-      <span class="spotlight-metric">${topWinner.wins_total}</span>
-      <p>First-place finishes collected so far.</p>
-    </article>
-    <article class="spotlight-card earner">
-      <span class="spotlight-label">Top Earner</span>
-      <strong>${escapeHtml(topEarner.name)}</strong>
-      <span class="spotlight-metric">${formatCurrency(topEarner.total_amount)}</span>
-      <p>Total amount won across all recorded results.</p>
-    </article>
-    <article id="top-earners-card" class="spotlight-card leaders">
+    <div class="stats-overview-column stats-overview-column-middle">
+      <article class="spotlight-card winner stats-feature-card">
+        <span class="spotlight-label">Most Wins</span>
+        <div class="stats-leader-list">${topWinnerRows}</div>
+        <p>First-place finishes collected so far.</p>
+      </article>
+      <article class="spotlight-card earner stats-feature-card">
+        <span class="spotlight-label">Top Earner</span>
+        <div class="stats-leader-list">${topEarnerRowsCompact}</div>
+        <p>Total amount won across all recorded results.</p>
+      </article>
+    </div>
+    <article id="top-earners-card" class="spotlight-card leaders stats-right-card">
       <span class="spotlight-label">Top 3 Earners</span>
       <div class="top-earner-list">${topEarnerRows}</div>
       <div class="spotlight-card-actions">

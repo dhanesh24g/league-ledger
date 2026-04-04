@@ -33,7 +33,7 @@
   </script>
 </head>
 
-<body>
+<body class="stats-page">
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
     <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
     <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
@@ -80,14 +80,14 @@
   </header>
 
   <main class="shell-main">
-    <section class="panel active">
+    <section class="panel active stats-panel stats-panel-overview">
       <h2>League Pulse</h2>
       <p class="muted">A quick read on the current leaders, money table, and how the season is unfolding.</p>
       <div id="stats-summary-strip" class="stats-summary-strip"></div>
       <div id="stats-overview" class="stats-overview"></div>
     </section>
 
-    <section class="panel active">
+    <section class="panel active stats-panel">
       <h2>Match Winners</h2>
       <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
       <div class="inline-form">
@@ -96,13 +96,13 @@
       <div id="match-winners-card" class="feed"></div>
     </section>
 
-    <section class="panel active" style="margin-top: 16px;">
+    <section class="panel active stats-panel stats-panel-spaced">
       <h2>League Ladder</h2>
       <p class="muted">Compare the entire table side by side across wins and winnings.</p>
       <div id="leaderboard-chart" class="leaderboard-chart"></div>
     </section>
 
-    <section class="panel active" style="margin-top: 16px;">
+    <section class="panel active stats-panel stats-panel-spaced">
       <h2>Player Performance</h2>
       <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
       <div class="inline-form">
