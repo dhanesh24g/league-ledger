@@ -143,10 +143,19 @@ function findCurrentPlayer() {
 }
 
 function createSliceColor(index, total) {
-  const hue = Math.round((360 / Math.max(total, 1)) * index + 205) % 360;
-  const saturation = 74 - ((index % 3) * 6);
-  const lightness = 60 - ((index % 2) * 5);
-  return `hsl(${hue} ${saturation}% ${lightness}%)`;
+  // Enterprise-grade color palette - professional, accessible, harmonious
+  const colors = [
+    { h: 210, s: 85, l: 55 }, // Professional Blue
+    { h: 160, s: 75, l: 45 }, // Emerald Green  
+    { h: 280, s: 70, l: 60 }, // Soft Purple
+    { h: 35, s: 90, l: 55 },  // Amber/Gold
+    { h: 190, s: 80, l: 50 }, // Cyan/Teal
+    { h: 340, s: 75, l: 55 }, // Rose/Coral
+    { h: 45, s: 85, l: 50 },  // Orange
+    { h: 260, s: 65, l: 55 }, // Indigo
+  ];
+  const color = colors[index % colors.length];
+  return `hsl(${color.h} ${color.s}% ${color.l}%)`;
 }
 
 function buildPayoutShares(players) {
@@ -323,30 +332,75 @@ function renderEarnersModal() {
     return;
   }
 
+  const { entry_fee } = stats.summary || {};
+  const entryFee = Number(entry_fee || 0);
+
   const topEarners = [...stats.players]
     .sort((a, b) => (b.total_amount - a.total_amount) || (b.wins_total - a.wins_total) || a.name.localeCompare(b.name));
-  const maxAmount = Math.max(...topEarners.map((player) => Number(player.total_amount || 0)), 0);
 
   earnersModalBody.innerHTML = `
-    <div class="zoom-board">
-      ${topEarners.map((player, index) => `
-        <article class="zoom-board-row">
-          <div class="zoom-board-head">
-            <span class="zoom-board-rank">${TROPHIES[index] || `#${index + 1}`}</span>
-            <div class="chart-player-avatar">${escapeHtml(getInitials(player.name))}</div>
-            <div>
-              <strong>${escapeHtml(player.name)}</strong>
-              <p class="muted">${player.matches_played} played • ${player.matches_won} winning matches • ${player.wins_total} titles</p>
+    <div class="earners-compact-list">
+      ${(() => {
+      const rows = [];
+      for (let i = 0; i < topEarners.length; i += 2) {
+        const player1 = topEarners[i];
+        const player2 = topEarners[i + 1];
+        const idx1 = i;
+        const idx2 = i + 1;
+
+        const amountWon1 = Number(player1.total_amount || 0);
+        const eligiblePayout1 = amountWon1 - (Number(player1.matches_played || 0) * entryFee);
+
+        let player2Html = '';
+        if (player2) {
+          const amountWon2 = Number(player2.total_amount || 0);
+          const eligiblePayout2 = amountWon2 - (Number(player2.matches_played || 0) * entryFee);
+          player2Html = `
+              <div class="earner-compact-cell">
+                <span class="earner-rank">${TROPHIES[idx2] || `#${idx2 + 1}`}</span>
+                <div class="earner-info">
+                  <span class="earner-name">${escapeHtml(player2.name)}</span>
+                  <span class="earner-meta">${player2.matches_played} played · ${player2.wins_total} titles</span>
+                </div>
+                <div class="earner-amounts">
+                  <div class="earner-amount-item">
+                    <span class="earner-amount-label">Amount Won</span>
+                    <span class="earner-amount-won">${formatCurrency(amountWon2)}</span>
+                  </div>
+                  <div class="earner-amount-item earner-payout-highlight">
+                    <span class="earner-amount-label">Eligible Payout</span>
+                    <span class="earner-payout">${formatCurrency(eligiblePayout2)}</span>
+                  </div>
+                </div>
+              </div>
+            `;
+        }
+
+        rows.push(`
+            <div class="earner-compact-row earner-compact-row-pair">
+              <div class="earner-compact-cell">
+                <span class="earner-rank">${TROPHIES[idx1] || `#${idx1 + 1}`}</span>
+                <div class="earner-info">
+                  <span class="earner-name">${escapeHtml(player1.name)}</span>
+                  <span class="earner-meta">${player1.matches_played} played · ${player1.wins_total} titles</span>
+                </div>
+                <div class="earner-amounts">
+                  <div class="earner-amount-item">
+                    <span class="earner-amount-label">Amount Won</span>
+                    <span class="earner-amount-won">${formatCurrency(amountWon1)}</span>
+                  </div>
+                  <div class="earner-amount-item earner-payout-highlight">
+                    <span class="earner-amount-label">Eligible Payout</span>
+                    <span class="earner-payout">${formatCurrency(eligiblePayout1)}</span>
+                  </div>
+                </div>
+              </div>
+              ${player2Html}
             </div>
-          </div>
-          <div class="zoom-board-lane">
-            <div class="chart-bar-track">
-              <span class="chart-bar-fill amount" style="width: ${barWidth(player.total_amount, maxAmount)};"></span>
-            </div>
-            <strong>${formatCurrency(player.total_amount)}</strong>
-          </div>
-        </article>
-      `).join('')}
+          `);
+      }
+      return rows.join('');
+    })()}
     </div>
   `;
 }
@@ -518,7 +572,7 @@ function renderOverview() {
         <p>Total amount won across all recorded results.</p>
       </article>
     </div>
-    <article id="top-earners-card" class="spotlight-card leaders stats-right-card">
+    <article id="top-earners-card" class="stats-page spotlight-card leaders stats-right-card" style="cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease;">
       <span class="spotlight-label">Top 3 Earners</span>
       <div class="top-earner-list">${topEarnerRows}</div>
       <div class="spotlight-card-actions">
@@ -557,7 +611,11 @@ function renderOverview() {
     </article>
   `;
 
-  document.getElementById('open-earners-modal')?.addEventListener('click', openEarnersModal);
+  document.getElementById('open-earners-modal')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    openEarnersModal();
+  });
+  document.getElementById('top-earners-card')?.addEventListener('click', openEarnersModal);
 }
 
 function renderLeaderboardChart() {
@@ -569,16 +627,11 @@ function renderLeaderboardChart() {
   const { shares, totalAmount } = buildPayoutShares(stats.players);
 
   leaderboardChart.innerHTML = `
-    <button id="open-ladder-modal" type="button" class="pie-chart-button pie-chart-button-block" aria-label="Open league ladder deep dive">
+    <button id="open-ladder-modal" type="button" class="pie-chart-button pie-chart-button-block ladder-chart-trigger" aria-label="Open league ladder deep dive">
       <div class="pie-chart-shell pie-chart-shell-plain">
-        ${renderPieChart(shares, { size: 360, radius: 136, innerRadius: 76, label: 'Paid Out', totalAmount })}
+        ${renderPieChart(shares, { size: 420, radius: 160, innerRadius: 88, label: 'Paid Out', totalAmount })}
       </div>
     </button>
-    <div class="chart-legend chart-legend-centered">
-      <span class="status-chip">Total ${formatCurrency(totalAmount)}</span>
-      <span class="status-chip">${shares.length} earners</span>
-      <span class="status-chip">Hover on desktop · tap to deep dive</span>
-    </div>
   `;
 
   renderLadderModal();
@@ -678,18 +731,14 @@ function renderSelectedMatch() {
             <div class="match-spotlight-meta">
               <span class="status-chip">${escapeHtml(match.status)}</span>
               <span class="status-chip">${escapeHtml(match.match_date)}</span>
+              <span class="status-chip">${match.participant_count || 0} players</span>
               <span class="status-chip">Settled ${formatCurrency(totalDistributed)}</span>
             </div>
           </div>
-          <div class="match-callout-card">
-            <span class="summary-chip-label">Champion line</span>
-            <div class="winner-pill-row">${championPills}</div>
-            <p class="muted">${champions.length > 1 ? 'Shared first-place finish for this match.' : 'Top finishers for this match.'}</p>
-          </div>
           <div class="match-summary-strip">
-            <div class="match-summary-card"><span class="summary-chip-label">Champion Slots</span><strong>${champions.length || 0}</strong></div>
-            <div class="match-summary-card"><span class="summary-chip-label">Winning Entries</span><strong>${winningEntries}</strong></div>
-            <div class="match-summary-card"><span class="summary-chip-label">Washout / Refunds</span><strong>${washoutEntries}</strong></div>
+            <div class="match-summary-card"><span>Champion Slots</span><strong>${champions.length || 0}</strong></div>
+            <div class="match-summary-card"><span>Winning Entries</span><strong>${winningEntries}</strong></div>
+            <div class="match-summary-card"><span>Refund / Washout</span><strong>${washoutEntries}</strong></div>
           </div>
         </div>
         <div class="winner-rank-grid winner-rank-grid-compact">${winnerRows}</div>
