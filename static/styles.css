@@ -3262,6 +3262,7 @@ th {
 
 .auth-split-form {
   width: min(430px, 100%);
+  gap: 18px;
 }
 
 .auth-split-inline-links {
@@ -3298,7 +3299,7 @@ th {
 }
 
 .login-read-mode .auth-split-form input {
-  font-size: clamp(18px, 2.3vw, 20px);
+  font-size: 16px;
   padding: 12px 15px;
 }
 
@@ -3341,7 +3342,7 @@ th {
   }
 
   .login-read-mode .auth-split-form input {
-    font-size: clamp(17px, 4vw, 19px);
+    font-size: 16px;
   }
 
   .login-read-mode .auth-primary-button,
@@ -4845,7 +4846,7 @@ th {
 .setup-page .payout-amount {
   min-width: 0;
   width: 100%;
-  text-align: right;
+  text-align: left;
 }
 
 .setup-page .payout-row .remove {
