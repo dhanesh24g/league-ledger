@@ -53,12 +53,18 @@ async function callApi(url, options = {}) {
 const form = document.getElementById('forgot-password-form');
 const result = document.getElementById('forgot-password-result');
 const linkBox = document.getElementById('forgot-password-link');
+const submitButton = form?.querySelector('button[type="submit"]');
 
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
   result.textContent = '';
   linkBox.classList.add('hidden');
   linkBox.innerHTML = '';
+  const originalLabel = submitButton?.textContent || 'Send Reset Link';
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = 'Sending...';
+  }
 
   try {
     const formData = new FormData(form);
@@ -73,16 +79,23 @@ form?.addEventListener('submit', async (event) => {
     result.textContent = response.message || 'If the account exists, reset instructions have been generated.';
 
     if (response.reset_link) {
-      const absoluteLink = `${window.location.origin}${response.reset_link}`;
+      const absoluteLink = /^https?:\/\//i.test(response.reset_link)
+        ? response.reset_link
+        : `${window.location.origin}${response.reset_link}`;
       linkBox.classList.remove('hidden');
       linkBox.innerHTML = `
         <strong>Reset Link (Development)</strong>
         <code>${absoluteLink}</code>
-        <a class="auth-inline-link" href="${response.reset_link}">Open reset page</a>
+        <a class="auth-inline-link" href="${absoluteLink}">Open reset page</a>
       `;
     }
   } catch (error) {
     result.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalLabel;
+    }
   }
 });
 
