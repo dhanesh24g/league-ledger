@@ -24,16 +24,26 @@ const loadWinnerBtn = document.getElementById('load-winner-form');
 const reopenMatchBtn = document.getElementById('reopen-match');
 const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
+const sendTelegramUpdateBtn = document.getElementById('send-telegram-update');
 const winnersForm = document.getElementById('winners-form');
 const winnerMatchSummary = document.getElementById('winner-match-summary');
 const winnersBackLink = document.getElementById('winners-back-link');
 const pageBrand = document.getElementById('page-brand');
+const telegramModal = document.getElementById('telegram-modal');
+const telegramModalBody = document.getElementById('telegram-modal-body');
+const closeTelegramModalBtn = document.getElementById('close-telegram-modal');
 
 let authUser = { username: '', role: 'read' };
 let appState = { league: null, players: [], matches: [] };
 let winnerFeedbackEl = null;
 let saveWinnersBtn = null;
 let activeParticipantIds = [];
+let telegramState = {
+  status: null,
+  activeMatchId: null,
+  activeSessionId: null,
+  sessionPollTimer: null,
+};
 
 function setWinnerFeedback(kind, message) {
   const feedback = ensureWinnerFeedback();
@@ -51,7 +61,7 @@ function clearWinnerFeedback() {
 
 function applyRoleBasedUI() {
   const isAdmin = authUser.league_role === 'admin';
-  [loadWinnerBtn, cancelMatchBtn, continueLedgerBtn].forEach((element) => {
+  [loadWinnerBtn, cancelMatchBtn, continueLedgerBtn, sendTelegramUpdateBtn].forEach((element) => {
     element.disabled = !isAdmin;
   });
 
@@ -118,6 +128,313 @@ function updateMatchActionState() {
   if (!match || !isAdmin) return;
   loadWinnerBtn.textContent = isCompleted ? 'Edit Assignment' : 'Load Assignment';
   cancelMatchBtn.textContent = isCanceled ? 'Washout Recorded' : 'Washout / Cancelled';
+  if (sendTelegramUpdateBtn) {
+    sendTelegramUpdateBtn.disabled = !isAdmin || !match;
+  }
+}
+
+function setTelegramModalState(isOpen) {
+  if (!telegramModal) return;
+  telegramModal.classList.toggle('hidden', !isOpen);
+  telegramModal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+  document.body.classList.toggle('modal-open', isOpen);
+}
+
+function clearTelegramSessionPolling() {
+  if (telegramState.sessionPollTimer) {
+    window.clearTimeout(telegramState.sessionPollTimer);
+    telegramState.sessionPollTimer = null;
+  }
+}
+
+function closeTelegramModal() {
+  clearTelegramSessionPolling();
+  setTelegramModalState(false);
+}
+
+function getActiveTelegramMatch() {
+  const targetId = telegramState.activeMatchId || matchSelect.value;
+  return appState.matches.find((item) => String(item.id) === String(targetId)) || null;
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function telegramTargetLabel(status) {
+  const target = status?.target;
+  if (!target?.chat_name) return 'Telegram target';
+  return target.chat_name;
+}
+
+function renderTelegramModal(content) {
+  if (!telegramModalBody) return;
+  telegramModalBody.innerHTML = content;
+  setTelegramModalState(true);
+}
+
+function telegramSetupSummary(match, intro) {
+  const safeTitle = escapeHtml(match?.title || 'Selected match');
+  const safeIntro = escapeHtml(intro || 'Connect Telegram once and we will remember it for future match updates.');
+  return `
+    <article class="telegram-surface-card telegram-surface-card-compact">
+      <span class="telegram-surface-kicker">Setup</span>
+      <h3>Set up Telegram for this league</h3>
+      <p>${safeIntro}</p>
+      <div class="telegram-match-pill">${safeTitle}</div>
+    </article>
+  `;
+}
+
+function renderTelegramConfigError(status, match, intro) {
+  const needsWebhook = status?.bot_ready && (!status?.webhook_ready || !status?.webhook_registered);
+  const helper = needsWebhook
+    ? 'Telegram bot is ready, but the webhook is not registered yet. Register it once, then continue.'
+    : 'Add TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME on the server to enable Telegram linking.';
+  renderTelegramModal(`
+    ${telegramSetupSummary(match, intro)}
+    <article class="telegram-surface-card telegram-surface-card-muted">
+      <h3>${needsWebhook ? 'Webhook setup pending' : 'Telegram bot setup pending'}</h3>
+      <p>${escapeHtml(helper)}</p>
+      <div class="telegram-inline-actions">
+        ${needsWebhook ? '<button id="telegram-register-webhook" type="button" class="primary">Register Webhook</button>' : ''}
+        <button id="telegram-close-inline" type="button" class="ghost">Close</button>
+      </div>
+    </article>
+  `);
+  document.getElementById('telegram-close-inline')?.addEventListener('click', closeTelegramModal);
+  document.getElementById('telegram-register-webhook')?.addEventListener('click', async (event) => {
+    const restore = setButtonLoading(event.currentTarget, 'Registering...');
+    try {
+      const result = await callApi('/api/integrations/telegram/webhook/register', { method: 'POST' });
+      showSuccess(result.description || 'Telegram webhook registered.');
+      await openTelegramModal({ matchId: match?.id, reason: 'Webhook registered. Continue with Telegram connect.' });
+    } catch (error) {
+      showError(error);
+    } finally {
+      restore();
+    }
+  });
+}
+
+function renderTelegramConnectedState(status, match, intro) {
+  const target = status?.target;
+  renderTelegramModal(`
+    <article class="telegram-surface-card telegram-surface-card-success telegram-surface-card-compact">
+      <span class="telegram-surface-kicker">Connected</span>
+      <h3>Ready to send</h3>
+      <p>${escapeHtml(intro || `Linked to ${telegramTargetLabel(status)}. Send this match update now or skip for later.`)}</p>
+      <div class="telegram-target-summary">
+        <strong>${escapeHtml(target?.chat_name || 'Configured Telegram target')}</strong>
+        <span>${escapeHtml(target?.chat_type || 'chat')}</span>
+      </div>
+      <div class="telegram-inline-actions">
+        <button id="telegram-send-now" type="button" class="primary">Send Match Update</button>
+        <button id="telegram-change-target" type="button" class="ghost">Change Telegram Target</button>
+        <button id="telegram-skip-now" type="button" class="ghost">Skip for now</button>
+      </div>
+    </article>
+  `);
+  document.getElementById('telegram-skip-now')?.addEventListener('click', closeTelegramModal);
+  document.getElementById('telegram-change-target')?.addEventListener('click', () => {
+    renderTelegramConnectChoiceState(match, 'Choose a new Telegram destination for this league.', status);
+  });
+  document.getElementById('telegram-send-now')?.addEventListener('click', async (event) => {
+    await sendTelegramUpdateForMatch(match?.id, event.currentTarget);
+  });
+}
+
+function renderTelegramWaitingState(match, session, statusSnapshot) {
+  const personal = session?.target === 'personal';
+  const title = personal ? 'Connect personal chat' : 'Connect Telegram group';
+  const helper = personal
+    ? 'Open the bot, tap Start, then return here.'
+    : 'Open Telegram, add the bot to the group, then return here.';
+  renderTelegramModal(`
+    ${telegramSetupSummary(match, 'Match update recorded. Connect Telegram once and the league can reuse it for future updates.')}
+    <article class="telegram-surface-card">
+      <span class="telegram-surface-kicker">Step 1</span>
+      <h3>${title}</h3>
+      <p>${helper}</p>
+      <div class="telegram-connect-grid">
+        <div class="telegram-connect-main">
+          <a class="primary telegram-open-link" href="${escapeHtml(session.connect_url)}" target="_blank" rel="noreferrer">Open Telegram</a>
+          <button id="telegram-copy-link" type="button" class="ghost">Copy Link</button>
+          <p class="telegram-helper-copy">Link expires in about 15 minutes.</p>
+          <div class="telegram-command-card">
+            <strong>Fallback for Telegram Web/Desktop</strong>
+            <p>Use this only if Telegram opens the chat without the secure token.</p>
+            <code class="telegram-command-code">${escapeHtml(session.start_command || '/start')}</code>
+            <button id="telegram-copy-command" type="button" class="ghost">Copy Secure Command</button>
+          </div>
+        </div>
+        <div class="telegram-qr-card ${session.qr_code_data_uri ? '' : 'telegram-qr-card-empty'}">
+          ${session.qr_code_data_uri ? `<img src="${session.qr_code_data_uri}" alt="Telegram connect QR code" class="telegram-qr-image">` : '<div class="telegram-qr-fallback">QR available after server package install</div>'}
+          <span>${personal ? 'Scan from your phone' : 'Scan to add the bot to the group'}</span>
+        </div>
+      </div>
+      <div class="telegram-inline-actions">
+        <button id="telegram-refresh-session" type="button" class="primary">I connected it</button>
+        <button id="telegram-cancel-session" type="button" class="ghost">Close</button>
+      </div>
+    </article>
+    ${statusSnapshot?.target ? `
+      <article class="telegram-surface-card telegram-surface-card-muted">
+        <span class="telegram-surface-kicker">Current league target</span>
+        <h3>${escapeHtml(statusSnapshot.target.chat_name || 'Telegram target already configured')}</h3>
+        <p>Connecting again will replace the existing destination for this league.</p>
+      </article>
+    ` : ''}
+  `);
+  document.getElementById('telegram-cancel-session')?.addEventListener('click', closeTelegramModal);
+  document.getElementById('telegram-copy-link')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(session.connect_url);
+      showSuccess('Telegram connect link copied.');
+    } catch (_) {
+      showError('Could not copy the Telegram link on this device.');
+    }
+  });
+  document.getElementById('telegram-copy-command')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(session.start_command || '/start');
+      showSuccess('Secure Telegram start command copied.');
+    } catch (_) {
+      showError('Could not copy the Telegram start command on this device.');
+    }
+  });
+  document.getElementById('telegram-refresh-session')?.addEventListener('click', () => refreshTelegramSession(session.session_id, match?.id));
+}
+
+async function loadTelegramStatus() {
+  telegramState.status = await callApi('/api/integrations/telegram/status');
+  return telegramState.status;
+}
+
+async function refreshTelegramSession(sessionId, matchId) {
+  clearTelegramSessionPolling();
+  try {
+    const session = await callApi(`/api/integrations/telegram/connect-session/${sessionId}`);
+    if (session.status === 'connected') {
+      telegramState.activeSessionId = null;
+      await loadTelegramStatus();
+      renderTelegramConnectedState(telegramState.status, getActiveTelegramMatch(), 'Telegram connected successfully. Send the latest match update now?');
+      return;
+    }
+    if (session.status === 'expired') {
+      showError('Telegram connect link expired. Generate a fresh one and try again.');
+      await openTelegramModal({ matchId, reason: 'The earlier Telegram link expired. Create a new one.' });
+      return;
+    }
+    telegramState.sessionPollTimer = window.setTimeout(() => refreshTelegramSession(sessionId, matchId), 3000);
+  } catch (error) {
+    showError(error);
+  }
+}
+
+async function startTelegramConnect(target, matchId, triggerButton) {
+  let restore = null;
+  try {
+    if (triggerButton) restore = setButtonLoading(triggerButton, 'Preparing...');
+    const session = await callApi('/api/integrations/telegram/connect-session', {
+      method: 'POST',
+      body: JSON.stringify({ target, match_id: matchId || null }),
+    });
+    telegramState.activeSessionId = session.session_id;
+    renderTelegramWaitingState(getActiveTelegramMatch(), session, telegramState.status);
+    telegramState.sessionPollTimer = window.setTimeout(() => refreshTelegramSession(session.session_id, matchId), 3000);
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (restore) restore();
+  }
+}
+
+async function sendTelegramUpdateForMatch(matchId, triggerButton = null) {
+  if (!matchId) {
+    showError('Choose a match first.');
+    return;
+  }
+  let restore = null;
+  try {
+    if (triggerButton) restore = setButtonLoading(triggerButton, 'Sending...');
+    const result = await callApi('/api/integrations/telegram/matches/send', {
+      method: 'POST',
+      body: JSON.stringify({ match_id: Number(matchId) }),
+    });
+    closeTelegramModal();
+    showSuccess(`Telegram update sent${result.chat_name ? ` to ${result.chat_name}` : ''}.`);
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (restore) restore();
+  }
+}
+
+function renderTelegramConnectChoiceState(match, intro = '', statusSnapshot = null) {
+  renderTelegramModal(`
+    ${telegramSetupSummary(match, intro || 'Match update recorded. Connect Telegram once and the league can send future result notifications in one tap.')}
+    <article class="telegram-surface-card">
+      <span class="telegram-surface-kicker">Step 1</span>
+      <h3>Choose how you want to connect</h3>
+      <p>Most admins test with their own Telegram first, then switch the league to a group later.</p>
+      <div class="telegram-choice-grid">
+        <button id="telegram-connect-personal" type="button" class="telegram-choice-card">
+          <strong>Connect personal chat</strong>
+          <span>Use your own Telegram chat to test the workflow safely.</span>
+        </button>
+        <button id="telegram-connect-group" type="button" class="telegram-choice-card">
+          <strong>Connect Telegram group</strong>
+          <span>Attach the bot directly to the league’s Telegram group.</span>
+        </button>
+      </div>
+      <div class="telegram-inline-actions">
+        <button id="telegram-close-choice" type="button" class="ghost">Close</button>
+      </div>
+    </article>
+    ${statusSnapshot?.target ? `
+      <article class="telegram-surface-card telegram-surface-card-muted">
+        <span class="telegram-surface-kicker">Current league target</span>
+        <h3>${escapeHtml(statusSnapshot.target.chat_name || 'Telegram target already configured')}</h3>
+        <p>Connecting again will replace the existing destination for this league.</p>
+      </article>
+    ` : ''}
+  `);
+  document.getElementById('telegram-close-choice')?.addEventListener('click', closeTelegramModal);
+  document.getElementById('telegram-connect-personal')?.addEventListener('click', (event) => startTelegramConnect('personal', match.id, event.currentTarget));
+  document.getElementById('telegram-connect-group')?.addEventListener('click', (event) => startTelegramConnect('group', match.id, event.currentTarget));
+}
+
+async function openTelegramModal({ matchId = null, reason = '', forceReconnect = false } = {}) {
+  const match = appState.matches.find((item) => String(item.id) === String(matchId || matchSelect.value));
+  if (!match) {
+    showError('Choose a match first.');
+    return;
+  }
+  telegramState.activeMatchId = String(match.id);
+  const status = await loadTelegramStatus();
+  if (!status.bot_ready) {
+    renderTelegramConfigError(status, match, reason);
+    return;
+  }
+  if (!status.webhook_ready || !status.webhook_registered) {
+    renderTelegramConfigError(status, match, reason);
+    return;
+  }
+  if (status.target?.chat_id && !forceReconnect) {
+    renderTelegramConnectedState(status, match, reason || `Connected to ${telegramTargetLabel(status)}. Send this match update now?`);
+    return;
+  }
+  renderTelegramConnectChoiceState(
+    match,
+    reason || 'Match update recorded. Connect Telegram once and the league can send future result notifications in one tap.',
+    status,
+  );
 }
 
 function renderMatchSelect() {
@@ -596,6 +913,10 @@ function renderWinnerForm(matchId) {
       'success',
       `<strong>Saved beautifully.</strong> Winners for <strong>${match.title}</strong> are now recorded and ready for the ledger.`
     );
+    await openTelegramModal({
+      matchId: match.id,
+      reason: `Match update for ${match.title} has been recorded successfully. Do you want to send the Telegram notification now?`,
+    });
   };
 }
 
@@ -658,6 +979,34 @@ matchSelect.addEventListener('change', () => {
   }
 });
 
+sendTelegramUpdateBtn?.addEventListener('click', async () => {
+  if (authUser.league_role !== 'admin') {
+    showError('Only admin can send Telegram notifications.');
+    return;
+  }
+  if (!matchSelect.value) {
+    showError('Choose a match first.');
+    return;
+  }
+
+  const match = appState.matches.find((item) => String(item.id) === String(matchSelect.value));
+  if (!match) {
+    showError('Choose a match first.');
+    return;
+  }
+
+  const status = String(match.status || '').toLowerCase();
+  if (!['completed', 'canceled'].includes(status)) {
+    showError('Save winners or record washout before sending a Telegram update.');
+    return;
+  }
+
+  await openTelegramModal({
+    matchId: match.id,
+    reason: `You can send the latest update for ${match.title} to Telegram now.`,
+  });
+});
+
 cancelMatchBtn.addEventListener('click', async () => {
   if (authUser.league_role !== 'admin') {
     showError('Only admin can cancel a match.');
@@ -691,6 +1040,10 @@ cancelMatchBtn.addEventListener('click', async () => {
     winnersForm.innerHTML = '<p class="muted">Match marked as washout/cancelled. Refund distributed equally.</p>';
     clearWinnerFeedback();
     showSuccess('Match cancelled and refund distributed.');
+    await openTelegramModal({
+      matchId: targetMatchId,
+      reason: `Washout for ${refreshedMatch.title} has been recorded successfully. Do you want to send the Telegram notification now?`,
+    });
   } catch (error) {
     showError(error);
   } finally {
@@ -768,6 +1121,16 @@ continueLedgerBtn.addEventListener('click', async () => {
     navigateTo('/ledger');
   } finally {
     if (restoreContinueButton) restoreContinueButton();
+  }
+});
+
+closeTelegramModalBtn?.addEventListener('click', closeTelegramModal);
+telegramModal?.querySelectorAll('[data-close-telegram-modal]').forEach((node) => {
+  node.addEventListener('click', closeTelegramModal);
+});
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && telegramModal && !telegramModal.classList.contains('hidden')) {
+    closeTelegramModal();
   }
 });
 

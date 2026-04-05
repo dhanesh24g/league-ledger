@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
+from dotenv import load_dotenv
 
 from .api import router as api_router
 from .database import init_database, get_supabase_client
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 STATIC_DIR = BASE_DIR / "static"
+SERVER_DIR = Path(__file__).resolve().parent
+
+load_dotenv(SERVER_DIR / ".env")
+load_dotenv(BASE_DIR / ".env")
 
 app = FastAPI(title="Dream11 League Prototype")
 app.include_router(api_router)
