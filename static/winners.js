@@ -227,8 +227,8 @@ function renderTelegramConnectedState(status, match, intro) {
   renderTelegramModal(`
     <article class="telegram-surface-card telegram-surface-card-success telegram-surface-card-compact">
       <span class="telegram-surface-kicker">Connected</span>
-      <h3>Telegram is ready</h3>
-      <p>${escapeHtml(intro || `Linked to ${telegramTargetLabel(status)}. You can send this match update now or skip for later.`)}</p>
+      <h3>Ready to send</h3>
+      <p>${escapeHtml(intro || `Linked to ${telegramTargetLabel(status)}. Send this match update now or skip for later.`)}</p>
       <div class="telegram-target-summary">
         <strong>${escapeHtml(target?.chat_name || 'Configured Telegram target')}</strong>
         <span>${escapeHtml(target?.chat_type || 'chat')}</span>
@@ -247,12 +247,12 @@ function renderTelegramConnectedState(status, match, intro) {
 
 function renderTelegramWaitingState(match, session, statusSnapshot) {
   const personal = session?.target === 'personal';
-  const title = personal ? 'Connect personal Telegram' : 'Connect Telegram group';
+  const title = personal ? 'Connect personal chat' : 'Connect Telegram group';
   const helper = personal
-    ? 'Open the bot, tap Start, then come back here.'
-    : 'Open Telegram, add the bot to the group, then come back here.';
+    ? 'Open the bot, tap Start, then return here.'
+    : 'Open Telegram, add the bot to the group, then return here.';
   renderTelegramModal(`
-    ${telegramSetupSummary(match, 'Match update recorded successfully. Connect Telegram once and we will remember the destination for future updates.')}
+    ${telegramSetupSummary(match, 'Match update recorded. Connect Telegram once and the league can reuse it for future updates.')}
     <article class="telegram-surface-card">
       <span class="telegram-surface-kicker">Step 1</span>
       <h3>${title}</h3>
@@ -264,14 +264,14 @@ function renderTelegramWaitingState(match, session, statusSnapshot) {
           <p class="telegram-helper-copy">Link expires in about 15 minutes.</p>
           <div class="telegram-command-card">
             <strong>Fallback for Telegram Web/Desktop</strong>
-            <p>Paste this only if Telegram opens the chat without the secure token.</p>
+            <p>Use this only if Telegram opens the chat without the secure token.</p>
             <code class="telegram-command-code">${escapeHtml(session.start_command || '/start')}</code>
-            <button id="telegram-copy-command" type="button" class="ghost">Copy Secure Start Command</button>
+            <button id="telegram-copy-command" type="button" class="ghost">Copy Secure Command</button>
           </div>
         </div>
         <div class="telegram-qr-card ${session.qr_code_data_uri ? '' : 'telegram-qr-card-empty'}">
           ${session.qr_code_data_uri ? `<img src="${session.qr_code_data_uri}" alt="Telegram connect QR code" class="telegram-qr-image">` : '<div class="telegram-qr-fallback">QR available after server package install</div>'}
-          <span>${personal ? 'Scan from your phone' : 'Scan to add bot to group'}</span>
+          <span>${personal ? 'Scan from your phone' : 'Scan to add the bot to the group'}</span>
         </div>
       </div>
       <div class="telegram-inline-actions">
@@ -393,18 +393,18 @@ async function openTelegramModal({ matchId = null, reason = '' } = {}) {
     return;
   }
   renderTelegramModal(`
-    ${telegramSetupSummary(match, reason || 'Match update recorded successfully. Connect Telegram once and the league can send future result notifications in one tap.')}
+    ${telegramSetupSummary(match, reason || 'Match update recorded. Connect Telegram once and the league can send future result notifications in one tap.')}
     <article class="telegram-surface-card">
       <span class="telegram-surface-kicker">Step 1</span>
       <h3>Choose how you want to connect</h3>
       <p>Most admins test with their own Telegram first, then switch the league to a group later.</p>
       <div class="telegram-choice-grid">
         <button id="telegram-connect-personal" type="button" class="telegram-choice-card">
-          <strong>Connect Personal Telegram</strong>
+          <strong>Connect personal chat</strong>
           <span>Use your own Telegram chat to test the workflow safely.</span>
         </button>
         <button id="telegram-connect-group" type="button" class="telegram-choice-card">
-          <strong>Connect Telegram Group</strong>
+          <strong>Connect Telegram group</strong>
           <span>Attach the bot directly to the league’s Telegram group.</span>
         </button>
       </div>
