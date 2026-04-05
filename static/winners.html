@@ -101,6 +101,7 @@
         <button id="load-winner-form" type="button">Load Assignment</button>
         <button id="reopen-match" type="button" class="ghost hidden">Reopen Match</button>
         <button id="mark-cancelled" type="button" class="ghost">Washout / Cancelled</button>
+        <button id="send-telegram-update" type="button" class="ghost">Send to Telegram</button>
       </div>
 
       <div id="winner-match-summary" class="workflow-match-summary"></div>
@@ -112,6 +113,20 @@
       </div>
     </section>
   </main>
+
+  <div id="telegram-modal" class="telegram-modal hidden" aria-hidden="true">
+    <div class="telegram-modal-backdrop" data-close-telegram-modal></div>
+    <section class="telegram-modal-panel" role="dialog" aria-modal="true" aria-labelledby="telegram-modal-title">
+      <div class="telegram-modal-head">
+        <div>
+          <span class="telegram-modal-kicker">League Communication</span>
+          <h2 id="telegram-modal-title">Telegram Notification</h2>
+        </div>
+        <button id="close-telegram-modal" type="button" class="ghost">Close</button>
+      </div>
+      <div id="telegram-modal-body" class="telegram-modal-body"></div>
+    </section>
+  </div>
 
   <script type="module" src="/static/winners.js"></script>
 </body>

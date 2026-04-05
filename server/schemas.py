@@ -78,3 +78,12 @@ class ResetPasswordPayload(BaseModel):
 class TelegramTestPayload(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
     chat_id: str | None = Field(default=None, min_length=1, max_length=128)
+
+
+class TelegramConnectSessionPayload(BaseModel):
+    target: str = Field(pattern="^(personal|group)$")
+    match_id: int | None = Field(default=None, ge=1)
+
+
+class TelegramNotifyMatchPayload(BaseModel):
+    match_id: int = Field(ge=1)

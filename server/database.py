@@ -227,6 +227,47 @@ def _create_sqlite_tables(connection: sqlite3.Connection) -> None:
         """
     )
 
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS league_integrations (
+            league_id INTEGER PRIMARY KEY,
+            telegram_chat_id TEXT,
+            telegram_chat_name TEXT,
+            telegram_chat_type TEXT,
+            telegram_notifications_enabled INTEGER NOT NULL DEFAULT 1,
+            telegram_connected_by_user_id INTEGER,
+            telegram_connected_at TEXT,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(league_id) REFERENCES league(id),
+            FOREIGN KEY(telegram_connected_by_user_id) REFERENCES users(id)
+        )
+        """
+    )
+
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS telegram_link_sessions (
+            id TEXT PRIMARY KEY,
+            token_hash TEXT NOT NULL UNIQUE,
+            league_id INTEGER NOT NULL,
+            created_by_user_id INTEGER NOT NULL,
+            target TEXT NOT NULL,
+            requested_match_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            expires_at TEXT NOT NULL,
+            connected_chat_id TEXT,
+            connected_chat_name TEXT,
+            connected_chat_type TEXT,
+            consumed_at TEXT,
+            last_error TEXT,
+            FOREIGN KEY(league_id) REFERENCES league(id),
+            FOREIGN KEY(created_by_user_id) REFERENCES users(id),
+            FOREIGN KEY(requested_match_id) REFERENCES matches(id)
+        )
+        """
+    )
+
 
 def _copy_table(connection: sqlite3.Connection, source: str, target: str, columns: list[str]) -> None:
     if not _table_exists(connection, source):
@@ -572,6 +613,33 @@ def _needs_multileague_migration(connection: sqlite3.Connection) -> bool:
     )
 
 
+def _ensure_telegram_tables(connection: sqlite3.Connection) -> None:
+    league_columns = _table_columns(connection, "league_integrations")
+    if league_columns and "created_at" not in league_columns:
+        connection.execute("DROP TABLE IF EXISTS league_integrations")
+
+    session_columns = _table_columns(connection, "telegram_link_sessions")
+    required_session_columns = {
+        "id",
+        "token_hash",
+        "league_id",
+        "created_by_user_id",
+        "target",
+        "requested_match_id",
+        "created_at",
+        "expires_at",
+        "connected_chat_id",
+        "connected_chat_name",
+        "connected_chat_type",
+        "consumed_at",
+        "last_error",
+    }
+    if session_columns and not required_session_columns.issubset(session_columns):
+        connection.execute("DROP TABLE IF EXISTS telegram_link_sessions")
+
+    _create_sqlite_tables(connection)
+
+
 def init_sqlite_db() -> None:
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
@@ -608,6 +676,45 @@ def init_sqlite_db() -> None:
             _migrate_single_league_schema(connection)
         else:
             _create_sqlite_tables(connection)
+
+        _ensure_telegram_tables(connection)
+
+        try:
+            connection.execute("ALTER TABLE league_integrations ADD COLUMN telegram_chat_type TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE league_integrations ADD COLUMN telegram_connected_by_user_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE league_integrations ADD COLUMN telegram_connected_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE telegram_link_sessions ADD COLUMN requested_match_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE telegram_link_sessions ADD COLUMN connected_chat_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE telegram_link_sessions ADD COLUMN connected_chat_name TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE telegram_link_sessions ADD COLUMN connected_chat_type TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE telegram_link_sessions ADD COLUMN consumed_at TEXT")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            connection.execute("ALTER TABLE telegram_link_sessions ADD COLUMN last_error TEXT")
+        except sqlite3.OperationalError:
+            pass
 
     connection.close()
 

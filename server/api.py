@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .auth import (
     approve_join_request,
@@ -29,18 +29,45 @@ from .auth import (
     signup_user,
     update_membership_role,
 )
-from .schemas import ForgotPasswordPayload, GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, RefreshTokenPayload, ResetPasswordPayload, SignupPayload, TelegramTestPayload, WinnersPayload
-from .integrations import TelegramIntegrationConfig, build_telegram_message, send_telegram_message
+from .schemas import (
+    ForgotPasswordPayload,
+    GoogleTokenPayload,
+    JoinRequestPayload,
+    LeaguePayload,
+    LoginPayload,
+    MatchPayload,
+    MembershipRolePayload,
+    PlayerPayload,
+    RefreshTokenPayload,
+    ResetPasswordPayload,
+    SignupPayload,
+    TelegramConnectSessionPayload,
+    TelegramNotifyMatchPayload,
+    TelegramTestPayload,
+    WinnersPayload,
+)
+from .integrations import (
+    TelegramIntegrationConfig,
+    build_telegram_message,
+    safe_compare,
+    send_telegram_message,
+)
 from .service import (
     add_match,
     add_player,
     cancel_match,
+    create_telegram_connect_session,
     delete_player,
     get_ledger,
     reopen_match,
     get_stats,
     get_state,
+    get_telegram_connect_session_status,
+    get_telegram_status,
+    process_telegram_webhook,
+    register_telegram_webhook,
     save_winners,
+    send_match_update_to_telegram,
 )
 from .supabase_service import (
     upsert_league,
@@ -106,11 +133,10 @@ def stats(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, An
 @router.get("/integrations/telegram/status")
 def telegram_status(user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
     config = TelegramIntegrationConfig.from_env()
-    return {
-        "configured": config.is_configured(),
-        "has_bot_token": bool(config.bot_token),
-        "has_default_chat_id": bool(config.default_chat_id),
-    }
+    response = get_telegram_status(user)
+    response["has_bot_token"] = bool(config.bot_token)
+    response["has_default_chat_id"] = bool(config.default_chat_id)
+    return response
 
 
 @router.post("/integrations/telegram/test")
@@ -133,6 +159,44 @@ def telegram_test_message(
         "chat_id": result.chat_id,
         "message_id": result.message_id,
     }
+
+
+@router.post("/integrations/telegram/connect-session")
+def telegram_connect_session(
+    payload: TelegramConnectSessionPayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return create_telegram_connect_session(payload.target, user, match_id=payload.match_id)
+
+
+@router.get("/integrations/telegram/connect-session/{session_id}")
+def telegram_connect_session_status(
+    session_id: str,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return get_telegram_connect_session_status(session_id, user)
+
+
+@router.post("/integrations/telegram/webhook/register")
+def telegram_register_webhook(user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+    return register_telegram_webhook(user)
+
+
+@router.post("/integrations/telegram/matches/send")
+def telegram_send_match_update(
+    payload: TelegramNotifyMatchPayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return send_match_update_to_telegram(payload.match_id, user)
+
+
+@router.post("/integrations/telegram/webhook/{secret}")
+async def telegram_webhook(secret: str, request: Request) -> dict[str, Any]:
+    config = TelegramIntegrationConfig.from_env()
+    if not safe_compare(secret, config.webhook_secret):
+        raise HTTPException(status_code=404, detail="Not found")
+    update = await request.json()
+    return process_telegram_webhook(update)
 
 
 @router.get("/auth/config")

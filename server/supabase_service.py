@@ -4,6 +4,7 @@ import re
 import secrets
 import json
 import math
+from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Any
 
@@ -16,6 +17,17 @@ except ImportError:
 
 from .auth import get_supabase_client, invalidate_profile_cache
 from .database import parse_participant_ids, parse_payouts
+from .integrations import (
+    TelegramIntegrationConfig,
+    build_telegram_link,
+    build_telegram_message,
+    ensure_telegram_webhook,
+    get_telegram_webhook_info,
+    hash_connect_token,
+    render_qr_data_uri,
+    send_telegram_message,
+    set_telegram_webhook,
+)
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 logger = logging.getLogger(__name__)
 
@@ -630,6 +642,337 @@ def reopen_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     _invalidate_league_cache(league_id)
 
     return {"message": "Match reopened for winner assignment"}
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _isoformat(value: datetime) -> str:
+    return value.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _parse_timestamp(raw: Any) -> datetime | None:
+    if not raw:
+        return None
+    try:
+        return datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _fetch_match_notification_context_supabase(supabase: Any, league_id: int, match_id: int) -> dict[str, Any]:
+    league_response = supabase.table("league").select("id, name, tournament, entry_fee").eq("id", league_id).limit(1).execute()
+    match_response = supabase.table("matches").select("id, title, match_date, status, participant_ids_json").eq("id", match_id).eq("league_id", league_id).limit(1).execute()
+    if not league_response.data or not match_response.data:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    league = league_response.data[0]
+    match = match_response.data[0]
+    players = _sync_active_members_to_players(supabase, league_id)
+    player_name_by_id = {int(player["id"]): str(player["name"]) for player in players}
+    participant_ids = parse_participant_ids(match.get("participant_ids_json")) or [int(player["id"]) for player in players]
+    winner_rows_response = (
+        supabase.table("winner_entries")
+        .select("rank, player_id, amount")
+        .eq("match_id", match_id)
+        .order("rank")
+        .execute()
+    )
+    winner_rows = winner_rows_response.data or []
+    matches_response = supabase.table("matches").select("id").eq("league_id", league_id).order("id").execute()
+    match_number_map = _build_match_number_map(matches_response.data or [])
+
+    grouped: dict[int, dict[str, Any]] = {}
+    for row in winner_rows:
+        rank = int(row["rank"])
+        grouped.setdefault(
+            rank,
+            {
+                "rank": rank,
+                "label": _rank_label(rank, str(match.get("status") or "pending"), True),
+                "amount": float(row["amount"]),
+                "players": [],
+            },
+        )["players"].append(player_name_by_id.get(int(row["player_id"]), f"Player #{row['player_id']}"))
+
+    return {
+        "league_name": str(league["name"]),
+        "tournament": str(league["tournament"]),
+        "entry_fee": float(league["entry_fee"]),
+        "match_id": int(match["id"]),
+        "match_number": match_number_map.get(int(match["id"]), 0),
+        "title": str(match["title"]),
+        "match_date": str(match["match_date"]),
+        "status": str(match.get("status") or "pending"),
+        "participant_count": len(participant_ids),
+        "winner_rows": list(grouped.values()),
+    }
+
+
+def _build_match_notification_message(context: dict[str, Any]) -> str:
+    title = f"{context['league_name']} · Match #{context['match_number'] or context['match_id']}"
+    lines = [
+        f"{context['title']} · {context['match_date']}",
+        f"Status: {str(context['status']).replace('_', ' ').title()}",
+    ]
+    if str(context["status"]).lower() == "canceled":
+        lines.append(f"Washout recorded. Refund restored across {context['participant_count']} participants.")
+    else:
+        for row in context["winner_rows"]:
+            players = ", ".join(row["players"]) if row["players"] else "No players"
+            lines.append(f"{row['label']}: {players} ({float(row['amount']):.2f} each)")
+    lines.append(f"Tournament: {context['tournament']}")
+    return build_telegram_message(title=title, lines=lines)
+
+
+def get_telegram_status(user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    league_id = _league_id_from_user(user)
+    config = TelegramIntegrationConfig.from_env()
+    target = None
+    try:
+        response = supabase.table("league_integrations").select(
+            "telegram_chat_id, telegram_chat_name, telegram_chat_type, telegram_notifications_enabled, telegram_connected_at"
+        ).eq("league_id", league_id).limit(1).execute()
+        row = response.data[0] if response.data else None
+        if row and row.get("telegram_chat_id"):
+            target = {
+                "chat_id": str(row.get("telegram_chat_id") or ""),
+                "chat_name": str(row.get("telegram_chat_name") or ""),
+                "chat_type": str(row.get("telegram_chat_type") or ""),
+                "enabled": bool(row.get("telegram_notifications_enabled", True)),
+                "connected_at": str(row.get("telegram_connected_at") or ""),
+            }
+    except Exception:
+        logger.warning("Telegram integration tables are not available yet in Supabase.")
+
+    webhook_registered = False
+    if config.is_webhook_ready():
+        try:
+            info = get_telegram_webhook_info(config)
+            webhook_registered = str((info.get("result") or {}).get("url") or "") == str(config.webhook_url() or "")
+        except HTTPException:
+            webhook_registered = False
+
+    return {
+        "bot_ready": config.is_bot_ready(),
+        "connect_ready": config.is_bot_ready(),
+        "send_ready": config.is_bot_ready() and bool(target and target.get("enabled")),
+        "webhook_ready": config.is_webhook_ready(),
+        "webhook_registered": webhook_registered,
+        "bot_username": config.bot_username,
+        "target": target,
+    }
+
+
+def create_telegram_connect_session(target: str, user: dict[str, Any], match_id: int | None = None) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    config = TelegramIntegrationConfig.from_env()
+    if not config.is_bot_ready():
+        raise HTTPException(status_code=503, detail="Telegram bot is not fully configured yet")
+    if not config.is_webhook_ready():
+        raise HTTPException(status_code=503, detail="Telegram webhook settings are incomplete")
+    ensure_telegram_webhook(config)
+
+    league_id = _league_id_from_user(user)
+    session_id = secrets.token_urlsafe(18)
+    raw_token = secrets.token_urlsafe(24)
+    expires_at = _utc_now() + timedelta(minutes=15)
+    deep_link = build_telegram_link(config.bot_username or "", raw_token, target)
+
+    supabase.table("telegram_link_sessions").insert(
+        {
+            "id": session_id,
+            "token_hash": hash_connect_token(raw_token),
+            "league_id": league_id,
+            "created_by_user_id": int(user["id"]),
+            "target": target,
+            "requested_match_id": int(match_id) if match_id else None,
+            "expires_at": _isoformat(expires_at),
+        }
+    ).execute()
+
+    return {
+        "session_id": session_id,
+        "target": target,
+        "connect_url": deep_link,
+        "start_command": f"/start {raw_token}",
+        "qr_code_data_uri": render_qr_data_uri(deep_link),
+        "expires_at": _isoformat(expires_at),
+    }
+
+
+def get_telegram_connect_session_status(session_id: str, user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    league_id = _league_id_from_user(user)
+    response = (
+        supabase.table("telegram_link_sessions")
+        .select("*")
+        .eq("id", session_id)
+        .eq("league_id", league_id)
+        .eq("created_by_user_id", int(user["id"]))
+        .limit(1)
+        .execute()
+    )
+    row = response.data[0] if response.data else None
+    if not row:
+        raise HTTPException(status_code=404, detail="Telegram connect session not found")
+
+    expires_at = _parse_timestamp(row.get("expires_at"))
+    connected = bool(row.get("consumed_at") and row.get("connected_chat_id"))
+    expired = bool(expires_at and _utc_now() >= expires_at and not connected)
+    status = "connected" if connected else "expired" if expired else "pending"
+    return {
+        "session_id": str(row["id"]),
+        "status": status,
+        "target": str(row["target"]),
+        "requested_match_id": int(row["requested_match_id"]) if row.get("requested_match_id") else None,
+        "expires_at": str(row.get("expires_at") or ""),
+        "connected_target": (
+            {
+                "chat_id": str(row.get("connected_chat_id") or ""),
+                "chat_name": str(row.get("connected_chat_name") or ""),
+                "chat_type": str(row.get("connected_chat_type") or ""),
+            }
+            if row.get("connected_chat_id")
+            else None
+        ),
+        "last_error": str(row.get("last_error") or ""),
+    }
+
+
+def process_telegram_webhook(update: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    message = (update or {}).get("message") or {}
+    text = str(message.get("text") or "").strip()
+    if not text.startswith("/start"):
+        return {"ok": True, "handled": False}
+
+    parts = text.split(maxsplit=1)
+    raw_token = parts[1].strip() if len(parts) > 1 else ""
+    if not raw_token:
+        return {"ok": True, "handled": False}
+
+    chat = message.get("chat") or {}
+    chat_id = str(chat.get("id") or "").strip()
+    chat_type = str(chat.get("type") or "").strip()
+    if not chat_id:
+        return {"ok": True, "handled": False}
+
+    chat_name = (
+        str(chat.get("title") or "").strip()
+        or " ".join(part for part in [str(chat.get("first_name") or "").strip(), str(chat.get("last_name") or "").strip()] if part).strip()
+        or str(chat.get("username") or "").strip()
+        or "Telegram Chat"
+    )
+    token_hash = hash_connect_token(raw_token)
+    response = supabase.table("telegram_link_sessions").select("*").eq("token_hash", token_hash).limit(1).execute()
+    row = response.data[0] if response.data else None
+    if not row:
+        return {"ok": True, "handled": False}
+
+    if row.get("consumed_at"):
+        return {"ok": True, "handled": True, "status": "already_consumed"}
+
+    expires_at = _parse_timestamp(row.get("expires_at"))
+    if expires_at and _utc_now() >= expires_at:
+        supabase.table("telegram_link_sessions").update({"last_error": "Session expired before Telegram link completed"}).eq("id", row["id"]).execute()
+        return {"ok": True, "handled": True, "status": "expired"}
+
+    target = str(row.get("target") or "")
+    if target == "personal" and chat_type != "private":
+        supabase.table("telegram_link_sessions").update({"last_error": "Personal connection must be completed from a private chat"}).eq("id", row["id"]).execute()
+        return {"ok": True, "handled": True, "status": "invalid_chat_type"}
+    if target == "group" and chat_type not in {"group", "supergroup"}:
+        supabase.table("telegram_link_sessions").update({"last_error": "Group connection must be completed from a Telegram group"}).eq("id", row["id"]).execute()
+        return {"ok": True, "handled": True, "status": "invalid_chat_type"}
+
+    connected_at = _isoformat(_utc_now())
+    supabase.table("league_integrations").upsert(
+        {
+            "league_id": int(row["league_id"]),
+            "telegram_chat_id": chat_id,
+            "telegram_chat_name": chat_name,
+            "telegram_chat_type": chat_type,
+            "telegram_notifications_enabled": True,
+            "telegram_connected_by_user_id": int(row["created_by_user_id"]),
+            "telegram_connected_at": connected_at,
+            "updated_at": connected_at,
+        },
+        on_conflict="league_id",
+    ).execute()
+    supabase.table("telegram_link_sessions").update(
+        {
+            "connected_chat_id": chat_id,
+            "connected_chat_name": chat_name,
+            "connected_chat_type": chat_type,
+            "consumed_at": connected_at,
+            "last_error": None,
+        }
+    ).eq("id", row["id"]).execute()
+
+    try:
+        send_telegram_message(
+            message=build_telegram_message(
+                title="League Ledger connected",
+                lines=[
+                    f"{chat_name} is now linked for future match updates.",
+                    "Return to League Ledger to send the latest result.",
+                ],
+            ),
+            chat_id=chat_id,
+            config=TelegramIntegrationConfig.from_env(),
+        )
+    except HTTPException:
+        logger.warning("Telegram confirmation message could not be sent after successful link.")
+
+    return {"ok": True, "handled": True, "status": "connected"}
+
+
+def send_match_update_to_telegram(match_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+
+    league_id = _league_id_from_user(user)
+    response = supabase.table("league_integrations").select(
+        "telegram_chat_id, telegram_chat_name, telegram_notifications_enabled"
+    ).eq("league_id", league_id).limit(1).execute()
+    integration = response.data[0] if response.data else None
+    if not integration or not integration.get("telegram_chat_id"):
+        raise HTTPException(status_code=400, detail="Telegram is not connected for this league yet")
+    if not bool(integration.get("telegram_notifications_enabled", True)):
+        raise HTTPException(status_code=400, detail="Telegram notifications are disabled for this league")
+
+    context = _fetch_match_notification_context_supabase(supabase, league_id, match_id)
+    result = send_telegram_message(
+        message=_build_match_notification_message(context),
+        chat_id=str(integration["telegram_chat_id"]),
+    )
+    return {
+        "ok": result.sent,
+        "chat_id": result.chat_id,
+        "chat_name": str(integration.get("telegram_chat_name") or ""),
+        "message_id": result.message_id,
+    }
+
+
+def register_telegram_webhook(user: dict[str, Any]) -> dict[str, Any]:
+    _league_id_from_user(user)
+    data = set_telegram_webhook(TelegramIntegrationConfig.from_env())
+    return {"ok": bool(data.get("ok")), "description": str(data.get("description") or "Webhook registered")}
 
 
 def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
