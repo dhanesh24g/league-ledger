@@ -750,6 +750,7 @@ export async function initWorkflowShell(currentPath) {
     authRole.textContent = `${user.user_id}`;
   }
 
+  updateHeaderLeagueContext(user);
   ensureLeagueSwitcher(user);
 
   return user;
@@ -758,4 +759,28 @@ export async function initWorkflowShell(currentPath) {
 export function navigateTo(target) {
   if (WORKFLOW_ROUTES.includes(target)) setCurrentWorkflowPage(target);
   window.location.assign(buildWorkflowRoute(target, { preserveDirectAdminFlow: true }));
+}
+
+export function updateHeaderLeagueContext(user, explicitPageName = '') {
+  const appName = document.querySelector('.brand-text .app-name');
+  if (!appName) return;
+
+  const basePageName = explicitPageName
+    || appName.dataset.pageName
+    || appName.textContent?.trim()
+    || '';
+
+  if (!appName.dataset.pageName && basePageName) {
+    appName.dataset.pageName = basePageName;
+  }
+
+  const activeLeagueName = String(
+    user?.active_league_name
+    || user?.league?.name
+    || ''
+  ).trim();
+
+  appName.textContent = activeLeagueName
+    ? `${activeLeagueName} | ${basePageName}`
+    : basePageName;
 }
