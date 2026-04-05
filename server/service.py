@@ -25,6 +25,8 @@ from .integrations import (
 from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
 
 logger = logging.getLogger(__name__)
+TELEGRAM_EXPIRED_SESSION_RETENTION_DAYS = 30
+TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE = 2
 
 try:
     from .supabase_service import (
@@ -56,6 +58,82 @@ def _league_id_from_user(user: dict[str, Any]) -> int:
     if not league_id:
         raise HTTPException(status_code=400, detail="Select a league first")
     return int(league_id)
+
+
+def _telegram_cleanup_cutoff() -> datetime:
+    return _utc_now() - timedelta(days=TELEGRAM_EXPIRED_SESSION_RETENTION_DAYS)
+
+
+def _purge_expired_telegram_sessions(connection: Any, league_id: int | None = None, user_id: int | None = None) -> None:
+    cutoff = _isoformat(_telegram_cleanup_cutoff())
+    query = """
+        DELETE FROM telegram_link_sessions
+        WHERE consumed_at IS NULL
+          AND expires_at < ?
+    """
+    params: list[Any] = [cutoff]
+    if league_id is not None:
+        query += " AND league_id = ?"
+        params.append(int(league_id))
+    if user_id is not None:
+        query += " AND created_by_user_id = ?"
+        params.append(int(user_id))
+    connection.execute(query, tuple(params))
+
+
+def _admin_league_count(connection: Any, user_id: int) -> int:
+    row = connection.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM league_memberships
+        WHERE user_id = ?
+          AND status = 'active'
+          AND role = 'admin'
+        """,
+        (int(user_id),),
+    ).fetchone()
+    return max(1, int(row["count"] if row and row["count"] is not None else 0))
+
+
+def _ensure_telegram_connect_session_capacity(connection: Any, league_id: int, user_id: int) -> None:
+    _purge_expired_telegram_sessions(connection, user_id=user_id)
+    league_count = _admin_league_count(connection, user_id)
+    total_limit = max(TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE, league_count * TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE)
+
+    total_row = connection.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM telegram_link_sessions
+        WHERE created_by_user_id = ?
+          AND consumed_at IS NULL
+          AND expires_at >= ?
+        """,
+        (int(user_id), _isoformat(_utc_now())),
+    ).fetchone()
+    total_pending = int(total_row["count"] if total_row and total_row["count"] is not None else 0)
+    if total_pending >= total_limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many active Telegram connect sessions. Finish or wait for an existing session to expire before creating more (limit {total_limit}).",
+        )
+
+    league_row = connection.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM telegram_link_sessions
+        WHERE created_by_user_id = ?
+          AND league_id = ?
+          AND consumed_at IS NULL
+          AND expires_at >= ?
+        """,
+        (int(user_id), int(league_id), _isoformat(_utc_now())),
+    ).fetchone()
+    league_pending = int(league_row["count"] if league_row and league_row["count"] is not None else 0)
+    if league_pending >= TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE:
+        raise HTTPException(
+            status_code=429,
+            detail="This league already has the maximum active Telegram connect sessions. Finish one before creating another.",
+        )
 
 
 def _normalize_participant_ids(raw_ids: list[int] | tuple[int, ...] | None) -> list[int]:
@@ -604,6 +682,7 @@ def get_telegram_status(user: dict[str, Any]) -> dict[str, Any]:
     league_id = _league_id_from_user(user)
     config = TelegramIntegrationConfig.from_env()
     with DatabaseManager() as c:
+        _purge_expired_telegram_sessions(c)
         row = c.execute(
             """
             SELECT telegram_chat_id, telegram_chat_name, telegram_chat_type, telegram_notifications_enabled, telegram_connected_at
@@ -661,6 +740,7 @@ def create_telegram_connect_session(target: str, user: dict[str, Any], match_id:
     qr_code = render_qr_data_uri(deep_link)
 
     with DatabaseManager() as c:
+        _ensure_telegram_connect_session_capacity(c, league_id, int(user["id"]))
         c.execute(
             """
             INSERT INTO telegram_link_sessions (

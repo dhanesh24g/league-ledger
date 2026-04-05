@@ -34,6 +34,8 @@ logger = logging.getLogger(__name__)
 _CACHE_TTL_SECONDS = 20.0
 _LEAGUE_READ_CACHE: dict[tuple[int, str], tuple[float, dict[str, Any]]] = {}
 _LEAGUE_READ_CACHE_LOCK = Lock()
+TELEGRAM_EXPIRED_SESSION_RETENTION_DAYS = 30
+TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE = 2
 
 
 def _cache_get(league_id: int, scope: str) -> dict[str, Any] | None:
@@ -72,6 +74,74 @@ def _league_id_from_user(user: dict[str, Any]) -> int:
     if not league_id:
         raise HTTPException(status_code=400, detail="Select a league first")
     return int(league_id)
+
+
+def _telegram_cleanup_cutoff() -> datetime:
+    return _utc_now() - timedelta(days=TELEGRAM_EXPIRED_SESSION_RETENTION_DAYS)
+
+
+def _purge_expired_telegram_sessions(supabase: Any, league_id: int | None = None, user_id: int | None = None) -> None:
+    query = (
+        supabase.table("telegram_link_sessions")
+        .delete()
+        .is_("consumed_at", "null")
+        .lt("expires_at", _isoformat(_telegram_cleanup_cutoff()))
+    )
+    if league_id is not None:
+        query = query.eq("league_id", int(league_id))
+    if user_id is not None:
+        query = query.eq("created_by_user_id", int(user_id))
+    query.execute()
+
+
+def _admin_league_count(supabase: Any, user_id: int) -> int:
+    response = (
+        supabase.table("league_memberships")
+        .select("league_id", count="exact")
+        .eq("user_id", int(user_id))
+        .eq("status", "active")
+        .eq("role", "admin")
+        .execute()
+    )
+    return max(1, int(response.count or 0))
+
+
+def _ensure_telegram_connect_session_capacity(supabase: Any, league_id: int, user_id: int) -> None:
+    _purge_expired_telegram_sessions(supabase, user_id=user_id)
+    league_count = _admin_league_count(supabase, user_id)
+    total_limit = max(TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE, league_count * TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE)
+    now_iso = _isoformat(_utc_now())
+
+    total_response = (
+        supabase.table("telegram_link_sessions")
+        .select("id", count="exact")
+        .eq("created_by_user_id", int(user_id))
+        .is_("consumed_at", "null")
+        .gte("expires_at", now_iso)
+        .execute()
+    )
+    total_pending = int(total_response.count or 0)
+    if total_pending >= total_limit:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many active Telegram connect sessions. Finish or wait for an existing session to expire before creating more (limit {total_limit}).",
+        )
+
+    league_response = (
+        supabase.table("telegram_link_sessions")
+        .select("id", count="exact")
+        .eq("created_by_user_id", int(user_id))
+        .eq("league_id", int(league_id))
+        .is_("consumed_at", "null")
+        .gte("expires_at", now_iso)
+        .execute()
+    )
+    league_pending = int(league_response.count or 0)
+    if league_pending >= TELEGRAM_MAX_PENDING_SESSIONS_PER_LEAGUE:
+        raise HTTPException(
+            status_code=429,
+            detail="This league already has the maximum active Telegram connect sessions. Finish one before creating another.",
+        )
 
 
 def _member_player_name(member: dict[str, Any]) -> str:
@@ -735,6 +805,7 @@ def get_telegram_status(user: dict[str, Any]) -> dict[str, Any]:
     config = TelegramIntegrationConfig.from_env()
     target = None
     try:
+        _purge_expired_telegram_sessions(supabase)
         response = supabase.table("league_integrations").select(
             "telegram_chat_id, telegram_chat_name, telegram_chat_type, telegram_notifications_enabled, telegram_connected_at"
         ).eq("league_id", league_id).limit(1).execute()
@@ -781,6 +852,7 @@ def create_telegram_connect_session(target: str, user: dict[str, Any], match_id:
     ensure_telegram_webhook(config)
 
     league_id = _league_id_from_user(user)
+    _ensure_telegram_connect_session_capacity(supabase, league_id, int(user["id"]))
     session_id = secrets.token_urlsafe(18)
     raw_token = secrets.token_urlsafe(24)
     expires_at = _utc_now() + timedelta(minutes=15)

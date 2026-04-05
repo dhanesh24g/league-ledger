@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -76,6 +77,10 @@ from .supabase_service import (
 router = APIRouter(prefix="/api")
 
 
+def _is_production_env() -> bool:
+    return os.getenv("APP_ENV", "development").strip().lower() == "production"
+
+
 @router.get("/state")
 def state(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, Any]:
     return get_state(user)
@@ -145,6 +150,19 @@ def telegram_test_message(
     user: dict[str, Any] = Depends(require_admin),
 ) -> dict[str, Any]:
     config = TelegramIntegrationConfig.from_env()
+    status = get_telegram_status(user)
+    target = status.get("target") or {}
+    override_chat_id = str(payload.chat_id or "").strip()
+
+    if _is_production_env() and override_chat_id:
+        raise HTTPException(status_code=403, detail="chat_id override is disabled in production")
+
+    chat_id = override_chat_id or str(target.get("chat_id") or "").strip()
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="Telegram target is not configured for this league")
+    if _is_production_env() and not bool(target.get("enabled")):
+        raise HTTPException(status_code=400, detail="Telegram notifications are disabled for this league")
+
     intro = (
         f"League Ledger Telegram test\n\n"
         f"Sent by: {user.get('user_id') or user.get('full_name') or 'admin'}"
@@ -153,7 +171,7 @@ def telegram_test_message(
         title=intro,
         lines=[payload.message],
     )
-    result = send_telegram_message(message=message, chat_id=payload.chat_id, config=config)
+    result = send_telegram_message(message=message, chat_id=chat_id, config=config)
     return {
         "ok": result.sent,
         "chat_id": result.chat_id,
