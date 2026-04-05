@@ -52,6 +52,7 @@ async function callApi(url, options = {}) {
 
 const form = document.getElementById('reset-password-form');
 const result = document.getElementById('reset-password-result');
+const submitButton = form?.querySelector('button[type="submit"]');
 
 function getResetToken() {
   const token = new URLSearchParams(window.location.search).get('token');
@@ -61,6 +62,7 @@ function getResetToken() {
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
   result.textContent = '';
+  const originalLabel = submitButton?.textContent || 'Reset Password';
 
   const token = getResetToken();
   if (!token) {
@@ -82,6 +84,10 @@ form?.addEventListener('submit', async (event) => {
   }
 
   try {
+    if (submitButton) {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Resetting...';
+    }
     await callApi('/api/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify({ token, new_password: newPassword }),
@@ -93,7 +99,16 @@ form?.addEventListener('submit', async (event) => {
     }, 1200);
   } catch (error) {
     result.textContent = error instanceof Error ? error.message : String(error);
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalLabel;
+    }
   }
 });
 
 initThemeToggle();
+
+if (!getResetToken() && submitButton) {
+  submitButton.disabled = true;
+}

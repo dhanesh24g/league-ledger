@@ -5,9 +5,13 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import hmac
 import json
+import logging
 import os
 import random
 import secrets
+import smtplib
+import ssl
+from email.message import EmailMessage
 from threading import Lock
 import time
 from typing import Any
@@ -33,6 +37,7 @@ LEAGUE_MEMBERS_CACHE_TTL_SECONDS = 20
 _USER_ID_CACHE: dict[str, Any] = {"loaded_at": 0.0, "values": set()}
 _LEAGUE_MEMBERS_CACHE: dict[int, tuple[float, dict[str, Any]]] = {}
 _LEAGUE_MEMBERS_CACHE_LOCK = Lock()
+logger = logging.getLogger(__name__)
 
 
 def _members_cache_get(league_id: int) -> dict[str, Any] | None:
@@ -322,6 +327,78 @@ def _hash_reset_token(token: str) -> str:
     return hmac.new(_secret(), token.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def _password_reset_delivery_mode() -> str:
+    if _smtp_ready():
+        return "email"
+    if os.getenv("APP_ENV", "development").strip().lower() == "production":
+        return "unavailable"
+    return "link"
+
+
+def _public_app_base_url() -> str:
+    return os.getenv("APP_BASE_URL", "").strip().rstrip("/")
+
+
+def _build_password_reset_link(token: str) -> str:
+    path = f"/reset-password?token={token}"
+    base_url = _public_app_base_url()
+    return f"{base_url}{path}" if base_url else path
+
+
+def _smtp_ready() -> bool:
+    host = os.getenv("SMTP_HOST", "").strip()
+    from_email = os.getenv("SMTP_FROM_EMAIL", "").strip()
+    return bool(host and from_email)
+
+
+def _send_password_reset_email(email: str, reset_link: str) -> None:
+    host = os.getenv("SMTP_HOST", "").strip()
+    port = int(os.getenv("SMTP_PORT", "587").strip() or "587")
+    username = os.getenv("SMTP_USERNAME", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "")
+    from_email = os.getenv("SMTP_FROM_EMAIL", "").strip()
+    from_name = os.getenv("SMTP_FROM_NAME", "League Ledger").strip() or "League Ledger"
+    use_ssl = os.getenv("SMTP_USE_SSL", "false").strip().lower() in {"1", "true", "yes", "on"}
+    use_tls = os.getenv("SMTP_USE_TLS", "true").strip().lower() not in {"0", "false", "no", "off"}
+
+    if not host or not from_email:
+        raise RuntimeError("SMTP configuration is incomplete")
+
+    message = EmailMessage()
+    message["Subject"] = "Reset your League Ledger password"
+    message["From"] = f"{from_name} <{from_email}>"
+    message["To"] = email
+    message.set_content(
+        "\n".join(
+            [
+                "A password reset was requested for your League Ledger account.",
+                "",
+                f"Reset your password: {reset_link}",
+                "",
+                "This link expires in 30 minutes and can be used only once.",
+                "If you did not request this reset, you can ignore this email.",
+            ]
+        )
+    )
+
+    context = ssl.create_default_context()
+    if use_ssl:
+        with smtplib.SMTP_SSL(host, port, timeout=15, context=context) as smtp:
+            if username:
+                smtp.login(username, password)
+            smtp.send_message(message)
+        return
+
+    with smtplib.SMTP(host, port, timeout=15) as smtp:
+        smtp.ehlo()
+        if use_tls:
+            smtp.starttls(context=context)
+            smtp.ehlo()
+        if username:
+            smtp.login(username, password)
+        smtp.send_message(message)
+
+
 def _find_user_for_password_reset(identifier: str) -> dict[str, Any] | None:
     normalized_identifier = str(identifier or "").strip()
     if not normalized_identifier:
@@ -354,9 +431,16 @@ def _find_user_for_password_reset(identifier: str) -> dict[str, Any] | None:
 
 def request_password_reset(identifier: str) -> dict[str, Any]:
     generic_message = "If an account exists for that email/username, reset instructions have been generated."
+    delivery_mode = _password_reset_delivery_mode()
+    if delivery_mode == "unavailable":
+        return {
+            "message": "Password reset is not configured right now. Please contact the league admin.",
+            "delivery": "unavailable",
+        }
+
     user = _find_user_for_password_reset(identifier)
     if not user:
-        return {"message": generic_message}
+        return {"message": generic_message, "delivery": delivery_mode}
 
     token = secrets.token_urlsafe(32)
     token_hash = _hash_reset_token(token)
@@ -382,11 +466,32 @@ def request_password_reset(identifier: str) -> dict[str, Any]:
                 (int(user["id"]), token_hash, expires_at),
             )
 
-    reset_link = f"/reset-password?token={token}"
-    include_link = os.getenv("APP_ENV", "development").lower() != "production"
+    reset_link = _build_password_reset_link(token)
+    if delivery_mode == "email":
+        try:
+            _send_password_reset_email(str(user["email"]), reset_link)
+        except Exception:
+            logger.exception("Failed to send password reset email")
+            if get_supabase_client():
+                supabase = get_supabase_client()
+                assert supabase is not None
+                supabase.table("password_reset_tokens").delete().eq("token_hash", token_hash).execute()
+            else:
+                with DatabaseManager() as connection:
+                    connection.execute("DELETE FROM password_reset_tokens WHERE token_hash = ?", (token_hash,))
+            return {
+                "message": "Password reset email could not be sent right now. Please contact the league admin.",
+                "delivery": "email_error",
+            }
+        return {
+            "message": "If an account exists for that email/username, a reset email has been sent.",
+            "delivery": "email",
+        }
+
     return {
         "message": generic_message,
-        **({"reset_link": reset_link} if include_link else {}),
+        "delivery": "link",
+        "reset_link": reset_link,
     }
 
 
