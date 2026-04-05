@@ -70,8 +70,8 @@ function setLoginHintState(text, kind = 'neutral') {
 function toFriendlyLoginError(message) {
   const msg = String(message || '').toLowerCase();
   if (!msg) return 'Login failed. Please try again.';
-  if (msg.includes('invalid user id or password') || msg.includes('invalid credentials')) {
-    return 'Invalid username or password. Please try again.';
+  if (msg.includes('invalid user id/email or password') || msg.includes('invalid user id or password') || msg.includes('invalid credentials')) {
+    return 'Invalid user ID/email or password. Please try again.';
   }
   if (
     (msg.includes('body.user_id') && msg.includes('at least 1 character'))
@@ -88,7 +88,7 @@ function toFriendlyLoginError(message) {
     return 'Network error. Please check your connection and try again.';
   }
   if (msg.includes('value_error.missing') || msg.includes('field required')) {
-    return 'Username and password are required.';
+    return 'User ID/email and password are required.';
   }
   return message;
 }
@@ -237,7 +237,7 @@ async function initLogin() {
 
   try {
     authConfig = await callApi('/api/auth/config');
-    setLoginHintState(`Use your username to sign in. Sessions stay valid for ${authConfig.session_ttl_hours || 4} hours.`);
+    setLoginHintState(`Use your user ID or email to sign in. Sessions stay valid for ${authConfig.session_ttl_hours || 4} hours.`);
     initGoogleLogin();
   } catch (err) {
     setLoginHintState('');
@@ -254,7 +254,7 @@ loginForm.addEventListener('submit', async (event) => {
   };
 
   if (!payload.user_id || !payload.password) {
-    setLoginHintState('Username and password are required.', 'error');
+    setLoginHintState('User ID/email and password are required.', 'error');
     return;
   }
 
