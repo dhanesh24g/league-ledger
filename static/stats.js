@@ -1,6 +1,7 @@
 import {
   callApi,
   clearAuthStorage,
+  ensureLeagueSwitcher,
   initThemeToggle,
   setActiveLeagueId,
   showError,
@@ -1248,6 +1249,7 @@ async function init() {
   if (user.active_league_id) {
     setActiveLeagueId(user.active_league_id);
   }
+  ensureLeagueSwitcher(user);
 
   const effectiveRole = user.league_role === 'admin' ? 'admin' : 'read';
   localStorage.setItem('league-ledger-user-role', effectiveRole);

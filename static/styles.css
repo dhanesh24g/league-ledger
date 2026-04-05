@@ -390,6 +390,19 @@ body.modal-open {
   min-width: min(200px, 48vw);
 }
 
+.header-center.has-league-switcher {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  align-content: center;
+}
+
+.header-center.has-league-switcher select,
+.header-center.has-league-switcher #league-switcher {
+  width: 100%;
+  min-width: 0;
+}
+
 .auth-panel {
   max-width: 520px;
   margin: 8vh auto 0;
@@ -7449,6 +7462,146 @@ th {
   max-width: none;
 }
 
+.league-settings-page .shell-header {
+  padding: 14px 24px 8px;
+}
+
+.league-settings-page .shell-header p {
+  max-width: 620px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.league-settings-page .shell-main {
+  padding-top: 8px;
+  gap: 12px;
+}
+
+.league-settings-page .panel {
+  padding: 16px;
+}
+
+.league-settings-page .panel h2 {
+  margin-bottom: 4px;
+  font-size: clamp(22px, 2.1vw, 26px);
+  line-height: 1.1;
+}
+
+.league-settings-page .panel > .muted {
+  max-width: 620px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.league-settings-panel-spaced {
+  margin-top: 0;
+}
+
+.league-settings-page .settings-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.league-settings-page .settings-card {
+  padding: 11px 12px;
+  border-radius: 12px;
+  gap: 4px;
+}
+
+.league-settings-page .settings-card strong {
+  font-size: clamp(16px, 1.5vw, 19px);
+  line-height: 1.12;
+}
+
+.league-settings-page .settings-card .muted,
+.league-settings-page .settings-card small {
+  font-size: 12px;
+}
+
+.league-settings-page .feed {
+  gap: 8px;
+}
+
+.league-settings-page .feed-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.league-settings-page .settings-member-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.league-settings-page .settings-member-item strong {
+  font-size: 15px;
+}
+
+.league-settings-page .settings-member-item p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.league-settings-page .settings-member-meta {
+  min-width: 260px;
+  justify-items: end;
+  gap: 8px;
+}
+
+.league-settings-page .settings-member-badges {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.league-settings-page .settings-self-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.league-settings-page .member-role-actions {
+  gap: 8px;
+}
+
+.league-settings-page .settings-member-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.league-settings-page .member-role-select,
+.league-settings-page .save-member-role {
+  min-height: 38px;
+}
+
+.league-settings-page .member-role-select {
+  min-width: 0;
+}
+
+.league-settings-page .save-member-role {
+  min-width: 84px;
+  padding-inline: 14px;
+}
+
+.league-settings-page .summary-chip-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.league-settings-page .status-chip {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.league-settings-page .feed-item > strong {
+  color: var(--text);
+}
+
 .mobile-select-proxy-copy {
   min-width: 0;
   overflow: hidden;
@@ -8338,6 +8491,54 @@ th {
     pointer-events: none;
   }
 
+  .league-settings-page .shell-header {
+    padding: 16px 14px 8px;
+  }
+
+  .league-settings-page .shell-main {
+    padding: 10px 14px 28px;
+    gap: 12px;
+  }
+
+  .league-settings-page .panel {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .league-settings-page .panel h2 {
+    font-size: 24px;
+  }
+
+  .league-settings-page .panel > .muted {
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .league-settings-page .settings-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .league-settings-page .settings-card {
+    padding: 12px;
+  }
+
+  .league-settings-page .settings-card strong {
+    font-size: 18px;
+  }
+
+  .league-settings-page .settings-member-item,
+  .league-settings-page .settings-member-meta,
+  .league-settings-page .member-role-actions {
+    align-items: stretch;
+  }
+
+  .league-settings-page .member-role-select,
+  .league-settings-page .save-member-role {
+    width: 100%;
+    min-width: 0;
+  }
+
   .stats-page .stats-current-user-grid {
     grid-template-columns: 1fr;
   }
@@ -8578,7 +8779,7 @@ th {
 .telegram-modal {
   position: fixed;
   inset: 0;
-  z-index: 1200;
+  z-index: 3200;
   display: grid;
   place-items: center;
   padding: 16px;
@@ -8617,6 +8818,10 @@ th {
   justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+.telegram-modal-head > div {
+  min-width: 0;
 }
 
 .telegram-modal-kicker {
@@ -8931,19 +9136,26 @@ th {
 
 @media (max-width: 760px) {
   .telegram-modal {
-    padding: 10px;
+    place-items: start stretch;
+    align-content: start;
+    overflow-y: auto;
+    padding: calc(env(safe-area-inset-top, 0px) + 10px) 10px calc(env(safe-area-inset-bottom, 0px) + 12px);
   }
 
   .telegram-modal-panel {
-    width: calc(100vw - 20px);
-    max-height: calc(100vh - 20px);
+    width: 100%;
+    max-height: none;
+    min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 22px);
     padding: 12px;
     border-radius: 18px;
   }
 
   .telegram-modal-head {
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
   .telegram-choice-grid,
@@ -8960,22 +9172,35 @@ th {
   }
 
   .telegram-qr-card {
-    justify-items: flex-start;
+    justify-items: start;
   }
 
   .telegram-qr-image {
-    width: min(132px, 100%);
+    width: min(116px, 100%);
   }
 
   .telegram-choice-card,
   .telegram-surface-card,
   .telegram-surface-card-compact {
-    padding: 11px;
-    border-radius: 16px;
+    padding: 10px;
+    border-radius: 14px;
   }
 
   .telegram-modal-head h2 {
-    font-size: 1.05rem;
+    font-size: 0.98rem;
+    line-height: 1.08;
+  }
+
+  .telegram-modal-kicker {
+    margin-bottom: 2px;
+    font-size: 0.58rem;
+  }
+
+  .telegram-modal-head .ghost {
+    min-width: 76px;
+    min-height: 34px;
+    padding: 7px 12px;
+    justify-self: end;
   }
 
   .telegram-command-code {
@@ -8986,5 +9211,28 @@ th {
   .telegram-match-pill {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .telegram-surface-card h3 {
+    font-size: 0.92rem;
+  }
+
+  .telegram-surface-card p,
+  .telegram-choice-card span {
+    font-size: 0.82rem;
+    line-height: 1.4;
+  }
+
+  .telegram-choice-card strong {
+    font-size: 0.86rem;
+  }
+
+  .telegram-inline-actions .primary,
+  .telegram-inline-actions .ghost,
+  .telegram-connect-main .ghost,
+  .telegram-open-link.primary {
+    min-height: 42px;
+    padding: 10px 14px;
+    font-size: 0.88rem;
   }
 }

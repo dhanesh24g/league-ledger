@@ -33,7 +33,7 @@
   </script>
 </head>
 
-<body>
+<body class="league-settings-page">
   <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
     <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
     <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
@@ -80,25 +80,25 @@
   </header>
 
   <header class="shell-header">
-    <p>Centralized governance for membership access, role policy, and compliance controls.</p>
+    <p>Manage membership access, role assignments, and join activity for the active league.</p>
   </header>
 
   <main class="shell-main">
     <section class="panel active">
-      <h2>Governance Overview</h2>
-      <p class="muted">This section is admin-only and is the designated home for league access controls.</p>
+      <h2>League Overview</h2>
+      <p class="muted">A compact summary of the current league, member mix, and approval load.</p>
 
       <div id="league-settings-summary" class="settings-grid"></div>
     </section>
 
-    <section class="panel active" style="margin-top: 16px;">
-      <h2>Member Access</h2>
-      <p class="muted">Promote trusted members to admin here. At least one admin is always preserved for the league.</p>
+    <section class="panel active league-settings-panel-spaced">
+      <h2>Members & Roles</h2>
+      <p class="muted">Promote trusted members to admin here. The app always preserves at least one admin.</p>
       <div id="league-settings-members" class="feed"></div>
     </section>
 
-    <section class="panel active" style="margin-top: 16px;">
-      <h2>Roadmap</h2>
+    <section class="panel active league-settings-panel-spaced">
+      <h2>Next Up</h2>
       <div class="feed-item">
         <strong>Coming next:</strong> role-change activity history, finer-grained permissions, and approval workflows in one place.
       </div>

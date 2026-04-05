@@ -653,11 +653,13 @@ function initLogout() {
   });
 }
 
-function ensureLeagueSwitcher(user) {
+export function ensureLeagueSwitcher(user) {
   const memberships = Array.isArray(user.memberships) ? user.memberships : [];
   const existing = document.getElementById('league-switcher');
   if (existing) existing.remove();
-  if (!memberships.length) return;
+  const headerCenter = document.querySelector('.header-center');
+  headerCenter?.classList.remove('has-league-switcher');
+  if (memberships.length < 2) return;
 
   const select = document.createElement('select');
   select.id = 'league-switcher';
@@ -677,17 +679,23 @@ function ensureLeagueSwitcher(user) {
     writeWorkflowState(readWorkflowState());
     window.location.reload();
   });
+  registerMobileSelectProxy(select, {
+    variant: 'compact',
+    placeholder: 'Choose league',
+  });
 
   const topNav = document.getElementById('top-nav');
   const fallbackParent =
-    document.querySelector('.header-center') ||
+    headerCenter ||
     document.querySelector('.header-actions') ||
     document.querySelector('.header-content');
 
   if (topNav && topNav.parentElement) {
     topNav.parentElement.insertBefore(select, topNav);
+    topNav.parentElement.classList.add('has-league-switcher');
   } else if (fallbackParent) {
     fallbackParent.insertBefore(select, fallbackParent.firstChild);
+    fallbackParent.classList.add('has-league-switcher');
   }
 }
 
@@ -742,7 +750,7 @@ export async function initWorkflowShell(currentPath) {
     authRole.textContent = `${user.user_id}`;
   }
 
-  // League switcher intentionally disabled in header UI.
+  ensureLeagueSwitcher(user);
 
   return user;
 }
