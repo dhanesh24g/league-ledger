@@ -6,12 +6,14 @@ import {
   initWorkflowShell,
   navigateTo,
   queueToast,
+  registerMobileSelectProxy,
   setButtonLoading,
   setActiveLeagueId,
   setSetupDraft,
   showError,
   showLoading,
   showSuccess,
+  syncMobileSelectProxy,
 } from '/static/workflow-common.js';
 import { createPayoutController } from '/static/payouts.js';
 import { initNotifications } from '/static/notifications.js';
@@ -397,6 +399,7 @@ function renderLeague(league) {
   suppressDraftSync = true;
 
   leagueForm.elements.sport.value = source?.sport || 'Cricket';
+  syncMobileSelectProxy(leagueForm.elements.sport);
   leagueForm.elements.name.value = source?.name || '';
   leagueForm.elements.tournament.value = source?.tournament || 'IPL';
   leagueForm.elements.entry_fee.value = source?.entry_fee || 100;
@@ -532,6 +535,10 @@ async function init() {
 
   authUser = await initWorkflowShell('/setup');
   if (!authUser) return;
+  registerMobileSelectProxy(leagueForm.elements.sport, {
+    variant: 'full',
+    placeholder: 'Select sport',
+  });
   applyRoleBasedUI();
   if (isCreateMode) {
     setActiveLeagueId('');

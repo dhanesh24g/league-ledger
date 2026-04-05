@@ -8,9 +8,11 @@ import {
   isDirectAdminFlow,
   navigateTo,
   queueToast,
+  registerMobileSelectProxy,
   setButtonLoading,
   setCurrentWorkflowPage,
   setSelectedMatchId,
+  syncMobileSelectProxy,
   setWinnerDraft,
   showError,
   showLoading,
@@ -465,6 +467,7 @@ function renderMatchSelect() {
   const activeMatchId = selectedMatch ? String(selectedMatch.id) : String(appState.matches[0].id);
   matchSelect.value = activeMatchId;
   setSelectedMatchId(activeMatchId);
+  syncMobileSelectProxy(matchSelect);
   updateMatchActionState();
 }
 
@@ -1140,6 +1143,10 @@ async function init() {
   winnersForm.innerHTML = '<div class="feed-item">Loading winner assignment...</div>';
   authUser = await initWorkflowShell('/winners');
   if (!authUser) return;
+  registerMobileSelectProxy(matchSelect, {
+    variant: 'full',
+    placeholder: 'Choose a match',
+  });
   applyEntryModeUI();
   applyRoleBasedUI();
   appState = await callApi('/api/state');

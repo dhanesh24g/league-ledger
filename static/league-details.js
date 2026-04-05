@@ -2,7 +2,9 @@ import {
   callApi,
   clearAuthStorage,
   initThemeToggle,
+  registerMobileSelectProxy,
   setActiveLeagueId,
+  syncMobileSelectProxy,
   showError,
 } from '/static/workflow-common.js';
 import { initNotifications } from '/static/notifications.js';
@@ -40,6 +42,11 @@ function setupNav(user) {
     .map((item) => `<option value="${item.value}">${item.label}</option>`)
     .join('');
   topNav.value = '/league-details';
+  registerMobileSelectProxy(topNav, {
+    variant: 'compact',
+    placeholder: 'Navigate',
+  });
+  syncMobileSelectProxy(topNav);
 
   topNav.addEventListener('change', () => {
     window.location.href = topNav.value;
