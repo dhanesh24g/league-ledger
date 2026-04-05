@@ -2003,6 +2003,14 @@ h3 {
   opacity: 0.7;
 }
 
+.matches-page .form-group input[type="date"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  display: block;
+}
+
 .match-vs-inline {
   display: flex;
   align-items: center;
@@ -2078,8 +2086,9 @@ h3 {
   }
 
   .match-vs-inline {
-    flex-direction: column;
-    gap: 1rem;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
     padding: 1rem;
   }
 
@@ -2087,11 +2096,24 @@ h3 {
     width: 45px;
     height: 45px;
     font-size: 12px;
-    order: -1;
+    order: 0;
+    margin: 0 auto;
   }
 
   .team-input-group {
     width: 100%;
+  }
+
+  .matches-page .team-input-group:first-child {
+    order: 1;
+  }
+
+  .matches-page .vs-divider {
+    order: 2;
+  }
+
+  .matches-page .team-input-group:last-child {
+    order: 3;
   }
 }
 
@@ -7401,6 +7423,47 @@ th {
   color: var(--muted);
 }
 
+.mobile-select-proxy {
+  width: min(214px, 100%);
+  max-width: 214px;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  color: var(--text);
+  display: none;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+  box-shadow: var(--input-shadow);
+}
+
+.mobile-select-shell {
+  display: contents;
+}
+
+.mobile-select-shell.mobile-select-shell-full .mobile-select-proxy {
+  width: 100%;
+  max-width: none;
+}
+
+.mobile-select-proxy-copy {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mobile-select-proxy-icon {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+}
+
 .stats-page .earners-compact-list {
   display: grid;
   gap: 6px;
@@ -8216,6 +8279,58 @@ th {
   }
 
   .stats-page .stats-mobile-select-proxy {
+    display: inline-flex;
+    width: 100%;
+    max-width: none;
+    align-self: flex-start;
+    pointer-events: none;
+  }
+
+  .mobile-select-shell.mobile-select-shell-active {
+    position: relative;
+    display: inline-flex;
+    width: min(214px, 100%);
+    max-width: 214px;
+    align-self: flex-start;
+  }
+
+  .mobile-select-shell.mobile-select-shell-full.mobile-select-shell-active {
+    display: flex;
+    width: 100%;
+    max-width: none;
+  }
+
+  .header-center .mobile-select-shell.mobile-select-shell-active {
+    width: min(214px, 100%);
+    max-width: 214px;
+  }
+
+  .winners-page .inline-form .mobile-select-shell.mobile-select-shell-active,
+  .setup-page .mobile-select-shell.mobile-select-shell-full.mobile-select-shell-active,
+  .member-role-actions .mobile-select-shell.mobile-select-shell-active {
+    width: 100%;
+    max-width: none;
+  }
+
+  .mobile-select-source {
+    position: absolute !important;
+    inset: 0 !important;
+    opacity: 0.015 !important;
+    pointer-events: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    z-index: 3 !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    background: transparent !important;
+    color: transparent !important;
+    white-space: nowrap !important;
+  }
+
+  .mobile-select-proxy {
     display: inline-flex;
     width: 100%;
     max-width: none;

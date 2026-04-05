@@ -1,6 +1,7 @@
 import {
   callApi,
   initWorkflowShell,
+  registerMobileSelectProxy,
   setButtonLoading,
   showError,
   showSuccess,
@@ -102,6 +103,13 @@ function renderMembers(members) {
       } finally {
         restoreButton();
       }
+    });
+  });
+
+  membersZone.querySelectorAll('.member-role-select').forEach((select) => {
+    registerMobileSelectProxy(select, {
+      variant: 'full',
+      placeholder: 'Select role',
     });
   });
 }

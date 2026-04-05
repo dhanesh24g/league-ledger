@@ -13,6 +13,11 @@ const STORAGE_KEYS = {
 const FLASH_TOAST_KEY = 'league-ledger-flash-toast';
 let refreshInFlight = null;
 let refreshTimerId = null;
+let mobileSelectProxyResizeBound = false;
+let mobileSelectProxyIdCounter = 0;
+
+const MOBILE_SELECT_BREAKPOINT = '(max-width: 760px)';
+const mobileSelectRegistry = new Set();
 
 const PROACTIVE_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 const MIN_PROACTIVE_REFRESH_DELAY_MS = 15 * 1000;
@@ -511,6 +516,95 @@ export function initThemeToggle() {
   });
 }
 
+function isMobileSelectViewport() {
+  return Boolean(window.matchMedia && window.matchMedia(MOBILE_SELECT_BREAKPOINT).matches);
+}
+
+function ensureMobileSelectId(select) {
+  if (select.id) return select.id;
+  mobileSelectProxyIdCounter += 1;
+  const name = select.getAttribute('name') || 'select';
+  select.id = `mobile-select-${name.replace(/[^a-z0-9_-]+/gi, '-').toLowerCase()}-${mobileSelectProxyIdCounter}`;
+  return select.id;
+}
+
+function ensureMobileSelectProxyShell(select, config = {}) {
+  if (!select) return null;
+
+  const selectId = ensureMobileSelectId(select);
+  const variant = config.variant === 'full' ? 'full' : 'compact';
+
+  let shell = select.closest(`.mobile-select-shell[data-select-id="${selectId}"]`);
+  if (!shell) {
+    shell = document.createElement('div');
+    shell.className = 'mobile-select-shell';
+    shell.dataset.selectId = selectId;
+    select.insertAdjacentElement('afterend', shell);
+    shell.appendChild(select);
+  }
+
+  shell.classList.toggle('mobile-select-shell-full', variant === 'full');
+  shell.classList.toggle('mobile-select-shell-compact', variant !== 'full');
+
+  let proxy = shell.querySelector(`.mobile-select-proxy[data-select-id="${selectId}"]`);
+  if (!proxy) {
+    proxy = document.createElement('button');
+    proxy.type = 'button';
+    proxy.className = 'mobile-select-proxy hidden';
+    proxy.dataset.selectId = selectId;
+    proxy.tabIndex = -1;
+    proxy.setAttribute('aria-hidden', 'true');
+    proxy.innerHTML = `
+      <span class="mobile-select-proxy-copy"></span>
+      <span class="mobile-select-proxy-icon" aria-hidden="true">⌄</span>
+    `;
+    shell.appendChild(proxy);
+  }
+
+  const syncProxyCopy = () => {
+    const selectedOption = select.options[select.selectedIndex];
+    const label = selectedOption?.textContent?.trim() || config.placeholder || 'Choose an option';
+    const copy = proxy.querySelector('.mobile-select-proxy-copy');
+    if (copy) copy.textContent = label;
+    proxy.disabled = Boolean(select.disabled);
+  };
+
+  if (!select.dataset.mobileSelectProxyBound) {
+    select.addEventListener('change', syncProxyCopy);
+    select.dataset.mobileSelectProxyBound = 'true';
+  }
+
+  syncProxyCopy();
+  return { shell, proxy };
+}
+
+export function syncMobileSelectProxy(select) {
+  if (!select) return;
+  const selectId = ensureMobileSelectId(select);
+  const mobile = isMobileSelectViewport();
+  const shell = select.closest(`.mobile-select-shell[data-select-id="${selectId}"]`);
+  const proxy = shell?.querySelector(`.mobile-select-proxy[data-select-id="${selectId}"]`);
+  select.classList.toggle('mobile-select-source', mobile);
+  shell?.classList.toggle('mobile-select-shell-active', mobile);
+  proxy?.classList.toggle('hidden', !mobile);
+}
+
+function syncAllMobileSelectProxies() {
+  mobileSelectRegistry.forEach((select) => syncMobileSelectProxy(select));
+}
+
+export function registerMobileSelectProxy(select, config = {}) {
+  if (!select) return null;
+  const proxyParts = ensureMobileSelectProxyShell(select, config);
+  mobileSelectRegistry.add(select);
+  if (!mobileSelectProxyResizeBound) {
+    mobileSelectProxyResizeBound = true;
+    window.addEventListener('resize', syncAllMobileSelectProxies);
+  }
+  syncMobileSelectProxy(select);
+  return proxyParts?.proxy || null;
+}
+
 function initTopNav(currentPath) {
   const topNav = document.getElementById('top-nav');
   if (!topNav) return;
@@ -523,6 +617,11 @@ function initTopNav(currentPath) {
     const target = topNav.value;
     if (WORKFLOW_ROUTES.includes(target)) setCurrentWorkflowPage(target);
     window.location.href = target;
+  });
+
+  registerMobileSelectProxy(topNav, {
+    variant: 'compact',
+    placeholder: 'Navigate',
   });
 }
 
