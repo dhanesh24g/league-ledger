@@ -235,11 +235,15 @@ function renderTelegramConnectedState(status, match, intro) {
       </div>
       <div class="telegram-inline-actions">
         <button id="telegram-send-now" type="button" class="primary">Send Match Update</button>
+        <button id="telegram-change-target" type="button" class="ghost">Change Telegram Target</button>
         <button id="telegram-skip-now" type="button" class="ghost">Skip for now</button>
       </div>
     </article>
   `);
   document.getElementById('telegram-skip-now')?.addEventListener('click', closeTelegramModal);
+  document.getElementById('telegram-change-target')?.addEventListener('click', () => {
+    renderTelegramConnectChoiceState(match, 'Choose a new Telegram destination for this league.', status);
+  });
   document.getElementById('telegram-send-now')?.addEventListener('click', async (event) => {
     await sendTelegramUpdateForMatch(match?.id, event.currentTarget);
   });
@@ -372,28 +376,9 @@ async function sendTelegramUpdateForMatch(matchId, triggerButton = null) {
   }
 }
 
-async function openTelegramModal({ matchId = null, reason = '' } = {}) {
-  const match = appState.matches.find((item) => String(item.id) === String(matchId || matchSelect.value));
-  if (!match) {
-    showError('Choose a match first.');
-    return;
-  }
-  telegramState.activeMatchId = String(match.id);
-  const status = await loadTelegramStatus();
-  if (!status.bot_ready) {
-    renderTelegramConfigError(status, match, reason);
-    return;
-  }
-  if (!status.webhook_ready || !status.webhook_registered) {
-    renderTelegramConfigError(status, match, reason);
-    return;
-  }
-  if (status.target?.chat_id) {
-    renderTelegramConnectedState(status, match, reason || `Connected to ${telegramTargetLabel(status)}. Send this match update now?`);
-    return;
-  }
+function renderTelegramConnectChoiceState(match, intro = '', statusSnapshot = null) {
   renderTelegramModal(`
-    ${telegramSetupSummary(match, reason || 'Match update recorded. Connect Telegram once and the league can send future result notifications in one tap.')}
+    ${telegramSetupSummary(match, intro || 'Match update recorded. Connect Telegram once and the league can send future result notifications in one tap.')}
     <article class="telegram-surface-card">
       <span class="telegram-surface-kicker">Step 1</span>
       <h3>Choose how you want to connect</h3>
@@ -412,10 +397,44 @@ async function openTelegramModal({ matchId = null, reason = '' } = {}) {
         <button id="telegram-close-choice" type="button" class="ghost">Close</button>
       </div>
     </article>
+    ${statusSnapshot?.target ? `
+      <article class="telegram-surface-card telegram-surface-card-muted">
+        <span class="telegram-surface-kicker">Current league target</span>
+        <h3>${escapeHtml(statusSnapshot.target.chat_name || 'Telegram target already configured')}</h3>
+        <p>Connecting again will replace the existing destination for this league.</p>
+      </article>
+    ` : ''}
   `);
   document.getElementById('telegram-close-choice')?.addEventListener('click', closeTelegramModal);
   document.getElementById('telegram-connect-personal')?.addEventListener('click', (event) => startTelegramConnect('personal', match.id, event.currentTarget));
   document.getElementById('telegram-connect-group')?.addEventListener('click', (event) => startTelegramConnect('group', match.id, event.currentTarget));
+}
+
+async function openTelegramModal({ matchId = null, reason = '', forceReconnect = false } = {}) {
+  const match = appState.matches.find((item) => String(item.id) === String(matchId || matchSelect.value));
+  if (!match) {
+    showError('Choose a match first.');
+    return;
+  }
+  telegramState.activeMatchId = String(match.id);
+  const status = await loadTelegramStatus();
+  if (!status.bot_ready) {
+    renderTelegramConfigError(status, match, reason);
+    return;
+  }
+  if (!status.webhook_ready || !status.webhook_registered) {
+    renderTelegramConfigError(status, match, reason);
+    return;
+  }
+  if (status.target?.chat_id && !forceReconnect) {
+    renderTelegramConnectedState(status, match, reason || `Connected to ${telegramTargetLabel(status)}. Send this match update now?`);
+    return;
+  }
+  renderTelegramConnectChoiceState(
+    match,
+    reason || 'Match update recorded. Connect Telegram once and the league can send future result notifications in one tap.',
+    status,
+  );
 }
 
 function renderMatchSelect() {

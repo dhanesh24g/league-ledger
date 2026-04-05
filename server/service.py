@@ -610,6 +610,12 @@ def _fetch_match_notification_context_sqlite(c: Any, league_id: int, match_id: i
     ).fetchone()
     if not league_row or not match_row:
         raise HTTPException(status_code=404, detail="Match not found")
+    match_status = str(match_row["status"] or "pending").lower()
+    if match_status not in {"completed", "canceled"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Telegram updates can only be sent after winners are saved or a washout is recorded",
+        )
 
     players = _sync_active_members_to_players(c, league_id)
     player_name_by_id = {int(player["id"]): str(player["name"]) for player in players}
@@ -636,7 +642,7 @@ def _fetch_match_notification_context_sqlite(c: Any, league_id: int, match_id: i
             rank,
             {
                 "rank": rank,
-                "label": _rank_label(rank, str(match_row["status"] or "pending"), True),
+                "label": _rank_label(rank, match_status, True),
                 "amount": float(row["amount"]),
                 "players": [],
             },
@@ -650,7 +656,7 @@ def _fetch_match_notification_context_sqlite(c: Any, league_id: int, match_id: i
         "match_number": match_number_map.get(int(match_row["id"]), 0),
         "title": str(match_row["title"]),
         "match_date": str(match_row["match_date"]),
-        "status": str(match_row["status"] or "pending"),
+        "status": match_status,
         "participant_count": len(participant_ids),
         "winner_rows": list(grouped.values()),
     }
