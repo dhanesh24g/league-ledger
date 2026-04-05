@@ -27,6 +27,9 @@ Python + FastAPI MVP to manage offline fantasy league money settlement.
 - `server/service.py` - business logic and DB operations
 - `server/schemas.py` - request payload schemas
 - `server/db.py` - SQLite connection, migration/init, helpers
+- `server/ai/` - future AI prompt and summary scaffolding
+- `server/automation/` - future event + notification orchestration scaffolding
+- `server/integrations/` - future external delivery integrations such as Telegram
 - `static/index.html` - UI shell
 - `static/app.js` - frontend logic
 - `static/styles.css` - styling
