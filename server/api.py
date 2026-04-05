@@ -257,7 +257,7 @@ def login(payload: LoginPayload, x_league_id: str | None = None) -> dict[str, An
     requested_league_id = int(x_league_id) if x_league_id and x_league_id.isdigit() else None
     user = authenticate(payload.user_id.strip(), payload.password, requested_league_id=requested_league_id)
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid user ID or password")
+        raise HTTPException(status_code=401, detail="Invalid user ID/email or password")
     token = create_token(user)
     refresh_token = create_refresh_token(user)
     return {"token": token, "refresh_token": refresh_token, "user": user}

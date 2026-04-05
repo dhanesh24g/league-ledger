@@ -1087,12 +1087,20 @@ def signup_user(
 
 
 def authenticate(user_id_value: str, password: str, requested_league_id: int | None = None) -> dict[str, Any] | None:
-    normalized_user_id = _normalize_user_id(user_id_value)
+    normalized_identifier = str(user_id_value or "").strip()
+    normalized_user_id = _normalize_user_id(normalized_identifier)
+    normalized_email = _normalize_email(normalized_identifier)
 
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
-        user_response = supabase.table("users").select("*").eq("user_id", normalized_user_id).limit(1).execute()
+        user_response = (
+            supabase.table("users")
+            .select("*")
+            .or_(f"user_id.eq.{normalized_user_id},email.eq.{normalized_email}")
+            .limit(1)
+            .execute()
+        )
         if not user_response.data:
             return None
         user = user_response.data[0]
@@ -1102,8 +1110,8 @@ def authenticate(user_id_value: str, password: str, requested_league_id: int | N
 
     with DatabaseManager() as connection:
         user = connection.execute(
-            "SELECT * FROM users WHERE user_id = ? LIMIT 1",
-            (normalized_user_id,),
+            "SELECT * FROM users WHERE user_id = ? OR email = ? LIMIT 1",
+            (normalized_user_id, normalized_email),
         ).fetchone()
         if not user:
             return None
