@@ -29,7 +29,8 @@ from .auth import (
     signup_user,
     update_membership_role,
 )
-from .schemas import ForgotPasswordPayload, GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, RefreshTokenPayload, ResetPasswordPayload, SignupPayload, WinnersPayload
+from .schemas import ForgotPasswordPayload, GoogleTokenPayload, JoinRequestPayload, LeaguePayload, LoginPayload, MatchPayload, MembershipRolePayload, PlayerPayload, RefreshTokenPayload, ResetPasswordPayload, SignupPayload, TelegramTestPayload, WinnersPayload
+from .integrations import TelegramIntegrationConfig, build_telegram_message, send_telegram_message
 from .service import (
     add_match,
     add_player,
@@ -100,6 +101,38 @@ def ledger(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, A
 @router.get("/stats")
 def stats(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, Any]:
     return get_stats(user)
+
+
+@router.get("/integrations/telegram/status")
+def telegram_status(user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+    config = TelegramIntegrationConfig.from_env()
+    return {
+        "configured": config.is_configured(),
+        "has_bot_token": bool(config.bot_token),
+        "has_default_chat_id": bool(config.default_chat_id),
+    }
+
+
+@router.post("/integrations/telegram/test")
+def telegram_test_message(
+    payload: TelegramTestPayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    config = TelegramIntegrationConfig.from_env()
+    intro = (
+        f"League Ledger Telegram test\n\n"
+        f"Sent by: {user.get('user_id') or user.get('full_name') or 'admin'}"
+    )
+    message = build_telegram_message(
+        title=intro,
+        lines=[payload.message],
+    )
+    result = send_telegram_message(message=message, chat_id=payload.chat_id, config=config)
+    return {
+        "ok": result.sent,
+        "chat_id": result.chat_id,
+        "message_id": result.message_id,
+    }
 
 
 @router.get("/auth/config")
