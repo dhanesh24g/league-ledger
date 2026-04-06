@@ -36,6 +36,7 @@ let previousFocus = null;
 let joinModalBindingsReady = false;
 let routeChoiceBindingsReady = false;
 let requestStatusRefreshInFlight = false;
+let requestStatusListenerBound = false;
 
 async function finalizeRequestAction(successMessage) {
   clearUserCache();
@@ -779,7 +780,10 @@ async function handleExternalRequestStatusUpdate() {
 async function init() {
   initThemeToggle();
   initNotifications();
-  window.addEventListener('league-ledger:request-status-updated', handleExternalRequestStatusUpdate);
+  if (!requestStatusListenerBound) {
+    window.addEventListener('league-ledger:request-status-updated', handleExternalRequestStatusUpdate);
+    requestStatusListenerBound = true;
+  }
 
   if (!getToken()) {
     window.location.replace('/login');

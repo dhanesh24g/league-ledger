@@ -198,17 +198,17 @@ class NotificationManager {
           this.updateBadge();
           this.renderNotifications();
 
-          requests
-            .filter((request) => !previousIds.has(String(request.request_id)))
-            .forEach((request) => {
-              this.addNotification({
+          this.addNotifications(
+            requests
+              .filter((request) => !previousIds.has(String(request.request_id)))
+              .map((request) => ({
                 title: 'New Join Request',
                 message: `${request.first_name} ${request.last_name} requested to join your league.`,
                 icon: '👤',
                 action: 'review_join_request',
                 request,
-              });
-            });
+              }))
+          );
 
           tracker.adminPendingRequestIds = currentIds;
         } catch (error) {
@@ -238,44 +238,47 @@ class NotificationManager {
       const seenOutcomeKeys = new Set((tracker.selfOutcomeNotificationKeys || []).map((value) => String(value)));
       let userRequestStateChanged = false;
 
-      previousPendingIds
-        .filter((leagueId) => !currentPendingIds.includes(leagueId))
-        .forEach((leagueId) => {
-          const latestRequest = latestRequestHistoryByLeague.get(leagueId);
-          const status = String(latestRequest?.status || '').toLowerCase();
-          const outcomeKey = latestRequest?.request_id ? `${latestRequest.request_id}:${status}` : `${leagueId}:${status}`;
-          if (seenOutcomeKeys.has(outcomeKey)) {
-            return;
-          }
+      latestRequestHistoryByLeague.forEach((latestRequest, leagueId) => {
+        const status = String(latestRequest?.status || '').toLowerCase();
+        if (status !== 'approved' && status !== 'rejected') {
+          return;
+        }
 
-          if (status === 'approved' && currentMembershipMap.has(leagueId)) {
-            const membership = currentMembershipMap.get(leagueId);
-            const leagueName = membership?.league?.name || latestRequest?.league?.name || 'your league';
-            this.addNotification({
-              title: 'Join Request Approved',
-              message: `Your request to join ${leagueName} was approved.`,
-              icon: '✅',
-              action: 'navigate',
-              url: '/league-details',
-            });
-            seenOutcomeKeys.add(outcomeKey);
-            userRequestStateChanged = true;
-            return;
-          }
+        const outcomeKey = latestRequest?.request_id ? `${latestRequest.request_id}:${status}` : `${leagueId}:${status}`;
+        if (seenOutcomeKeys.has(outcomeKey)) {
+          return;
+        }
 
-          if (status === 'rejected') {
-            const leagueName = latestRequest?.league?.name || 'this league';
-            this.addNotification({
-              title: 'Join Request Rejected',
-              message: `Your request to join ${leagueName} was not approved.`,
-              icon: '❌',
-              action: 'navigate',
-              url: '/welcome',
-            });
-            seenOutcomeKeys.add(outcomeKey);
-            userRequestStateChanged = true;
-          }
-        });
+        const wasPendingBefore = previousPendingIds.includes(leagueId);
+        const membership = currentMembershipMap.get(leagueId);
+
+        if (status === 'approved' && membership) {
+          const leagueName = membership?.league?.name || latestRequest?.league?.name || 'your league';
+          this.addNotification({
+            title: 'Join Request Approved',
+            message: `Your request to join ${leagueName} was approved.`,
+            icon: '✅',
+            action: 'navigate',
+            url: '/league-details',
+          });
+          seenOutcomeKeys.add(outcomeKey);
+          userRequestStateChanged = true;
+          return;
+        }
+
+        if (status === 'rejected' && (wasPendingBefore || !membership)) {
+          const leagueName = latestRequest?.league?.name || 'this league';
+          this.addNotification({
+            title: 'Join Request Rejected',
+            message: `Your request to join ${leagueName} was not approved.`,
+            icon: '❌',
+            action: 'navigate',
+            url: '/welcome',
+          });
+          seenOutcomeKeys.add(outcomeKey);
+          userRequestStateChanged = true;
+        }
+      });
 
       tracker.selfPendingLeagueIds = currentPendingIds;
       tracker.selfOutcomeNotificationKeys = Array.from(seenOutcomeKeys).slice(-50);
@@ -339,6 +342,24 @@ class NotificationManager {
     };
 
     this.notifications.unshift(newNotification);
+    this.saveNotifications();
+    this.updateBadge();
+    this.renderNotifications();
+  }
+
+  addNotifications(notifications) {
+    if (!Array.isArray(notifications) || notifications.length === 0) return;
+
+    const now = Date.now();
+    const timestamp = new Date(now).toISOString();
+    const prepared = notifications.map((notification, index) => ({
+      id: `${now}-${index}-${Math.random().toString(16).slice(2)}`,
+      timestamp,
+      read: false,
+      ...notification,
+    }));
+
+    this.notifications.unshift(...prepared);
     this.saveNotifications();
     this.updateBadge();
     this.renderNotifications();
