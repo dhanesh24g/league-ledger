@@ -111,16 +111,21 @@ function mergeWorkflowState(value) {
   };
 }
 
-export function readWorkflowState() {
+function getWorkflowStorageScope() {
+  const rawUsername = localStorage.getItem(STORAGE_KEYS.username) || '';
+  const username = rawUsername.trim().toLowerCase() || 'anonymous';
   const leagueKey = getActiveLeagueId() || 'global';
+  return `${username}::${leagueKey}`;
+}
+
+export function readWorkflowState() {
   const allStates = safeParse(localStorage.getItem(STORAGE_KEYS.workflow), {});
-  return mergeWorkflowState(allStates[leagueKey] || DEFAULT_WORKFLOW_STATE);
+  return mergeWorkflowState(allStates[getWorkflowStorageScope()] || DEFAULT_WORKFLOW_STATE);
 }
 
 export function writeWorkflowState(nextState) {
-  const leagueKey = getActiveLeagueId() || 'global';
   const allStates = safeParse(localStorage.getItem(STORAGE_KEYS.workflow), {});
-  allStates[leagueKey] = mergeWorkflowState(nextState);
+  allStates[getWorkflowStorageScope()] = mergeWorkflowState(nextState);
   localStorage.setItem(STORAGE_KEYS.workflow, JSON.stringify(allStates));
 }
 
@@ -1096,7 +1101,6 @@ export function populateHeaderIdentity(user) {
 }
 
 export async function initWorkflowShell(currentPath) {
-  setCurrentWorkflowPage(currentPath);
   initThemeToggle();
   initTopNav(currentPath);
   initStepNav(currentPath);
@@ -1119,6 +1123,7 @@ export async function initWorkflowShell(currentPath) {
   localStorage.setItem(STORAGE_KEYS.role, effectiveRole);
   localStorage.setItem(STORAGE_KEYS.username, user.user_id);
   localStorage.setItem(STORAGE_KEYS.fullName, user.full_name || user.user_id);
+  setCurrentWorkflowPage(currentPath);
 
   const createMode = currentPath === '/setup' && new URLSearchParams(window.location.search).get('mode') === 'create';
   const canCreateFirstLeague = currentPath === '/setup' && createMode;
