@@ -86,6 +86,37 @@ def invalidate_profile_cache(user_id_value: int | None = None, user_id_label: st
             _profile_cache_timestamps.pop(key, None)
 
 
+def _get_user_id_label(user_id_value: int, connection: Any | None = None) -> str:
+    if get_supabase_client() and connection is None:
+        supabase = get_supabase_client()
+        assert supabase is not None
+        response = (
+            supabase.table("users")
+            .select("user_id")
+            .eq("id", int(user_id_value))
+            .limit(1)
+            .execute()
+        )
+        if response.data:
+            return str(response.data[0].get("user_id") or "")
+        return ""
+
+    if connection is not None:
+        row = connection.execute(
+            "SELECT user_id FROM users WHERE id = ? LIMIT 1",
+            (int(user_id_value),),
+        ).fetchone()
+    else:
+        with DatabaseManager() as db_connection:
+            row = db_connection.execute(
+                "SELECT user_id FROM users WHERE id = ? LIMIT 1",
+                (int(user_id_value),),
+            ).fetchone()
+    if not row:
+        return ""
+    return str(row["user_id"] or "")
+
+
 def _secret() -> bytes:
     return os.getenv("APP_AUTH_SECRET", "league-ledger-secret").encode("utf-8")
 
@@ -1182,6 +1213,8 @@ def get_league_by_invite_code(invite_code: str) -> dict[str, Any]:
 
 
 def create_join_request(user: dict[str, Any], league_id: int | None = None, invite_code: str | None = None) -> dict[str, str]:
+    user_id = int(user["id"])
+    user_id_label = str(user.get("user_id") or "")
     if invite_code:
         league = get_league_by_invite_code(invite_code)
         target_league_id = int(league["id"])
@@ -1200,18 +1233,19 @@ def create_join_request(user: dict[str, Any], league_id: int | None = None, invi
         assert supabase is not None
         supabase.table("league_join_requests").upsert(
             {
-                "user_id": int(user["id"]),
+                "user_id": user_id,
                 "league_id": target_league_id,
                 "status": "pending",
             },
             on_conflict="user_id,league_id",
         ).execute()
+        invalidate_profile_cache(user_id_value=user_id, user_id_label=user_id_label)
         return {"message": "Join request sent"}
 
     with DatabaseManager() as connection:
         existing = connection.execute(
             "SELECT id FROM league_join_requests WHERE user_id = ? AND league_id = ? LIMIT 1",
-            (int(user["id"]), target_league_id),
+            (user_id, target_league_id),
         ).fetchone()
         if existing:
             connection.execute(
@@ -1220,13 +1254,14 @@ def create_join_request(user: dict[str, Any], league_id: int | None = None, invi
                 SET status = 'pending', reviewed_at = NULL
                 WHERE user_id = ? AND league_id = ?
                 """,
-                (int(user["id"]), target_league_id),
+                (user_id, target_league_id),
             )
         else:
             connection.execute(
                 "INSERT INTO league_join_requests (user_id, league_id, status) VALUES (?, ?, 'pending')",
-                (int(user["id"]), target_league_id),
+                (user_id, target_league_id),
             )
+    invalidate_profile_cache(user_id_value=user_id, user_id_label=user_id_label)
     return {"message": "Join request sent"}
 
 
@@ -1387,7 +1422,7 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
             )
         invalidate_profile_cache(
             user_id_value=int(request_row["user_id"]),
-            user_id_label=str(request_row.get("user_id_label") or ""),
+            user_id_label=str(user_row.get("user_id") or "") if joined_user.data else "",
         )
         _invalidate_members_cache(league_id)
         return {"message": "Join request approved"}
@@ -1431,7 +1466,7 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
             )
     invalidate_profile_cache(
         user_id_value=int(request_row["user_id"]),
-        user_id_label=str(request_row["user_id"]),
+        user_id_label=str(joined_user["user_id"]) if joined_user else "",
     )
     _invalidate_members_cache(league_id)
     return {"message": "Join request approved"}
@@ -1443,7 +1478,7 @@ def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]
         assert supabase is not None
         request_response = (
             supabase.table("league_join_requests")
-            .select("id, league_id")
+            .select("id, league_id, user_id")
             .eq("id", int(request_id))
             .eq("status", "pending")
             .limit(1)
@@ -1460,12 +1495,17 @@ def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]
                 "reviewed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             }
         ).eq("id", int(request_id)).execute()
+        target_user_id = int(request_response.data[0]["user_id"])
+        invalidate_profile_cache(
+            user_id_value=target_user_id,
+            user_id_label=_get_user_id_label(target_user_id),
+        )
         return {"message": "Join request rejected"}
 
     with DatabaseManager() as connection:
         request_row = connection.execute(
             """
-            SELECT id, league_id
+            SELECT id, league_id, user_id
             FROM league_join_requests
             WHERE id = ? AND status = 'pending'
             LIMIT 1
@@ -1488,6 +1528,11 @@ def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="Join request not found")
+        target_user_id = int(request_row["user_id"])
+        invalidate_profile_cache(
+            user_id_value=target_user_id,
+            user_id_label=_get_user_id_label(target_user_id, connection=connection),
+        )
     return {"message": "Join request rejected"}
 
 
@@ -1534,10 +1579,7 @@ def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
         raise HTTPException(status_code=403, detail="Active league membership required")
 
     league_id = int(user["active_league_id"])
-    
-    # Clear any existing cache to ensure data integrity
-    _invalidate_members_cache(league_id)
-    
+
     cached = _members_cache_get(league_id)
     if cached is not None:
         return cached
@@ -1637,6 +1679,10 @@ def remove_league_member(member_user_id: int, user: dict[str, Any]) -> dict[str,
 
         supabase.table("league_memberships").delete().eq("league_id", league_id).eq("user_id", target_user_id).execute()
         supabase.table("league_join_requests").delete().eq("league_id", league_id).eq("user_id", target_user_id).execute()
+        invalidate_profile_cache(
+            user_id_value=target_user_id,
+            user_id_label=_get_user_id_label(target_user_id),
+        )
         _invalidate_members_cache(league_id)
         return {"message": "League member removed"}
 
@@ -1650,6 +1696,10 @@ def remove_league_member(member_user_id: int, user: dict[str, Any]) -> dict[str,
         connection.execute(
             "DELETE FROM league_join_requests WHERE league_id = ? AND user_id = ?",
             (league_id, target_user_id),
+        )
+        invalidate_profile_cache(
+            user_id_value=target_user_id,
+            user_id_label=_get_user_id_label(target_user_id, connection=connection),
         )
     _invalidate_members_cache(league_id)
     return {"message": "League member removed"}
@@ -1696,6 +1746,10 @@ def update_membership_role(member_user_id: int, role: str, user: dict[str, Any])
                 raise HTTPException(status_code=400, detail="At least one admin must remain in the league")
 
         supabase.table("league_memberships").update({"role": normalized_role}).eq("league_id", league_id).eq("user_id", target_user_id).execute()
+        invalidate_profile_cache(
+            user_id_value=target_user_id,
+            user_id_label=_get_user_id_label(target_user_id),
+        )
         _invalidate_members_cache(league_id)
         return {"message": "Member role updated"}
 
@@ -1726,6 +1780,10 @@ def update_membership_role(member_user_id: int, role: str, user: dict[str, Any])
         )
         if cursor.rowcount == 0:
             raise HTTPException(status_code=404, detail="League member not found")
+        invalidate_profile_cache(
+            user_id_value=target_user_id,
+            user_id_label=_get_user_id_label(target_user_id, connection=connection),
+        )
     _invalidate_members_cache(league_id)
     return {"message": "Member role updated"}
 
