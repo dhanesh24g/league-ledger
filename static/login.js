@@ -257,7 +257,7 @@ async function initLogin() {
   initPasswordToggles(loginForm);
   try {
     authConfig = await callApi('/api/auth/config');
-    setLoginHintState(`Use your user ID or email to sign in. Sessions stay valid for ${authConfig.session_ttl_hours || 4} hours.`);
+    setLoginHintState('Use your user ID or email to sign in.');
     initGoogleLogin();
   } catch (err) {
     setLoginHintState('');
