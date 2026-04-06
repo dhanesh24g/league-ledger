@@ -1294,11 +1294,39 @@ def list_join_requests(user: dict[str, Any]) -> dict[str, Any]:
     return {"requests": [dict(row) for row in rows]}
 
 
-def approve_join_request(request_id: int, user: dict[str, Any], role: str = "read") -> dict[str, str]:
-    if user["league_role"] != "admin" or not user.get("active_league_id"):
+def _ensure_admin_for_league(user_id: int, league_id: int) -> None:
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        membership_response = (
+            supabase.table("league_memberships")
+            .select("id")
+            .eq("user_id", int(user_id))
+            .eq("league_id", int(league_id))
+            .eq("status", "active")
+            .eq("role", "admin")
+            .limit(1)
+            .execute()
+        )
+        if not membership_response.data:
+            raise HTTPException(status_code=403, detail="Admin role required")
+        return
+
+    with DatabaseManager() as connection:
+        membership_row = connection.execute(
+            """
+            SELECT id
+            FROM league_memberships
+            WHERE user_id = ? AND league_id = ? AND status = 'active' AND role = 'admin'
+            LIMIT 1
+            """,
+            (int(user_id), int(league_id)),
+        ).fetchone()
+    if not membership_row:
         raise HTTPException(status_code=403, detail="Admin role required")
 
-    league_id = int(user["active_league_id"])
+
+def approve_join_request(request_id: int, user: dict[str, Any], role: str = "read") -> dict[str, str]:
     normalized_role = _normalize_membership_role(role)
     if get_supabase_client():
         supabase = get_supabase_client()
@@ -1307,13 +1335,15 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
             supabase.table("league_join_requests")
             .select("*")
             .eq("id", int(request_id))
-            .eq("league_id", league_id)
+            .eq("status", "pending")
             .limit(1)
             .execute()
         )
         if not request_response.data:
             raise HTTPException(status_code=404, detail="Join request not found")
         request_row = request_response.data[0]
+        league_id = int(request_row["league_id"])
+        _ensure_admin_for_league(int(user["id"]), league_id)
         supabase.table("league_memberships").upsert(
             {
                 "user_id": int(request_row["user_id"]),
@@ -1357,11 +1387,13 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
 
     with DatabaseManager() as connection:
         request_row = connection.execute(
-            "SELECT * FROM league_join_requests WHERE id = ? AND league_id = ? LIMIT 1",
-            (int(request_id), league_id),
+            "SELECT * FROM league_join_requests WHERE id = ? AND status = 'pending' LIMIT 1",
+            (int(request_id),),
         ).fetchone()
         if not request_row:
             raise HTTPException(status_code=404, detail="Join request not found")
+        league_id = int(request_row["league_id"])
+        _ensure_admin_for_league(int(user["id"]), league_id)
         connection.execute(
             """
             INSERT INTO league_memberships (user_id, league_id, role, status)
@@ -1399,24 +1431,21 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
 
 
 def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]:
-    if user["league_role"] != "admin" or not user.get("active_league_id"):
-        raise HTTPException(status_code=403, detail="Admin role required")
-
-    league_id = int(user["active_league_id"])
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
         request_response = (
             supabase.table("league_join_requests")
-            .select("id")
+            .select("id, league_id")
             .eq("id", int(request_id))
-            .eq("league_id", league_id)
             .eq("status", "pending")
             .limit(1)
             .execute()
         )
         if not request_response.data:
             raise HTTPException(status_code=404, detail="Join request not found")
+        league_id = int(request_response.data[0]["league_id"])
+        _ensure_admin_for_league(int(user["id"]), league_id)
 
         supabase.table("league_join_requests").update(
             {
@@ -1427,6 +1456,21 @@ def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]
         return {"message": "Join request rejected"}
 
     with DatabaseManager() as connection:
+        request_row = connection.execute(
+            """
+            SELECT id, league_id
+            FROM league_join_requests
+            WHERE id = ? AND status = 'pending'
+            LIMIT 1
+            """,
+            (int(request_id),),
+        ).fetchone()
+        if not request_row:
+            raise HTTPException(status_code=404, detail="Join request not found")
+
+        league_id = int(request_row["league_id"])
+        _ensure_admin_for_league(int(user["id"]), league_id)
+
         cursor = connection.execute(
             """
             UPDATE league_join_requests

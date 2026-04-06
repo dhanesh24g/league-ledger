@@ -1,4 +1,4 @@
-import { callApi } from '/static/workflow-common.js';
+import { callApi, showToast } from '/static/workflow-common.js';
 
 class NotificationManager {
   constructor() {
@@ -179,6 +179,16 @@ class NotificationManager {
           const requests = Array.isArray(requestResult.requests) ? requestResult.requests : [];
           const currentIds = requests.map((request) => String(request.request_id)).sort();
           const previousIds = new Set((tracker.adminPendingRequestIds || []).map((id) => String(id)));
+
+          this.notifications = this.notifications.filter((notification) => {
+            if (notification.action !== 'review_join_request' || !notification.request?.request_id) {
+              return true;
+            }
+            return currentIds.includes(String(notification.request.request_id));
+          });
+          this.saveNotifications();
+          this.updateBadge();
+          this.renderNotifications();
 
           requests
             .filter((request) => !previousIds.has(String(request.request_id)))
@@ -433,9 +443,16 @@ class NotificationManager {
           <button type="button" class="ghost" data-close-review>Close</button>
         </div>
         <div class="notification-review-body" id="notification-review-body"></div>
+        <div class="notification-review-feedback hidden" id="notification-review-feedback" role="status" aria-live="polite"></div>
         <div class="notification-review-actions">
-          <button type="button" class="notification-approve-btn" id="notification-approve-btn">✅ Approve</button>
-          <button type="button" class="notification-reject-btn" id="notification-reject-btn">❌ Reject</button>
+          <button type="button" class="notification-approve-btn" id="notification-approve-btn">
+            <span class="notification-review-btn-icon" aria-hidden="true">✓</span>
+            <span class="notification-review-btn-label">Approve</span>
+          </button>
+          <button type="button" class="notification-reject-btn" id="notification-reject-btn">
+            <span class="notification-review-btn-icon" aria-hidden="true">×</span>
+            <span class="notification-review-btn-label">Reject</span>
+          </button>
         </div>
       </section>
     `;
@@ -455,7 +472,7 @@ class NotificationManager {
     document.body.classList.remove('modal-open');
   }
 
-  async submitJoinRequestReview(requestId, action, notificationId) {
+  async submitJoinRequestReview(requestId, action, notificationId, requestLeagueId = null) {
     if (!requestId) return;
 
     const endpoint = action === 'approve'
@@ -465,6 +482,7 @@ class NotificationManager {
 
     await callApi(endpoint, {
       method: 'POST',
+      ...(requestLeagueId ? { headers: { 'X-League-ID': String(requestLeagueId) } } : {}),
       ...(body ? { body } : {}),
     });
 
@@ -477,27 +495,49 @@ class NotificationManager {
     const request = notification.request || {};
     const modal = this.ensureReviewModal();
     const body = modal.querySelector('#notification-review-body');
+    const feedback = modal.querySelector('#notification-review-feedback');
     const approveBtn = modal.querySelector('#notification-approve-btn');
     const rejectBtn = modal.querySelector('#notification-reject-btn');
 
-    if (!body || !approveBtn || !rejectBtn) return;
+    if (!body || !feedback || !approveBtn || !rejectBtn) return;
 
     body.innerHTML = `
       <p><strong>${request.first_name || ''} ${request.last_name || ''}</strong></p>
       <p class="muted">${request.user_id_label || ''}${request.email ? ` • ${request.email}` : ''}</p>
       <p class="muted small">Choose what to do with this request.</p>
     `;
+    feedback.textContent = '';
+    feedback.classList.add('hidden');
+    feedback.classList.remove('is-error');
 
     const handleAction = async (action) => {
       approveBtn.disabled = true;
       rejectBtn.disabled = true;
+      approveBtn.classList.toggle('is-loading', action === 'approve');
+      rejectBtn.classList.toggle('is-loading', action === 'reject');
+      feedback.classList.remove('hidden');
+      feedback.classList.remove('is-error');
+      feedback.textContent = action === 'approve' ? 'Approving request...' : 'Rejecting request...';
       try {
-        await this.submitJoinRequestReview(request.request_id, action, notification.id);
+        await this.submitJoinRequestReview(request.request_id, action, notification.id, request.league_id);
+        showToast(action === 'approve' ? 'Join request approved.' : 'Join request rejected.', 'success');
       } catch (error) {
         console.warn('Join request review failed:', error);
+        const message = error instanceof Error ? error.message : 'Request failed';
+        if (/not found/i.test(message)) {
+          this.removeNotification(notification.id);
+          await this.syncServerNotifications();
+          this.closeJoinRequestReview();
+          showToast('This request is no longer pending.', 'info');
+          return;
+        }
+        feedback.classList.add('is-error');
+        feedback.textContent = message;
       } finally {
         approveBtn.disabled = false;
         rejectBtn.disabled = false;
+        approveBtn.classList.remove('is-loading');
+        rejectBtn.classList.remove('is-loading');
       }
     };
 

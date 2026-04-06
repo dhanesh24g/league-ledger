@@ -6,6 +6,10 @@ import {
   getToken,
   initThemeToggle,
   setActiveLeagueId,
+  setButtonLoading,
+  showError,
+  showLoading,
+  showToast,
 } from '/static/workflow-common.js';
 import { initNotifications } from '/static/notifications.js';
 
@@ -318,8 +322,8 @@ async function renderJoinRequests(user) {
               </div>
               <div class="member-role-actions">
                 <span class="status-chip">Will be approved as Read</span>
-                <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
-                <button type="button" class="ghost reject-request" data-request-id="${request.request_id}">Reject</button>
+                <button type="button" class="ghost approve-request" data-request-id="${request.request_id}" data-league-id="${request.league_id}">Approve</button>
+                <button type="button" class="ghost reject-request" data-request-id="${request.request_id}" data-league-id="${request.league_id}">Reject</button>
               </div>
             </div>
           `
@@ -331,16 +335,23 @@ async function renderJoinRequests(user) {
 
     joinRequestsPanel.querySelectorAll('.approve-request').forEach((button) => {
       button.addEventListener('click', async () => {
+        let closeLoading = null;
+        let restoreButton = null;
         try {
-          button.disabled = true;
+          restoreButton = setButtonLoading(button, 'Approving...');
+          closeLoading = showLoading('Approving join request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/approve`, {
             method: 'POST',
+            headers: button.dataset.leagueId ? { 'X-League-ID': button.dataset.leagueId } : undefined,
             body: JSON.stringify({ role: 'read' }),
           });
+          showToast('Join request approved.', 'success');
           await renderJoinRequests(user);
         } catch (error) {
-          window.alert(error instanceof Error ? error.message : String(error));
-          button.disabled = false;
+          showError(error);
+        } finally {
+          if (restoreButton) restoreButton();
+          if (closeLoading) closeLoading();
         }
       });
     });
@@ -349,15 +360,22 @@ async function renderJoinRequests(user) {
       button.addEventListener('click', async () => {
         const confirmed = window.confirm('Reject this join request?');
         if (!confirmed) return;
+        let closeLoading = null;
+        let restoreButton = null;
         try {
-          button.disabled = true;
+          restoreButton = setButtonLoading(button, 'Rejecting...');
+          closeLoading = showLoading('Rejecting join request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/reject`, {
             method: 'POST',
+            headers: button.dataset.leagueId ? { 'X-League-ID': button.dataset.leagueId } : undefined,
           });
+          showToast('Join request rejected.', 'success');
           await renderJoinRequests(user);
         } catch (error) {
-          window.alert(error instanceof Error ? error.message : String(error));
-          button.disabled = false;
+          showError(error);
+        } finally {
+          if (restoreButton) restoreButton();
+          if (closeLoading) closeLoading();
         }
       });
     });
