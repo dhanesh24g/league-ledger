@@ -371,6 +371,7 @@ function formatRequestStatus(status) {
   const normalized = String(status || 'pending').toLowerCase();
   if (normalized === 'approved') return 'Approved';
   if (normalized === 'rejected') return 'Rejected';
+  if (normalized === 'canceled' || normalized === 'cancelled') return 'Canceled';
   return 'Pending';
 }
 
@@ -391,7 +392,7 @@ function renderRequestHistory(user) {
       <div class="request-list">
         ${rows.map((row) => {
     const status = String(row.status || 'pending').toLowerCase();
-    const statusClass = status === 'approved' ? 'is-approved' : status === 'rejected' ? 'is-rejected' : '';
+    const statusClass = status === 'approved' ? 'is-approved' : status === 'rejected' ? 'is-rejected' : status === 'canceled' || status === 'cancelled' ? 'is-canceled' : '';
     const reviewedLabel = row.reviewed_at ? `Reviewed: ${new Date(row.reviewed_at).toLocaleString()}` : 'Awaiting review';
     return `
             <div class="request-row">
@@ -403,7 +404,7 @@ function renderRequestHistory(user) {
               </div>
               <div class="member-role-actions">
                 <span class="status-chip ${statusClass}">${formatRequestStatus(status)}</span>
-                ${status === 'pending' ? `<button type="button" class="ghost cancel-request" data-request-id="${row.request_id}">Cancel request</button>` : ''}
+                ${status === 'pending' ? `<button type="button" class="ghost cancel-request welcome-inline-action" data-request-id="${row.request_id}">Cancel request</button>` : ''}
               </div>
             </div>
           `;
@@ -418,14 +419,16 @@ function renderRequestHistory(user) {
       if (!confirmed) return;
       try {
         button.disabled = true;
+        button.classList.add('is-loading');
         await callApi(`/api/league/requests/${button.dataset.requestId}/cancel`, {
           method: 'POST',
         });
         clearUserCache();
-        await renderWelcome();
+        await refreshWelcomeView();
       } catch (error) {
         window.alert(error instanceof Error ? error.message : String(error));
         button.disabled = false;
+        button.classList.remove('is-loading');
       }
     });
   });
@@ -620,6 +623,29 @@ function renderHome(user) {
 
   bindMembershipCards(user);
   bindJoinModal(user);
+}
+
+async function refreshWelcomeView() {
+  const profile = await callApi('/api/auth/me');
+  const user = profile.user;
+
+  cacheUser(user);
+  document.body.classList.toggle('welcome-read-mode', user.league_role !== 'admin');
+  localStorage.setItem('dhaneshlabs-login-role-hint', user.league_role === 'admin' ? 'admin' : 'read');
+  authRole.textContent = `${user.user_id}`;
+
+  const inviteCode = getInviteCodeFromLocation();
+  if (inviteCode) {
+    await renderInvitePreview(user, inviteCode);
+  } else {
+    if (user.active_league_id) {
+      setActiveLeagueId(user.active_league_id);
+    }
+    renderHome(user);
+  }
+
+  await renderJoinRequests(user);
+  renderRequestHistory(user);
 }
 
 async function init() {
