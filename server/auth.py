@@ -743,21 +743,22 @@ def _build_profile(
     active_memberships = [row for row in memberships if str(row.get("status", "")).lower() == "active"]
     pending_requests = [row for row in requests if str(row.get("status", "")).lower() == "pending"]
 
-    current_membership = None
+    requested_membership = None
     if requested_league_id is not None:
-        current_membership = next(
+        requested_membership = next(
             (row for row in active_memberships if int(row["league_id"]) == int(requested_league_id)),
             None,
         )
-    if requested_league_id is None and current_membership is None and active_memberships:
-        current_membership = active_memberships[0]
 
-    current_pending = None
+    requested_pending = None
     if requested_league_id is not None:
-        current_pending = next(
+        requested_pending = next(
             (row for row in pending_requests if int(row["league_id"]) == int(requested_league_id)),
             None,
         )
+
+    current_membership = requested_membership or (active_memberships[0] if active_memberships else None)
+    current_pending = None if current_membership else (requested_pending or (pending_requests[0] if pending_requests else None))
 
     current_league = None
     league_role = "none"
