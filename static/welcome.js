@@ -160,10 +160,15 @@ function createRouteCard({
   button.className = `route-choice-card ${variant} ${recommended ? 'recommended' : ''}`.trim();
   button.innerHTML = `
     <span class="route-choice-title-row">
-      <strong>${title}</strong>
-      ${badge ? `<span class="route-choice-badge">${badge}</span>` : ''}
+      <span class="route-choice-title-stack">
+        <strong>${title}</strong>
+        <span class="route-choice-description muted">${description}</span>
+      </span>
+      <span class="route-choice-meta">
+        ${badge ? `<span class="route-choice-badge">${badge}</span>` : ''}
+        <span class="route-choice-arrow" aria-hidden="true">→</span>
+      </span>
     </span>
-    <span class="route-choice-description muted">${description}</span>
   `;
   button.addEventListener('click', () => {
     setActiveLeagueId(leagueId);
