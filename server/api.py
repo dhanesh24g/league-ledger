@@ -10,6 +10,7 @@ from .auth import (
     authenticate_google,
     auth_config,
     authenticate,
+    cancel_join_request,
     create_join_request,
     create_refresh_token,
     create_token,
@@ -318,6 +319,11 @@ def approve_request(
 @router.post("/league/requests/{request_id}/reject")
 def reject_request(request_id: int, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
     return reject_join_request(request_id, user)
+
+
+@router.post("/league/requests/{request_id}/cancel")
+def cancel_request(request_id: int, user: dict[str, Any] = Depends(current_user)) -> dict[str, str]:
+    return cancel_join_request(request_id, user)
 
 
 @router.get("/league/members")

@@ -7,7 +7,7 @@ class NotificationManager {
     this.syncTimer = null;
     this.isSyncing = false;
     this.hasBootstrapped = false;
-    this.syncIntervalMs = 60000;
+    this.syncIntervalMs = 15000;
     this.storageKey = 'league-ledger-notifications';
     this.trackerStorageKey = '';
     this.notificationBtn = document.getElementById('notification-btn');
@@ -61,6 +61,10 @@ class NotificationManager {
     window.addEventListener('resize', this.handleViewportChange);
     window.addEventListener('orientationchange', this.handleViewportChange);
     window.addEventListener('scroll', this.handleViewportChange, { passive: true });
+
+    window.setTimeout(() => {
+      this.ensureServerSyncStarted();
+    }, 0);
   }
 
   shouldUseViewportDropdownPosition() {
