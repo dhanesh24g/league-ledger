@@ -766,7 +766,11 @@ async function refreshWelcomeView() {
   renderRequestHistory(user);
 }
 
-async function handleExternalRequestStatusUpdate() {
+async function handleExternalRequestStatusUpdate(event) {
+  const approvedLeagueId = Number(event?.detail?.approvedLeagueId || 0);
+  if (Number.isFinite(approvedLeagueId) && approvedLeagueId > 0) {
+    setActiveLeagueId(approvedLeagueId);
+  }
   if (requestStatusRefreshInFlight) return;
   if (!getToken()) return;
   requestStatusRefreshInFlight = true;

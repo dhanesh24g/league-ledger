@@ -1,4 +1,4 @@
-import { callApi, showToast } from '/static/workflow-common.js';
+import { callApi, setActiveLeagueId, showToast } from '/static/workflow-common.js';
 
 class NotificationManager {
   constructor() {
@@ -266,12 +266,14 @@ class NotificationManager {
 
         if (status === 'approved' && membership) {
           const leagueName = membership?.league?.name || latestRequest?.league?.name || 'your league';
+          setActiveLeagueId(leagueId);
           this.addNotification({
             title: 'Join Request Approved',
             message: `Your request to join ${leagueName} was approved.`,
             icon: '✅',
             action: 'navigate',
             url: '/league-details',
+            leagueId,
           });
           seenOutcomeKeys.add(outcomeKey);
           userRequestStateChanged = true;
@@ -297,7 +299,13 @@ class NotificationManager {
       this.saveTracker(tracker);
 
       if (userRequestStateChanged) {
-        window.dispatchEvent(new CustomEvent('league-ledger:request-status-updated'));
+        const latestApprovedMembership = Array.from(currentMembershipMap.entries()).find(([leagueId]) => {
+          const latestRequest = latestRequestHistoryByLeague.get(leagueId);
+          return String(latestRequest?.status || '').toLowerCase() === 'approved';
+        });
+        window.dispatchEvent(new CustomEvent('league-ledger:request-status-updated', {
+          detail: latestApprovedMembership ? { approvedLeagueId: latestApprovedMembership[0] } : {},
+        }));
       }
     } catch (error) {
       console.warn('Notification sync failed:', error);
@@ -504,6 +512,9 @@ class NotificationManager {
   }
 
   handleNotificationAction(notification) {
+    if (notification.leagueId) {
+      setActiveLeagueId(notification.leagueId);
+    }
     if (notification.action === 'review_join_request' && notification.request) {
       this.openJoinRequestReview(notification);
     } else if (notification.action === 'navigate' && notification.url) {
