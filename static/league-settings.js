@@ -59,16 +59,21 @@ function renderMembers(members) {
   membersZone.innerHTML = members
     .map((member) => `
       <article class="feed-item settings-member-item">
-        <div>
+        <div class="settings-member-copy">
           <strong>${escapeHtml(`${member.first_name} ${member.last_name}`.trim() || member.user_id_label)}</strong>
           <p class="muted">${escapeHtml(member.user_id_label)} • ${escapeHtml(member.email || 'No email')}</p>
         </div>
         <div class="settings-member-meta">
-          <span class="status-chip">Role: ${member.role === 'admin' ? 'Admin' : 'Read'}</span>
+          <div class="settings-member-badges">
+            <span class="status-chip">Role: ${member.role === 'admin' ? 'Admin' : 'Read'}</span>
+            ${Number(member.user_id) === Number(currentUser?.id)
+              ? '<span class="muted small settings-self-badge">You</span>'
+              : ''}
+          </div>
           ${Number(member.user_id) === Number(currentUser?.id)
-            ? '<span class="muted small">You</span>'
+            ? ''
             : `
-              <div class="member-role-actions">
+              <div class="member-role-actions settings-member-controls">
                 <select class="member-role-select" data-user-id="${member.user_id}" aria-label="Role for ${escapeHtml(member.user_id_label)}">
                   <option value="read" ${member.role === 'read' ? 'selected' : ''}>Read</option>
                   <option value="admin" ${member.role === 'admin' ? 'selected' : ''}>Admin</option>

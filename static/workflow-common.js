@@ -653,11 +653,13 @@ function initLogout() {
   });
 }
 
-function ensureLeagueSwitcher(user) {
+export function ensureLeagueSwitcher(user) {
   const memberships = Array.isArray(user.memberships) ? user.memberships : [];
   const existing = document.getElementById('league-switcher');
   if (existing) existing.remove();
-  if (!memberships.length) return;
+  const headerCenter = document.querySelector('.header-center');
+  headerCenter?.classList.remove('has-league-switcher');
+  if (memberships.length < 2) return;
 
   const select = document.createElement('select');
   select.id = 'league-switcher';
@@ -677,17 +679,23 @@ function ensureLeagueSwitcher(user) {
     writeWorkflowState(readWorkflowState());
     window.location.reload();
   });
+  registerMobileSelectProxy(select, {
+    variant: 'compact',
+    placeholder: 'Choose league',
+  });
 
   const topNav = document.getElementById('top-nav');
   const fallbackParent =
-    document.querySelector('.header-center') ||
+    headerCenter ||
     document.querySelector('.header-actions') ||
     document.querySelector('.header-content');
 
   if (topNav && topNav.parentElement) {
     topNav.parentElement.insertBefore(select, topNav);
+    topNav.parentElement.classList.add('has-league-switcher');
   } else if (fallbackParent) {
     fallbackParent.insertBefore(select, fallbackParent.firstChild);
+    fallbackParent.classList.add('has-league-switcher');
   }
 }
 
@@ -742,7 +750,8 @@ export async function initWorkflowShell(currentPath) {
     authRole.textContent = `${user.user_id}`;
   }
 
-  // League switcher intentionally disabled in header UI.
+  updateHeaderLeagueContext(user);
+  ensureLeagueSwitcher(user);
 
   return user;
 }
@@ -750,4 +759,28 @@ export async function initWorkflowShell(currentPath) {
 export function navigateTo(target) {
   if (WORKFLOW_ROUTES.includes(target)) setCurrentWorkflowPage(target);
   window.location.assign(buildWorkflowRoute(target, { preserveDirectAdminFlow: true }));
+}
+
+export function updateHeaderLeagueContext(user, explicitPageName = '') {
+  const appName = document.querySelector('.brand-text .app-name');
+  if (!appName) return;
+
+  const basePageName = explicitPageName
+    || appName.dataset.pageName
+    || appName.textContent?.trim()
+    || '';
+
+  if (!appName.dataset.pageName && basePageName) {
+    appName.dataset.pageName = basePageName;
+  }
+
+  const activeLeagueName = String(
+    user?.active_league_name
+    || user?.league?.name
+    || ''
+  ).trim();
+
+  appName.textContent = activeLeagueName
+    ? `${activeLeagueName} | ${basePageName}`
+    : basePageName;
 }

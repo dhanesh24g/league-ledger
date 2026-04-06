@@ -76,19 +76,8 @@ function applyEntryModeUI() {
   const directFlow = isDirectAdminFlow('/winners');
   document.body.classList.toggle('direct-admin-flow', directFlow);
   if (pageBrand) {
-    pageBrand.classList.toggle('brand-home-link', directFlow);
-    pageBrand.tabIndex = directFlow ? 0 : -1;
-    pageBrand.setAttribute('role', directFlow ? 'link' : 'presentation');
-    pageBrand.setAttribute('aria-label', directFlow ? 'Back to welcome page' : 'Page brand');
-    pageBrand.onclick = directFlow ? () => window.location.assign('/welcome') : null;
-    pageBrand.onkeydown = directFlow
-      ? (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          window.location.assign('/welcome');
-        }
-      }
-      : null;
+    pageBrand.classList.add('brand-home-link');
+    pageBrand.setAttribute('aria-label', 'Go to home');
   }
 
   if (!winnersBackLink) return;

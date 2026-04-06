@@ -6,6 +6,7 @@ import {
   setActiveLeagueId,
   syncMobileSelectProxy,
   showError,
+  updateHeaderLeagueContext,
 } from '/static/workflow-common.js';
 import { initNotifications } from '/static/notifications.js';
 
@@ -84,17 +85,17 @@ function renderHero(league, playerCount, matchCount) {
         <article class="league-details-stat-card">
           <span class="summary-chip-label">Entry Fee</span>
           <strong>${Number(league.entry_fee || 0).toFixed(2)}</strong>
-          <small class="muted">Per player, per match</small>
+          <small class="muted">Per player</small>
         </article>
         <article class="league-details-stat-card">
           <span class="summary-chip-label">Configured Players</span>
           <strong>${Number(league.active_player_count || 0)}</strong>
-          <small class="muted">Target roster size</small>
+          <small class="muted">League roster</small>
         </article>
         <article class="league-details-stat-card">
           <span class="summary-chip-label">Winner Slots</span>
           <strong>${Number(league.default_winner_count || 0)}</strong>
-          <small class="muted">Default payout places</small>
+          <small class="muted">Default places</small>
         </article>
       </div>
     </div>
@@ -245,6 +246,7 @@ async function init() {
   }
 
   authRole.textContent = user.user_id;
+  updateHeaderLeagueContext(user);
   setupNav(user);
 
   logoutBtn?.addEventListener('click', () => {
