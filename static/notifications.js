@@ -166,6 +166,44 @@ class NotificationManager {
     }
   }
 
+  shouldPollAdminJoinRequests() {
+    const path = window.location.pathname || '';
+    return path !== '/welcome' && path !== '/setup';
+  }
+
+  reconcileAdminJoinRequests(requests = []) {
+    if (!this.user?.id) return;
+
+    const tracker = this.loadTracker();
+    const currentIds = (Array.isArray(requests) ? requests : []).map((request) => String(request.request_id)).sort();
+    const previousIds = new Set((tracker.adminPendingRequestIds || []).map((id) => String(id)));
+
+    this.notifications = this.notifications.filter((notification) => {
+      if (notification.action !== 'review_join_request' || !notification.request?.request_id) {
+        return true;
+      }
+      return currentIds.includes(String(notification.request.request_id));
+    });
+
+    this.addNotifications(
+      (Array.isArray(requests) ? requests : [])
+        .filter((request) => !previousIds.has(String(request.request_id)))
+        .map((request) => ({
+          title: 'New Join Request',
+          message: `${request.first_name} ${request.last_name} requested to join your league.`,
+          icon: '👤',
+          action: 'review_join_request',
+          request,
+        }))
+    );
+
+    tracker.adminPendingRequestIds = currentIds;
+    this.saveTracker(tracker);
+    this.saveNotifications();
+    this.updateBadge();
+    this.renderNotifications();
+  }
+
   async syncServerNotifications(currentUser = null, force = false) {
     if (!this.user || this.isSyncing) return;
     const now = Date.now();
@@ -181,36 +219,10 @@ class NotificationManager {
 
       const tracker = this.loadTracker();
 
-      if (latestUser.league_role === 'admin' && latestUser.active_league_id) {
+      if (latestUser.league_role === 'admin' && latestUser.active_league_id && this.shouldPollAdminJoinRequests()) {
         try {
           const requestResult = await callApi('/api/league/requests');
-          const requests = Array.isArray(requestResult.requests) ? requestResult.requests : [];
-          const currentIds = requests.map((request) => String(request.request_id)).sort();
-          const previousIds = new Set((tracker.adminPendingRequestIds || []).map((id) => String(id)));
-
-          this.notifications = this.notifications.filter((notification) => {
-            if (notification.action !== 'review_join_request' || !notification.request?.request_id) {
-              return true;
-            }
-            return currentIds.includes(String(notification.request.request_id));
-          });
-          this.saveNotifications();
-          this.updateBadge();
-          this.renderNotifications();
-
-          this.addNotifications(
-            requests
-              .filter((request) => !previousIds.has(String(request.request_id)))
-              .map((request) => ({
-                title: 'New Join Request',
-                message: `${request.first_name} ${request.last_name} requested to join your league.`,
-                icon: '👤',
-                action: 'review_join_request',
-                request,
-              }))
-          );
-
-          tracker.adminPendingRequestIds = currentIds;
+          this.reconcileAdminJoinRequests(Array.isArray(requestResult.requests) ? requestResult.requests : []);
         } catch (error) {
           // ignore request fetch errors for non-admin surfaces
         }

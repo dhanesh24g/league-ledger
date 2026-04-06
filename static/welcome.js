@@ -341,6 +341,9 @@ async function renderJoinRequests(user) {
 
   try {
     const result = await callApi('/api/league/requests');
+    if (window.notificationManager?.reconcileAdminJoinRequests) {
+      window.notificationManager.reconcileAdminJoinRequests(Array.isArray(result.requests) ? result.requests : []);
+    }
     if (!result.requests.length) {
       joinRequestsPanel.classList.add('hidden');
       joinRequestsPanel.innerHTML = '';
