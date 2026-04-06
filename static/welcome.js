@@ -35,6 +35,7 @@ const USER_CACHE_PREFIX = 'league-ledger-user-cache';
 let previousFocus = null;
 let joinModalBindingsReady = false;
 let routeChoiceBindingsReady = false;
+let requestStatusRefreshInFlight = false;
 
 async function finalizeRequestAction(successMessage) {
   clearUserCache();
@@ -761,9 +762,24 @@ async function refreshWelcomeView() {
   renderRequestHistory(user);
 }
 
+async function handleExternalRequestStatusUpdate() {
+  if (requestStatusRefreshInFlight) return;
+  if (!getToken()) return;
+  requestStatusRefreshInFlight = true;
+  try {
+    clearUserCache();
+    await refreshWelcomeView();
+  } catch (error) {
+    console.warn('Failed to refresh welcome view after request update:', error);
+  } finally {
+    requestStatusRefreshInFlight = false;
+  }
+}
+
 async function init() {
   initThemeToggle();
   initNotifications();
+  window.addEventListener('league-ledger:request-status-updated', handleExternalRequestStatusUpdate);
 
   if (!getToken()) {
     window.location.replace('/login');

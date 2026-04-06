@@ -142,7 +142,7 @@ class NotificationManager {
 
   loadTracker() {
     if (!this.trackerStorageKey) {
-      return { adminPendingRequestIds: [], selfPendingLeagueIds: [] };
+      return { adminPendingRequestIds: [], selfPendingLeagueIds: [], selfOutcomeNotificationKeys: [] };
     }
     try {
       const stored = localStorage.getItem(this.trackerStorageKey);
@@ -150,9 +150,10 @@ class NotificationManager {
       return {
         adminPendingRequestIds: Array.isArray(parsed.adminPendingRequestIds) ? parsed.adminPendingRequestIds : [],
         selfPendingLeagueIds: Array.isArray(parsed.selfPendingLeagueIds) ? parsed.selfPendingLeagueIds : [],
+        selfOutcomeNotificationKeys: Array.isArray(parsed.selfOutcomeNotificationKeys) ? parsed.selfOutcomeNotificationKeys : [],
       };
     } catch {
-      return { adminPendingRequestIds: [], selfPendingLeagueIds: [] };
+      return { adminPendingRequestIds: [], selfPendingLeagueIds: [], selfOutcomeNotificationKeys: [] };
     }
   }
 
@@ -222,23 +223,67 @@ class NotificationManager {
       const currentMembershipMap = new Map(
         (Array.isArray(latestUser.memberships) ? latestUser.memberships : []).map((item) => [Number(item.league_id), item])
       );
+      const latestRequestHistoryByLeague = new Map();
+      const requestHistoryRows = Array.isArray(latestUser.request_history) ? latestUser.request_history : [];
+      requestHistoryRows.forEach((row) => {
+        const leagueId = Number(row?.league_id);
+        if (!Number.isFinite(leagueId)) return;
+        const existing = latestRequestHistoryByLeague.get(leagueId);
+        const existingTime = Date.parse(String(existing?.reviewed_at || existing?.created_at || '')) || 0;
+        const candidateTime = Date.parse(String(row?.reviewed_at || row?.created_at || '')) || 0;
+        if (!existing || candidateTime >= existingTime) {
+          latestRequestHistoryByLeague.set(leagueId, row);
+        }
+      });
+      const seenOutcomeKeys = new Set((tracker.selfOutcomeNotificationKeys || []).map((value) => String(value)));
+      let userRequestStateChanged = false;
 
       previousPendingIds
-        .filter((leagueId) => !currentPendingIds.includes(leagueId) && currentMembershipMap.has(leagueId))
+        .filter((leagueId) => !currentPendingIds.includes(leagueId))
         .forEach((leagueId) => {
-          const membership = currentMembershipMap.get(leagueId);
-          const leagueName = membership?.league?.name || 'your league';
-          this.addNotification({
-            title: 'Join Request Approved',
-            message: `Your request to join ${leagueName} was approved.`,
-            icon: '✅',
-            action: 'navigate',
-            url: '/league-details',
-          });
+          const latestRequest = latestRequestHistoryByLeague.get(leagueId);
+          const status = String(latestRequest?.status || '').toLowerCase();
+          const outcomeKey = latestRequest?.request_id ? `${latestRequest.request_id}:${status}` : `${leagueId}:${status}`;
+          if (seenOutcomeKeys.has(outcomeKey)) {
+            return;
+          }
+
+          if (status === 'approved' && currentMembershipMap.has(leagueId)) {
+            const membership = currentMembershipMap.get(leagueId);
+            const leagueName = membership?.league?.name || latestRequest?.league?.name || 'your league';
+            this.addNotification({
+              title: 'Join Request Approved',
+              message: `Your request to join ${leagueName} was approved.`,
+              icon: '✅',
+              action: 'navigate',
+              url: '/league-details',
+            });
+            seenOutcomeKeys.add(outcomeKey);
+            userRequestStateChanged = true;
+            return;
+          }
+
+          if (status === 'rejected') {
+            const leagueName = latestRequest?.league?.name || 'this league';
+            this.addNotification({
+              title: 'Join Request Rejected',
+              message: `Your request to join ${leagueName} was not approved.`,
+              icon: '❌',
+              action: 'navigate',
+              url: '/welcome',
+            });
+            seenOutcomeKeys.add(outcomeKey);
+            userRequestStateChanged = true;
+          }
         });
 
       tracker.selfPendingLeagueIds = currentPendingIds;
+      tracker.selfOutcomeNotificationKeys = Array.from(seenOutcomeKeys).slice(-50);
       this.saveTracker(tracker);
+
+      if (userRequestStateChanged) {
+        window.dispatchEvent(new CustomEvent('league-ledger:request-status-updated'));
+      }
     } catch (error) {
       console.warn('Notification sync failed:', error);
     } finally {
