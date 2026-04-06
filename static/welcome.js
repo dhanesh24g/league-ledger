@@ -26,6 +26,7 @@ const routeChoiceCopy = document.getElementById('route-choice-copy');
 const routeChoiceActions = document.getElementById('route-choice-actions');
 const closeRouteChoiceBtn = document.getElementById('close-route-choice');
 const LAST_LEAGUE_ROUTE_KEY = 'league-ledger-last-route-by-league';
+const USER_CACHE_PREFIX = 'league-ledger-user-cache';
 
 let previousFocus = null;
 let joinModalBindingsReady = false;
@@ -671,7 +672,8 @@ async function init() {
 
 function getCachedUser() {
   try {
-    const cached = localStorage.getItem('league-ledger-user-cache');
+    const cacheKey = `${USER_CACHE_PREFIX}:${(localStorage.getItem('league-ledger-username') || 'anonymous').trim().toLowerCase() || 'anonymous'}`;
+    const cached = localStorage.getItem(cacheKey);
     if (cached) {
       const data = JSON.parse(cached);
       const now = Date.now();
@@ -688,7 +690,8 @@ function getCachedUser() {
 
 function cacheUser(user) {
   try {
-    localStorage.setItem('league-ledger-user-cache', JSON.stringify({
+    const cacheKey = `${USER_CACHE_PREFIX}:${(localStorage.getItem('league-ledger-username') || 'anonymous').trim().toLowerCase() || 'anonymous'}`;
+    localStorage.setItem(cacheKey, JSON.stringify({
       user,
       timestamp: Date.now()
     }));
@@ -699,7 +702,8 @@ function cacheUser(user) {
 
 function clearUserCache() {
   try {
-    localStorage.removeItem('league-ledger-user-cache');
+    const cacheKey = `${USER_CACHE_PREFIX}:${(localStorage.getItem('league-ledger-username') || 'anonymous').trim().toLowerCase() || 'anonymous'}`;
+    localStorage.removeItem(cacheKey);
   } catch (e) {
     // Ignore cache errors
   }

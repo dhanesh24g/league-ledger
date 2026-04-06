@@ -25,25 +25,25 @@
 }
 
 [data-theme="light"] {
-  --bg: #eef3f9;
-  --bg-radial-1: rgba(37, 99, 235, 0.08);
-  --bg-radial-2: rgba(14, 165, 233, 0.08);
-  --panel: rgba(255, 255, 255, 0.9);
-  --panel-2: rgba(248, 250, 252, 0.94);
-  --glass: rgba(255, 255, 255, 0.82);
+  --bg: #e7eef7;
+  --bg-radial-1: rgba(59, 130, 246, 0.16);
+  --bg-radial-2: rgba(6, 182, 212, 0.12);
+  --panel: rgba(255, 255, 255, 0.94);
+  --panel-2: rgba(240, 246, 252, 0.97);
+  --glass: rgba(248, 251, 255, 0.9);
   --text: #0f172a;
-  --muted: #475569;
+  --muted: #52627a;
   --accent: linear-gradient(135deg, #2563eb, #0ea5e9);
   --accent-solid: #2563eb;
   --accent-2: #ff8bd1;
   --accent-text: #ffffff;
-  --border: rgba(15, 23, 42, 0.12);
-  --chip: rgba(15, 23, 42, 0.045);
+  --border: rgba(71, 85, 105, 0.18);
+  --chip: rgba(37, 99, 235, 0.06);
   --input-bg: rgba(255, 255, 255, 0.98);
-  --input-border: rgba(15, 23, 42, 0.14);
-  --input-focus-ring: rgba(37, 99, 235, 0.14);
-  --input-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
-  --shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
+  --input-border: rgba(71, 85, 105, 0.16);
+  --input-focus-ring: rgba(37, 99, 235, 0.18);
+  --input-shadow: 0 10px 28px rgba(15, 23, 42, 0.1);
+  --shadow: 0 20px 48px rgba(30, 41, 59, 0.12);
   --good: #059669;
   --bad: #dc2626;
   --font-heading: "Space Grotesk", "Manrope", "Inter", "Segoe UI", sans-serif;
@@ -300,7 +300,11 @@ body.modal-open {
 }
 
 [data-theme="light"] .app-header {
-  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, rgba(247, 250, 255, 0.92), rgba(236, 243, 251, 0.88));
+  border-bottom-color: rgba(100, 116, 139, 0.16);
+  box-shadow:
+    0 14px 34px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 [data-theme="light"] .shell-header p {
@@ -308,15 +312,24 @@ body.modal-open {
 }
 
 [data-theme="light"] .panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.99), rgba(244, 247, 251, 0.96));
-  box-shadow: 0 18px 44px rgba(148, 163, 184, 0.12);
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.05), transparent 24%),
+    radial-gradient(circle at top left, rgba(6, 182, 212, 0.04), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.995), rgba(241, 246, 252, 0.97));
+  border-color: rgba(71, 85, 105, 0.14);
+  box-shadow:
+    0 18px 44px rgba(148, 163, 184, 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.88);
 }
 
 [data-theme="light"] input,
 [data-theme="light"] select,
 [data-theme="light"] textarea {
   background: rgba(255, 255, 255, 0.99);
-  border-color: rgba(15, 23, 42, 0.12);
+  border-color: rgba(71, 85, 105, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    0 8px 18px rgba(148, 163, 184, 0.08);
 }
 
 .header-content {
@@ -402,6 +415,12 @@ body.modal-open {
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+[data-theme="light"] .auth-pill {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(240, 245, 251, 0.94));
+  border-color: rgba(100, 116, 139, 0.18);
+  box-shadow: 0 8px 20px rgba(148, 163, 184, 0.08);
 }
 
 .auth-pill-identity {
@@ -3778,6 +3797,15 @@ button {
   padding: 22px;
 }
 
+[data-theme="light"] .dashboard-modal-panel {
+  border-color: rgba(71, 85, 105, 0.14);
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.08), transparent 28%),
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.992), rgba(242, 247, 252, 0.978));
+  box-shadow: 0 30px 70px rgba(148, 163, 184, 0.18);
+}
+
 .dashboard-modal-head {
   display: flex;
   justify-content: space-between;
@@ -3814,6 +3842,14 @@ button {
   border-radius: 18px;
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.04);
+}
+
+[data-theme="light"] .zoom-board-row,
+[data-theme="light"] .player-breakdown-card,
+[data-theme="light"] .rank-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(239, 245, 251, 0.95));
+  border-color: rgba(71, 85, 105, 0.12);
+  box-shadow: 0 12px 26px rgba(148, 163, 184, 0.1);
 }
 
 .zoom-board-head {
@@ -5175,8 +5211,11 @@ th {
 [data-theme="light"] .auth-provider-card,
 [data-theme="light"] .soft-box,
 [data-theme="light"] .feed-item {
-  border-color: rgba(15, 23, 42, 0.08);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  border-color: rgba(71, 85, 105, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.985), rgba(242, 247, 252, 0.955));
+  box-shadow:
+    0 12px 28px rgba(148, 163, 184, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
 }
 
 [data-theme="light"] .workflow-feed-item-soft,
@@ -5289,8 +5328,8 @@ th {
 [data-theme="light"] .participant-pill,
 [data-theme="light"] .chips li,
 [data-theme="light"] .payout-rank-display {
-  background: rgba(15, 23, 42, 0.04);
-  border-color: rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(234, 241, 248, 0.92));
+  border-color: rgba(100, 116, 139, 0.16);
   color: var(--text);
 }
 
@@ -5308,7 +5347,7 @@ th {
 [data-theme="light"] .accent-amber,
 [data-theme="light"] .accent-pink,
 [data-theme="light"] .accent-slate {
-  filter: saturate(0.9);
+  filter: saturate(1.05) contrast(1.02);
 }
 
 [data-theme="light"] .chart-bar-track,
