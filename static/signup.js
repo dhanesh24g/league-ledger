@@ -11,6 +11,25 @@ let lastSuggestedSeed = '';
 let googleIdentityScriptPromise = null;
 let googleClientInitialized = false;
 
+function initPasswordToggles(root = document) {
+  root.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    if (button.dataset.bound === 'true') return;
+    button.addEventListener('click', () => {
+      const field = button.closest('.password-field');
+      const input = field?.querySelector('input');
+      if (!input) return;
+      const showIcon = button.querySelector('.password-toggle-icon-show');
+      const hideIcon = button.querySelector('.password-toggle-icon-hide');
+      const revealing = input.type === 'password';
+      input.type = revealing ? 'text' : 'password';
+      button.setAttribute('aria-label', revealing ? 'Hide password' : 'Show password');
+      showIcon?.classList.toggle('hidden', revealing);
+      hideIcon?.classList.toggle('hidden', !revealing);
+    });
+    button.dataset.bound = 'true';
+  });
+}
+
 async function callApi(url, options = {}) {
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
@@ -255,6 +274,7 @@ function initGoogleSignup() {
 
 async function initSignup() {
   initThemeToggle();
+  initPasswordToggles(signupForm);
   const token = localStorage.getItem('league-ledger-token');
   if (token) {
     window.location.replace(localStorage.getItem('league-ledger-post-auth-path') || '/welcome');

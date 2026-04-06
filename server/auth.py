@@ -1348,6 +1348,10 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
                     "user_id_label": str(user_row.get("user_id") or ""),
                 },
             )
+        invalidate_profile_cache(
+            user_id_value=int(request_row["user_id"]),
+            user_id_label=str(request_row.get("user_id_label") or ""),
+        )
         _invalidate_members_cache(league_id)
         return {"message": "Join request approved"}
 
@@ -1386,6 +1390,10 @@ def approve_join_request(request_id: int, user: dict[str, Any], role: str = "rea
                 },
                 connection=connection,
             )
+    invalidate_profile_cache(
+        user_id_value=int(request_row["user_id"]),
+        user_id_label=str(request_row["user_id"]),
+    )
     _invalidate_members_cache(league_id)
     return {"message": "Join request approved"}
 

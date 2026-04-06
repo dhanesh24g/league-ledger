@@ -3,6 +3,8 @@ import {
   clearAuthStorage,
   ensureLeagueSwitcher,
   initThemeToggle,
+  populateHeaderIdentity,
+  refreshHeaderCommandMenu,
   setActiveLeagueId,
   showError,
   updateHeaderLeagueContext,
@@ -17,8 +19,6 @@ const statsOverview = document.getElementById('stats-overview');
 const statsSummaryStrip = document.getElementById('stats-summary-strip');
 const leaderboardChart = document.getElementById('leaderboard-chart');
 const topNav = document.getElementById('top-nav');
-const logoutBtn = document.getElementById('logout-btn');
-const authRole = document.getElementById('auth-role');
 const earnersModal = document.getElementById('earners-modal');
 const earnersModalBody = document.getElementById('earners-modal-body');
 const closeEarnersModalBtn = document.getElementById('close-earners-modal');
@@ -103,6 +103,39 @@ function isMobileStatsViewport() {
 
 function closeMobileSelect() {
   setModalState(mobileSelectModal, false);
+}
+
+function renderDesktopHeaderNav() {
+  if (!topNav) return;
+  document.querySelector('.header-content')?.classList.add('header-content-modern-nav');
+  topNav.classList.add('header-select-source');
+
+  let nav = document.querySelector(`.header-desktop-nav[data-select-id="${topNav.id}"]`);
+  if (!nav) {
+    nav = document.createElement('nav');
+    nav.className = 'header-desktop-nav';
+    nav.dataset.selectId = topNav.id;
+    nav.setAttribute('aria-label', 'Primary navigation');
+    topNav.parentElement?.insertBefore(nav, topNav.nextSibling);
+  }
+
+  nav.innerHTML = [...topNav.options].map((option) => {
+    const active = String(option.value) === String(topNav.value);
+    return `
+      <button type="button" class="header-nav-pill${active ? ' is-active' : ''}" data-nav-value="${option.value}">
+        ${escapeHtml(option.textContent || '')}
+      </button>
+    `;
+  }).join('');
+
+  nav.querySelectorAll('[data-nav-value]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextValue = button.getAttribute('data-nav-value') || '';
+      if (!nextValue || nextValue === topNav.value) return;
+      topNav.value = nextValue;
+      topNav.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
 }
 
 function ensureMobileSelectProxy(select, config = {}) {
@@ -303,6 +336,13 @@ function renderPieChart(shares, options = {}) {
 
   let cursor = 0;
   const slices = shares.map((share) => {
+    if (share.percentage >= 99.999) {
+      return `
+        <circle cx="${center}" cy="${center}" r="${radius}" fill="${share.color}" class="pie-slice" data-slice-index="${share.player_id}" data-interactive="${interactive}" tabindex="${options.interactive ? '0' : '-1'}" role="${options.interactive ? 'button' : 'presentation'}" aria-label="${escapeHtml(share.name)} ${formatCurrency(share.total_amount)}">
+          <title>${escapeHtml(share.name)} • ${formatCurrency(share.total_amount)}</title>
+        </circle>
+      `;
+    }
     const startAngle = cursor;
     const sliceAngle = (share.percentage / 100) * 360;
     const endAngle = cursor + sliceAngle;
@@ -1064,17 +1104,7 @@ function setupHeader() {
   topNav.addEventListener('change', () => {
     window.location.href = topNav.value;
   });
-
-  logoutBtn.addEventListener('click', () => {
-    clearAuthStorage();
-    window.location.replace('/login');
-  });
-
-  ensureMobileSelectProxy(topNav, {
-    title: 'Navigate',
-    subtitle: 'Choose where you want to go next.',
-    placeholder: 'Navigate',
-  });
+  refreshHeaderCommandMenu(currentUser);
 }
 
 function setupModal() {
@@ -1128,9 +1158,14 @@ function setReadNavigationMode() {
   if (!topNav) return;
   topNav.innerHTML = '';
 
+  const homeOption = document.createElement('option');
+  homeOption.value = '/welcome';
+  homeOption.textContent = 'Home';
+  topNav.appendChild(homeOption);
+
   const statsOption = document.createElement('option');
   statsOption.value = '/stats';
-  statsOption.textContent = 'League Dashboard';
+  statsOption.textContent = 'Stats Dashboard';
   topNav.appendChild(statsOption);
 
   const detailsOption = document.createElement('option');
@@ -1138,17 +1173,8 @@ function setReadNavigationMode() {
   detailsOption.textContent = 'League Details';
   topNav.appendChild(detailsOption);
 
-  const homeOption = document.createElement('option');
-  homeOption.value = '/welcome';
-  homeOption.textContent = 'Home';
-  topNav.appendChild(homeOption);
-
   topNav.value = '/stats';
-  ensureMobileSelectProxy(topNav, {
-    title: 'Navigate',
-    subtitle: 'Choose where you want to go next.',
-    placeholder: 'Navigate',
-  });
+  refreshHeaderCommandMenu(currentUser);
 }
 
 function renderLoadingState() {
@@ -1252,12 +1278,13 @@ async function init() {
   }
   updateHeaderLeagueContext(user);
   ensureLeagueSwitcher(user);
+  refreshHeaderCommandMenu();
 
   const effectiveRole = user.league_role === 'admin' ? 'admin' : 'read';
   localStorage.setItem('league-ledger-user-role', effectiveRole);
   localStorage.setItem('league-ledger-username', user.user_id);
   localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
-  authRole.textContent = `${user.user_id}`;
+  populateHeaderIdentity(user);
   if (effectiveRole !== 'admin') {
     setReadNavigationMode();
   }

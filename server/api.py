@@ -69,8 +69,6 @@ from .service import (
     register_telegram_webhook,
     save_winners,
     send_match_update_to_telegram,
-)
-from .supabase_service import (
     upsert_league,
 )
 

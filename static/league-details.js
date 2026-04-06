@@ -1,18 +1,16 @@
 import {
   callApi,
-  clearAuthStorage,
+  ensureLeagueSwitcher,
   initThemeToggle,
-  registerMobileSelectProxy,
+  populateHeaderIdentity,
+  refreshHeaderCommandMenu,
   setActiveLeagueId,
-  syncMobileSelectProxy,
   showError,
   updateHeaderLeagueContext,
 } from '/static/workflow-common.js';
 import { initNotifications } from '/static/notifications.js';
 
 const topNav = document.getElementById('top-nav');
-const authRole = document.getElementById('auth-role');
-const logoutBtn = document.getElementById('logout-btn');
 const leagueHero = document.getElementById('league-hero');
 const leagueOverview = document.getElementById('league-overview');
 const leaguePayouts = document.getElementById('league-payouts');
@@ -30,28 +28,22 @@ function escapeHtml(value) {
 
 function setupNav(user) {
   if (!topNav) return;
-  const isAdmin = user.league_role === 'admin';
-
   const options = [
-    { value: '/league-details', label: 'League Details' },
-    { value: '/stats', label: 'Stats Dashboard' },
-    ...(isAdmin ? [{ value: '/setup', label: 'League Workflow' }, { value: '/league-settings', label: 'League Settings' }] : []),
     { value: '/welcome', label: 'Home' },
+    { value: '/stats', label: 'Stats Dashboard' },
+    { value: '/league-details', label: 'League Details' },
   ];
 
   topNav.innerHTML = options
     .map((item) => `<option value="${item.value}">${item.label}</option>`)
     .join('');
   topNav.value = '/league-details';
-  registerMobileSelectProxy(topNav, {
-    variant: 'compact',
-    placeholder: 'Navigate',
-  });
-  syncMobileSelectProxy(topNav);
 
   topNav.addEventListener('change', () => {
     window.location.href = topNav.value;
   });
+
+  refreshHeaderCommandMenu(user);
 }
 
 function statusClass(status) {
@@ -245,14 +237,11 @@ async function init() {
     setActiveLeagueId(user.active_league_id);
   }
 
-  authRole.textContent = user.user_id;
+  populateHeaderIdentity(user);
   updateHeaderLeagueContext(user);
   setupNav(user);
-
-  logoutBtn?.addEventListener('click', () => {
-    clearAuthStorage();
-    window.location.replace('/login');
-  });
+  ensureLeagueSwitcher(user);
+  refreshHeaderCommandMenu(user);
 
   const [state, stats, memberResult] = await Promise.all([
     callApi('/api/state'),
