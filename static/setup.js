@@ -258,9 +258,12 @@ async function renderJoinRequests() {
           }
 
           showSuccess('Join request approved successfully.');
-
-          await renderJoinRequests();
-          await renderMembers();
+          if (window.notificationManager?.syncServerNotifications) {
+            await window.notificationManager.syncServerNotifications();
+          }
+          window.setTimeout(() => {
+            window.location.reload();
+          }, 180);
         } catch (error) {
           showError(error);
         } finally {
@@ -286,7 +289,12 @@ async function renderJoinRequests() {
           });
 
           showSuccess('Join request rejected.');
-          await renderJoinRequests();
+          if (window.notificationManager?.syncServerNotifications) {
+            await window.notificationManager.syncServerNotifications();
+          }
+          window.setTimeout(() => {
+            window.location.reload();
+          }, 180);
         } catch (error) {
           showError(error);
         } finally {
