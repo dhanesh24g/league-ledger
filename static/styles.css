@@ -1118,9 +1118,9 @@ select option:focus-visible {
     linear-gradient(180deg, color-mix(in srgb, var(--panel-2) 92%, rgba(255, 255, 255, 0.02)), color-mix(in srgb, var(--panel) 86%, rgba(255, 255, 255, 0.01)));
   color: inherit;
   text-align: left;
-  padding: 16px 18px;
+  padding: 18px 20px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   box-shadow: 0 10px 22px rgba(6, 12, 28, 0.16);
   transition: transform 160ms ease, border-color 180ms ease, box-shadow 200ms ease, background 180ms ease;
 }
@@ -1135,6 +1135,16 @@ select option:focus-visible {
     0 18px 34px rgba(74, 88, 255, 0.18);
 }
 
+.route-choice-card.primary .route-choice-title-stack strong,
+.route-choice-card.recommended .route-choice-title-stack strong {
+  color: var(--text);
+}
+
+.route-choice-card.primary .route-choice-description,
+.route-choice-card.recommended .route-choice-description {
+  color: color-mix(in srgb, var(--text) 82%, var(--muted));
+}
+
 .route-choice-card:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--accent) 48%, var(--border));
@@ -1145,7 +1155,7 @@ select option:focus-visible {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   align-items: start;
 }
 
@@ -1156,8 +1166,8 @@ select option:focus-visible {
 }
 
 .route-choice-title-stack strong {
-  font-size: 17px;
-  line-height: 1.16;
+  font-size: 18px;
+  line-height: 1.18;
   letter-spacing: -0.02em;
   font-weight: 800;
 }
@@ -1165,13 +1175,14 @@ select option:focus-visible {
 .route-choice-meta {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  align-self: start;
+  gap: 12px;
   justify-self: end;
 }
 
 .route-choice-arrow {
   color: color-mix(in srgb, var(--muted) 72%, var(--text));
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
 }
@@ -1189,10 +1200,16 @@ select option:focus-visible {
 }
 
 .route-choice-description {
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.55;
   color: color-mix(in srgb, var(--muted) 88%, var(--text));
-  max-width: 52ch;
+  max-width: 46ch;
+}
+
+.route-choice-cancel {
+  justify-self: start;
+  min-width: 140px;
+  padding-inline: 22px;
 }
 
 [data-theme="light"] .route-choice-card {
@@ -1212,6 +1229,14 @@ select option:focus-visible {
     0 18px 32px rgba(59, 130, 246, 0.12);
 }
 
+[data-theme="light"] .route-choice-card .route-choice-title-stack strong {
+  color: #0f172a;
+}
+
+[data-theme="light"] .route-choice-card .route-choice-description {
+  color: #475569;
+}
+
 [data-theme="light"] .route-choice-badge {
   color: #4338ca;
   background: rgba(99, 102, 241, 0.08);
@@ -1228,13 +1253,13 @@ select option:focus-visible {
   }
 
   .route-choice-card {
-    padding: 14px 15px;
+    padding: 15px 16px;
     border-radius: 14px;
   }
 
   .route-choice-title-row {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 12px;
   }
 
   .route-choice-meta {
@@ -1247,8 +1272,14 @@ select option:focus-visible {
   }
 
   .route-choice-description {
-    font-size: 12px;
-    line-height: 1.42;
+    font-size: 13px;
+    line-height: 1.48;
+  }
+
+  .route-choice-cancel {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
   }
 }
 

@@ -233,6 +233,11 @@ async function init() {
   const profile = await callApi('/api/auth/me');
   const user = profile.user;
 
+  if (user.membership_status !== 'active') {
+    window.location.replace('/welcome');
+    return;
+  }
+
   if (user.active_league_id) {
     setActiveLeagueId(user.active_league_id);
   }

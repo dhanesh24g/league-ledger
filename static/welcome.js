@@ -208,29 +208,76 @@ function openRouteChoiceModal(membership) {
 
   const leagueId = membership.league_id;
   const isAdmin = membership.role === 'admin';
-  const allowedRoutes = isAdmin
-    ? ['/stats', '/league-details', '/setup', '/matches', '/winners', '/league-settings']
-    : ['/stats', '/league-details'];
-  const lastRoute = getLastRouteForLeague(leagueId);
+  const routeOptions = isAdmin
+    ? [
+      {
+        route: '/stats',
+        title: 'Open Stats Dashboard',
+        continueLabel: 'Stats Dashboard',
+        description: 'Performance analytics, leaderboard, match and player insights.',
+      },
+      {
+        route: '/league-details',
+        title: 'Open League Details',
+        continueLabel: 'League Details',
+        description: 'League rules, players, matches, winner amounts and payout settings.',
+      },
+      {
+        route: '/matches?flow=match-update',
+        title: 'Open Match Entry',
+        continueLabel: 'Match Entry',
+        description: 'Log today\'s fixture, roster, and match-level exception settings directly.',
+      },
+      {
+        route: '/winners?flow=match-update',
+        title: 'Open Winner Assignment',
+        continueLabel: 'Winner Assignment',
+        description: 'Pick a saved match and assign payout ranks without reopening setup steps.',
+      },
+      {
+        route: '/setup',
+        title: 'Open League Setup',
+        continueLabel: 'League Setup',
+        description: 'Manage league workflow: players, matches, winners and ledger.',
+      },
+      {
+        route: '/league-settings',
+        title: 'Open League Settings',
+        continueLabel: 'League Settings',
+        description: 'Governance controls, roles policy and admin-level management.',
+      },
+    ]
+    : [
+      {
+        route: '/stats',
+        title: 'Open Stats Dashboard',
+        continueLabel: 'Stats Dashboard',
+        description: 'Performance analytics, leaderboard, match and player insights.',
+      },
+      {
+        route: '/league-details',
+        title: 'Open League Details',
+        continueLabel: 'League Details',
+        description: 'League rules, players, matches, winner amounts and payout settings.',
+      },
+    ];
+  const routeMap = new Map(routeOptions.map((option) => [option.route, option]));
+  const storedRoute = getLastRouteForLeague(leagueId);
+  const lastRoute = storedRoute === '/matches'
+    ? '/matches?flow=match-update'
+    : storedRoute === '/winners'
+      ? '/winners?flow=match-update'
+      : storedRoute;
+  const recommendedRoute = routeMap.get(lastRoute) ? lastRoute : '';
+  const visibleRoutes = routeOptions.filter((option) => option.route !== recommendedRoute);
 
-  if (allowedRoutes.includes(lastRoute)) {
-    const lastLabel = lastRoute === '/setup'
-      ? 'League Setup'
-      : lastRoute === '/matches'
-        ? 'Match Entry'
-        : lastRoute === '/winners'
-          ? 'Winner Assignment'
-      : lastRoute === '/league-settings'
-        ? 'League Settings'
-        : lastRoute === '/league-details'
-          ? 'League Details'
-          : 'Stats Dashboard';
-
+  if (recommendedRoute) {
+    const recommendedOption = routeMap.get(recommendedRoute);
     routeChoiceActions.appendChild(
       createRouteCard({
-        title: `Continue to ${lastLabel}`,
+        title: `Continue to ${recommendedOption.continueLabel}`,
         description: 'Recommended based on your last destination for this league.',
-        route: lastRoute,
+        route: recommendedOption.route,
         variant: 'primary',
         badge: 'Last Used',
         recommended: true,
@@ -239,71 +286,21 @@ function openRouteChoiceModal(membership) {
     );
   }
 
-  routeChoiceActions.appendChild(
-    createRouteCard({
-      title: 'Open Stats Dashboard',
-      description: 'Performance analytics, leaderboard, match and player insights.',
-      route: '/stats',
-      variant: 'ghost',
-      leagueId,
-    })
-  );
-
-  routeChoiceActions.appendChild(
-    createRouteCard({
-      title: 'Open League Details',
-      description: 'League rules, players, matches, winner amounts and payout settings.',
-      route: '/league-details',
-      variant: 'ghost',
-      leagueId,
-    })
-  );
-
-  if (isAdmin) {
+  visibleRoutes.forEach((option) => {
     routeChoiceActions.appendChild(
       createRouteCard({
-        title: 'Open Match Entry',
-        description: 'Log today\'s fixture, roster, and match-level exception settings directly.',
-        route: '/matches?flow=match-update',
+        title: option.title,
+        description: option.description,
+        route: option.route,
         variant: 'ghost',
         leagueId,
       })
     );
-
-    routeChoiceActions.appendChild(
-      createRouteCard({
-        title: 'Open Winner Assignment',
-        description: 'Pick a saved match and assign payout ranks without reopening setup steps.',
-        route: '/winners?flow=match-update',
-        variant: 'ghost',
-        leagueId,
-      })
-    );
-
-    routeChoiceActions.appendChild(
-      createRouteCard({
-        title: 'Open League Setup',
-        description: 'Manage league workflow: players, matches, winners and ledger.',
-        route: '/setup',
-        variant: 'ghost',
-        leagueId,
-      })
-    );
-
-    routeChoiceActions.appendChild(
-      createRouteCard({
-        title: 'Open League Settings',
-        description: 'Governance controls, roles policy and admin-level management.',
-        route: '/league-settings',
-        variant: 'ghost',
-        leagueId,
-      })
-    );
-  }
+  });
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
-  cancelBtn.className = 'ghost';
+  cancelBtn.className = 'ghost route-choice-cancel';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.addEventListener('click', () => closeRouteChoiceModal());
   routeChoiceActions.appendChild(cancelBtn);
