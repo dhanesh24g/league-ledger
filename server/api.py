@@ -311,13 +311,13 @@ def join_requests(user: dict[str, Any] = Depends(require_admin)) -> dict[str, An
 def approve_request(
     request_id: int,
     payload: MembershipRolePayload,
-    user: dict[str, Any] = Depends(require_admin),
+    user: dict[str, Any] = Depends(current_user),
 ) -> dict[str, str]:
     return approve_join_request(request_id, user, role="read")
 
 
 @router.post("/league/requests/{request_id}/reject")
-def reject_request(request_id: int, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
+def reject_request(request_id: int, user: dict[str, Any] = Depends(current_user)) -> dict[str, str]:
     return reject_join_request(request_id, user)
 
 

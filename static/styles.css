@@ -5942,6 +5942,18 @@ th {
   margin: 0;
 }
 
+.notification-review-feedback {
+  min-height: 20px;
+  padding: 4px 2px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #bfdbfe;
+}
+
+.notification-review-feedback.is-error {
+  color: #fca5a5;
+}
+
 .notification-review-actions {
   display: flex;
   gap: 10px;
@@ -5950,21 +5962,152 @@ th {
 
 .notification-approve-btn,
 .notification-reject-btn {
-  border: 0;
-  border-radius: 10px;
-  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  min-height: 44px;
+  min-width: 152px;
+  padding: 10px 18px;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 14px 30px rgba(2, 8, 23, 0.24);
+  transition: transform 160ms ease, box-shadow 200ms ease, filter 200ms ease, opacity 160ms ease, border-color 160ms ease;
 }
 
 .notification-approve-btn {
-  background: #16a34a;
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  border-color: rgba(134, 239, 172, 0.26);
   color: #ffffff;
 }
 
 .notification-reject-btn {
-  background: #dc2626;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  border-color: rgba(252, 165, 165, 0.24);
   color: #ffffff;
+}
+
+.notification-review-btn-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.notification-review-btn-label {
+  line-height: 1;
+}
+
+.notification-approve-btn:hover,
+.notification-approve-btn:focus-visible,
+.notification-reject-btn:hover,
+.notification-reject-btn:focus-visible {
+  transform: translateY(-1px);
+  filter: saturate(1.06);
+}
+
+.notification-approve-btn.is-loading,
+.notification-reject-btn.is-loading {
+  cursor: progress;
+  opacity: 0.92;
+  transform: none;
+}
+
+[data-theme="light"] .notification-review-feedback {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] .notification-review-feedback.is-error {
+  color: #b91c1c;
+}
+
+[data-theme="light"] .notification-approve-btn {
+  background: linear-gradient(135deg, #16a34a, #166534);
+  border-color: rgba(34, 197, 94, 0.22);
+  box-shadow: 0 12px 28px rgba(34, 197, 94, 0.18);
+}
+
+[data-theme="light"] .notification-reject-btn {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  border-color: rgba(239, 68, 68, 0.2);
+  box-shadow: 0 12px 28px rgba(239, 68, 68, 0.16);
+}
+
+[data-theme="light"] .notification-review-btn-icon {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.approve-request,
+.reject-request {
+  min-height: 34px;
+  padding: 0.45rem 0.82rem;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  box-shadow: none;
+}
+
+.approve-request.ghost {
+  border-color: color-mix(in srgb, #16a34a 42%, var(--border));
+  background: color-mix(in srgb, #16a34a 14%, transparent);
+  color: #86efac;
+}
+
+.approve-request.ghost:hover,
+.approve-request.ghost:focus-visible {
+  border-color: color-mix(in srgb, #22c55e 56%, var(--border));
+  background: color-mix(in srgb, #16a34a 20%, transparent);
+  color: #dcfce7;
+}
+
+.reject-request.ghost {
+  border-color: color-mix(in srgb, #dc2626 42%, var(--border));
+  background: color-mix(in srgb, #dc2626 12%, transparent);
+  color: #fca5a5;
+}
+
+.reject-request.ghost:hover,
+.reject-request.ghost:focus-visible {
+  border-color: color-mix(in srgb, #ef4444 58%, var(--border));
+  background: color-mix(in srgb, #dc2626 18%, transparent);
+  color: #fee2e2;
+}
+
+[data-theme="light"] .approve-request.ghost {
+  border-color: rgba(22, 163, 74, 0.24);
+  background: rgba(34, 197, 94, 0.1);
+  color: #166534;
+}
+
+[data-theme="light"] .approve-request.ghost:hover,
+[data-theme="light"] .approve-request.ghost:focus-visible {
+  border-color: rgba(22, 163, 74, 0.34);
+  background: rgba(34, 197, 94, 0.16);
+  color: #14532d;
+}
+
+[data-theme="light"] .reject-request.ghost {
+  border-color: rgba(220, 38, 38, 0.22);
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+}
+
+[data-theme="light"] .reject-request.ghost:hover,
+[data-theme="light"] .reject-request.ghost:focus-visible {
+  border-color: rgba(220, 38, 38, 0.32);
+  background: rgba(239, 68, 68, 0.14);
+  color: #991b1b;
 }
 
 .status-chip.is-approved {

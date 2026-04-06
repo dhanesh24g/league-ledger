@@ -221,8 +221,8 @@ async function renderJoinRequests() {
               </div>
               <div class="member-role-actions">
                 <span class="status-chip">Will be approved as Read</span>
-                <button type="button" class="ghost approve-request" data-request-id="${request.request_id}">Approve</button>
-                <button type="button" class="ghost reject-request" data-request-id="${request.request_id}">Reject</button>
+                <button type="button" class="ghost approve-request" data-request-id="${request.request_id}" data-league-id="${request.league_id}">Approve</button>
+                <button type="button" class="ghost reject-request" data-request-id="${request.request_id}" data-league-id="${request.league_id}">Reject</button>
               </div>
             </div>
           `).join('')}
@@ -239,6 +239,7 @@ async function renderJoinRequests() {
           closeLoading = showLoading('Approving request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/approve`, {
             method: 'POST',
+            headers: button.dataset.leagueId ? { 'X-League-ID': button.dataset.leagueId } : undefined,
             body: JSON.stringify({ role: 'read' }),
           });
           membersLoaded = false;
@@ -281,6 +282,7 @@ async function renderJoinRequests() {
           closeLoading = showLoading('Rejecting request...');
           await callApi(`/api/league/requests/${button.dataset.requestId}/reject`, {
             method: 'POST',
+            headers: button.dataset.leagueId ? { 'X-League-ID': button.dataset.leagueId } : undefined,
           });
 
           showSuccess('Join request rejected.');
