@@ -66,11 +66,9 @@ function scheduleProactiveRefresh() {
 
 const WORKFLOW_ROUTES = ['/setup', '/players', '/matches', '/winners', '/ledger', '/league-settings'];
 const HEADER_NAV_DESTINATIONS = [
-  { value: '/welcome', label: 'Home', adminOnly: false },
-  { value: '/stats', label: 'Stats Dashboard', adminOnly: false },
-  { value: '/league-details', label: 'League Details', adminOnly: false },
-  { value: '/setup', label: 'League Workflow', adminOnly: true },
-  { value: '/league-settings', label: 'League Settings', adminOnly: true },
+  { value: '/welcome', label: 'Home' },
+  { value: '/stats', label: 'Stats Dashboard' },
+  { value: '/league-details', label: 'League Details' },
 ];
 const PAGE_LABEL_BY_ROUTE = {
   '/welcome': 'Home',
@@ -773,20 +771,28 @@ function ensureHeaderCommandMenu() {
       <div class="header-command-panel" role="menu">
         <div class="header-command-section header-command-section-pages is-open">
           <button type="button" class="header-command-section-toggle is-static" data-command-section="pages" aria-expanded="true">
-            <span class="header-command-section-label">Choose destination</span>
+            <span class="header-command-section-copy">
+              <span class="header-command-section-label">Choose destination</span>
+            </span>
           </button>
           <div class="header-command-options" data-command-options="pages"></div>
         </div>
         <div class="header-command-section header-command-section-leagues hidden">
           <button type="button" class="header-command-section-toggle" data-command-section="leagues" aria-expanded="false">
-            <span class="header-command-section-label">Choose league</span>
+            <span class="header-command-section-copy">
+              <span class="header-command-section-label">Choose league</span>
+            </span>
+            <span class="header-command-section-summary" data-command-summary="leagues"></span>
             <span class="header-command-section-chevron" aria-hidden="true">⌄</span>
           </button>
           <div class="header-command-options" data-command-options="leagues"></div>
         </div>
         <div class="header-command-section header-command-section-admin hidden">
           <button type="button" class="header-command-section-toggle" data-command-section="admin" aria-expanded="false">
-            <span class="header-command-section-label">Admin shortcuts</span>
+            <span class="header-command-section-copy">
+              <span class="header-command-section-label">Admin shortcuts</span>
+            </span>
+            <span class="header-command-section-summary" data-command-summary="admin"></span>
             <span class="header-command-section-chevron" aria-hidden="true">⌄</span>
           </button>
           <div class="header-command-options" data-command-options="admin"></div>
@@ -882,8 +888,7 @@ export function refreshHeaderCommandMenu(user = null) {
 
   const pagesHost = menu.querySelector('[data-command-options="pages"]');
   if (pagesHost) {
-    const pageOptions = HEADER_NAV_DESTINATIONS.filter((item) => isAdmin || !item.adminOnly);
-    pagesHost.innerHTML = pageOptions
+    pagesHost.innerHTML = HEADER_NAV_DESTINATIONS
       .map((item) => buildHeaderCommandOption(item.value, item.label, item.value === currentPath, 'page'))
       .join('');
 
@@ -901,17 +906,22 @@ export function refreshHeaderCommandMenu(user = null) {
   }
   const adminSection = menu.querySelector('.header-command-section-admin');
   const adminHost = menu.querySelector('[data-command-options="admin"]');
+  const adminSummary = menu.querySelector('[data-command-summary="admin"]');
   if (adminSection && adminHost) {
     adminSection.classList.toggle('hidden', !isAdmin);
     if (!isAdmin) {
       adminSection.classList.remove('is-open');
       adminSection.querySelector('.header-command-section-toggle')?.setAttribute('aria-expanded', 'false');
+      if (adminSummary) adminSummary.textContent = '';
     }
     if (isAdmin) {
       const shortcuts = [
+        { value: '/setup', label: 'League Workflow' },
+        { value: '/league-settings', label: 'League Settings' },
         { value: '/matches', label: 'Match Entry' },
         { value: '/winners', label: 'Winner Assignment' },
       ];
+      if (adminSummary) adminSummary.textContent = `${shortcuts.length} tools`;
       adminHost.innerHTML = shortcuts
         .map((item) => buildHeaderCommandOption(item.value, item.label, item.value === currentPath, 'admin'))
         .join('');
@@ -933,6 +943,7 @@ export function refreshHeaderCommandMenu(user = null) {
 
   const leagueSection = menu.querySelector('.header-command-section-leagues');
   const leagueHost = menu.querySelector('[data-command-options="leagues"]');
+  const leagueSummary = menu.querySelector('[data-command-summary="leagues"]');
   const leagues = leagueSelect ? [...leagueSelect.options] : [];
   if (leagueSection && leagueHost) {
     const showLeagues = leagues.length > 1;
@@ -940,8 +951,10 @@ export function refreshHeaderCommandMenu(user = null) {
     if (!showLeagues) {
       leagueSection.classList.remove('is-open');
       leagueSection.querySelector('.header-command-section-toggle')?.setAttribute('aria-expanded', 'false');
+      if (leagueSummary) leagueSummary.textContent = '';
     }
     if (showLeagues) {
+      if (leagueSummary) leagueSummary.textContent = `${leagues.length} leagues`;
       leagueHost.innerHTML = leagues
         .map((option) => buildHeaderCommandOption(option.value, option.textContent || '', String(option.value) === String(leagueSelect.value), 'league'))
         .join('');

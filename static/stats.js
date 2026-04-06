@@ -336,6 +336,13 @@ function renderPieChart(shares, options = {}) {
 
   let cursor = 0;
   const slices = shares.map((share) => {
+    if (share.percentage >= 99.999) {
+      return `
+        <circle cx="${center}" cy="${center}" r="${radius}" fill="${share.color}" class="pie-slice" data-slice-index="${share.player_id}" data-interactive="${interactive}" tabindex="${options.interactive ? '0' : '-1'}" role="${options.interactive ? 'button' : 'presentation'}" aria-label="${escapeHtml(share.name)} ${formatCurrency(share.total_amount)}">
+          <title>${escapeHtml(share.name)} • ${formatCurrency(share.total_amount)}</title>
+        </circle>
+      `;
+    }
     const startAngle = cursor;
     const sliceAngle = (share.percentage / 100) * 360;
     const endAngle = cursor + sliceAngle;

@@ -28,13 +28,10 @@ function escapeHtml(value) {
 
 function setupNav(user) {
   if (!topNav) return;
-  const isAdmin = user.league_role === 'admin';
-
   const options = [
     { value: '/welcome', label: 'Home' },
     { value: '/stats', label: 'Stats Dashboard' },
     { value: '/league-details', label: 'League Details' },
-    ...(isAdmin ? [{ value: '/setup', label: 'League Workflow' }, { value: '/league-settings', label: 'League Settings' }] : []),
   ];
 
   topNav.innerHTML = options
