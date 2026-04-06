@@ -1440,6 +1440,44 @@ def reject_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]
     return {"message": "Join request rejected"}
 
 
+def cancel_join_request(request_id: int, user: dict[str, Any]) -> dict[str, str]:
+    user_id = int(user["id"])
+    user_id_label = str(user.get("user_id") or "")
+
+    if get_supabase_client():
+        supabase = get_supabase_client()
+        assert supabase is not None
+        request_response = (
+            supabase.table("league_join_requests")
+            .select("id")
+            .eq("id", int(request_id))
+            .eq("user_id", user_id)
+            .eq("status", "pending")
+            .limit(1)
+            .execute()
+        )
+        if not request_response.data:
+            raise HTTPException(status_code=404, detail="Pending join request not found")
+
+        supabase.table("league_join_requests").delete().eq("id", int(request_id)).execute()
+        invalidate_profile_cache(user_id_value=user_id, user_id_label=user_id_label)
+        return {"message": "Join request canceled"}
+
+    with DatabaseManager() as connection:
+        cursor = connection.execute(
+            """
+            DELETE FROM league_join_requests
+            WHERE id = ? AND user_id = ? AND status = 'pending'
+            """,
+            (int(request_id), user_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Pending join request not found")
+
+    invalidate_profile_cache(user_id_value=user_id, user_id_label=user_id_label)
+    return {"message": "Join request canceled"}
+
+
 def list_league_members(user: dict[str, Any]) -> dict[str, Any]:
     if user["membership_status"] != "active" or not user.get("active_league_id"):
         raise HTTPException(status_code=403, detail="Active league membership required")

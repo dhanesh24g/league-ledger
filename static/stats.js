@@ -77,6 +77,13 @@ function formatPercent(value) {
   return `${Math.round(Number(value || 0))}%`;
 }
 
+function getEligiblePayoutTone(value) {
+  const amount = Number(value || 0);
+  if (amount > 0) return 'positive';
+  if (amount < 0) return 'negative';
+  return 'neutral';
+}
+
 function getRankVisual(rank) {
   return RANK_VISUALS[rank] || { icon: '🏁', label: `Rank ${rank}` };
 }
@@ -377,6 +384,7 @@ function renderLadderSliceDetails(share) {
 
   const entryFee = Number(stats.summary?.entry_fee || 0);
   const eligiblePayout = Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee);
+  const eligiblePayoutTone = getEligiblePayoutTone(eligiblePayout);
 
   return `
     <div class="pie-slice-detail-card">
@@ -392,7 +400,7 @@ function renderLadderSliceDetails(share) {
           <span>Payout Won</span>
           <strong>${formatCurrency(share.total_amount)}</strong>
         </div>
-        <div class="stats-current-user-metric">
+        <div class="stats-current-user-metric stats-current-user-metric-payout stats-current-user-metric-payout-${eligiblePayoutTone}">
           <span>Eligible Payout</span>
           <strong>${formatCurrency(eligiblePayout)}</strong>
         </div>
@@ -573,6 +581,7 @@ function renderEarnersModal() {
         if (player2) {
           const amountWon2 = Number(player2.total_amount || 0);
           const eligiblePayout2 = amountWon2 - (Number(player2.matches_played || 0) * entryFee);
+          const eligiblePayoutTone2 = getEligiblePayoutTone(eligiblePayout2);
           player2Html = `
               <div class="earner-compact-cell">
                 <span class="earner-rank">${TROPHIES[idx2] || `#${idx2 + 1}`}</span>
@@ -585,14 +594,16 @@ function renderEarnersModal() {
                     <span class="earner-amount-label">Amount Won</span>
                     <span class="earner-amount-won">${formatCurrency(amountWon2)}</span>
                   </div>
-                  <div class="earner-amount-item earner-payout-highlight">
+                  <div class="earner-amount-item earner-payout-highlight earner-payout-highlight-${eligiblePayoutTone2}">
                     <span class="earner-amount-label">Eligible Payout</span>
-                    <span class="earner-payout">${formatCurrency(eligiblePayout2)}</span>
+                    <span class="earner-payout earner-payout-${eligiblePayoutTone2}">${formatCurrency(eligiblePayout2)}</span>
                   </div>
                 </div>
               </div>
             `;
         }
+
+        const eligiblePayoutTone1 = getEligiblePayoutTone(eligiblePayout1);
 
         rows.push(`
             <div class="earner-compact-row earner-compact-row-pair">
@@ -607,9 +618,9 @@ function renderEarnersModal() {
                     <span class="earner-amount-label">Amount Won</span>
                     <span class="earner-amount-won">${formatCurrency(amountWon1)}</span>
                   </div>
-                  <div class="earner-amount-item earner-payout-highlight">
+                  <div class="earner-amount-item earner-payout-highlight earner-payout-highlight-${eligiblePayoutTone1}">
                     <span class="earner-amount-label">Eligible Payout</span>
-                    <span class="earner-payout">${formatCurrency(eligiblePayout1)}</span>
+                    <span class="earner-payout earner-payout-${eligiblePayoutTone1}">${formatCurrency(eligiblePayout1)}</span>
                   </div>
                 </div>
               </div>
@@ -652,19 +663,23 @@ function renderLadderModal() {
       <div class="pie-detail-panel">
         <div id="ladder-slice-detail" class="pie-slice-detail-shell"></div>
         <div class="zoom-board pie-detail-list">
-          ${shares.length ? shares.map((share) => `
-            <button type="button" class="zoom-board-row pie-detail-row pie-detail-button" data-slice-trigger="${share.player_id}">
+          ${shares.length ? shares.map((share) => {
+            const eligiblePayout = Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee);
+            const payoutTone = getEligiblePayoutTone(eligiblePayout);
+            return `
+            <button type="button" class="zoom-board-row pie-detail-row pie-detail-button pie-detail-button-${payoutTone}" data-slice-trigger="${share.player_id}">
               <div class="pie-legend-chip" style="--slice-color:${share.color};"></div>
               <div>
                 <strong>${escapeHtml(share.name)}</strong>
-                <p class="muted">${share.matches_played} played • ${share.wins_total} titles • Eligible ${formatCurrency(Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee))}</p>
+                <p class="muted">${share.matches_played} played • ${share.wins_total} titles • Eligible <span class="pie-detail-payout pie-detail-payout-${payoutTone}">${formatCurrency(eligiblePayout)}</span></p>
               </div>
               <div class="pie-detail-meta">
                 <strong>${formatCurrency(share.total_amount)}</strong>
                 <span>${formatPercent(share.percentage)}</span>
               </div>
             </button>
-          `).join('') : '<div class="feed-item">No payout data available yet.</div>'}
+          `;
+          }).join('') : '<div class="feed-item">No payout data available yet.</div>'}
         </div>
       </div>
     </div>

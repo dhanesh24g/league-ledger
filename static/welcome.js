@@ -403,6 +403,7 @@ function renderRequestHistory(user) {
               </div>
               <div class="member-role-actions">
                 <span class="status-chip ${statusClass}">${formatRequestStatus(status)}</span>
+                ${status === 'pending' ? `<button type="button" class="ghost cancel-request" data-request-id="${row.request_id}">Cancel request</button>` : ''}
               </div>
             </div>
           `;
@@ -410,6 +411,24 @@ function renderRequestHistory(user) {
       </div>
     </div>
   `;
+
+  requestHistoryPanel.querySelectorAll('.cancel-request').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const confirmed = window.confirm('Cancel this pending join request?');
+      if (!confirmed) return;
+      try {
+        button.disabled = true;
+        await callApi(`/api/league/requests/${button.dataset.requestId}/cancel`, {
+          method: 'POST',
+        });
+        clearUserCache();
+        await renderWelcome();
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : String(error));
+        button.disabled = false;
+      }
+    });
+  });
 }
 
 async function renderInvitePreview(user, inviteCode) {
