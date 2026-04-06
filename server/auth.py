@@ -28,7 +28,10 @@ _profile_cache: dict[str, dict[str, Any]] = {}
 _profile_cache_timestamps: dict[str, float] = {}
 _cache_lock = Lock()
 PROFILE_CACHE_TTL_SECONDS = 300  # 5 minutes
-REFRESH_TOKEN_TTL_SECONDS = int(os.getenv("APP_REFRESH_TOKEN_TTL_SECONDS", str(60 * 60 * 24 * 30)))
+REFRESH_TOKEN_TTL_SECONDS = max(
+    int(os.getenv("APP_REFRESH_TOKEN_TTL_SECONDS", str(60 * 60 * 24 * 30))),
+    60 * 60 * 24 * 7,
+)
 TOKEN_TTL_SECONDS = ACCESS_TOKEN_TTL_SECONDS
 PBKDF2_ITERATIONS = 120_000
 USER_ID_CACHE_TTL_SECONDS = 60
@@ -999,12 +1002,16 @@ def get_user_profile_by_id(user_id_value: int, requested_league_id: int | None =
 
 
 def auth_config() -> dict[str, Any]:
+    access_ttl_hours = max(1, ACCESS_TOKEN_TTL_SECONDS // 3600)
+    refresh_ttl_days = max(1, REFRESH_TOKEN_TTL_SECONDS // 86400)
     return {
         "enabled": _auth_enabled(),
         "signup_enabled": True,
         "google_enabled": bool(_google_client_id()),
         "google_client_id": _google_client_id() or None,
-        "session_ttl_hours": TOKEN_TTL_SECONDS // 3600,
+        "session_ttl_hours": access_ttl_hours,
+        "access_token_ttl_hours": access_ttl_hours,
+        "refresh_session_ttl_days": refresh_ttl_days,
     }
 
 

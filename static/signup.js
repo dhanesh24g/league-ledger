@@ -282,7 +282,7 @@ async function initSignup() {
   }
 
   authConfig = await callApi('/api/auth/config');
-  signupHint.textContent = `After signup, your session stays valid for ${authConfig.session_ttl_hours || 4} hours.`;
+  signupHint.textContent = 'Create your account to continue.';
   initGoogleSignup();
   await refreshSuggestions(true);
 }

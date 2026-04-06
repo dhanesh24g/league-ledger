@@ -529,13 +529,8 @@ async function renderInvitePreview(user, inviteCode) {
         method: 'POST',
         body: JSON.stringify({ invite_code: league.invite_code }),
       });
-      await renderInvitePreview(
-        {
-          ...user,
-          pending_requests: [...(user.pending_requests || []), { league_id: league.id, league }],
-        },
-        league.invite_code
-      );
+      clearUserCache();
+      await refreshWelcomeView();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : String(error));
     }
