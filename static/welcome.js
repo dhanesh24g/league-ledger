@@ -53,6 +53,22 @@ async function finalizeRequestAction(successMessage) {
   }, 180);
 }
 
+async function finalizeJoinRequestSubmission(successMessage) {
+  clearUserCache();
+  if (window.notificationManager?.syncServerNotifications) {
+    try {
+      await window.notificationManager.syncServerNotifications();
+    } catch (_) {
+      // no-op
+    }
+  }
+  window.history.replaceState({}, '', '/welcome');
+  await refreshWelcomeView();
+  if (successMessage) {
+    showToast(successMessage, 'success');
+  }
+}
+
 function renderButtonLink(label, href, kind = 'primary') {
   return `<a class="button-link ${kind} auth-primary-button" href="${href}">${label}</a>`;
 }
@@ -479,6 +495,14 @@ async function renderInvitePreview(user, inviteCode) {
   const league = result.league;
   const membership = (user.memberships || []).find((item) => String(item.league_id) === String(league.id));
   const pending = (user.pending_requests || []).find((item) => String(item.league_id) === String(league.id));
+  const latestHistory = (user.request_history || [])
+    .filter((item) => String(item.league_id) === String(league.id))
+    .sort((a, b) => {
+      const left = Date.parse(String(b.reviewed_at || b.created_at || '')) || 0;
+      const right = Date.parse(String(a.reviewed_at || a.created_at || '')) || 0;
+      return left - right;
+    })[0] || null;
+  const latestHistoryStatus = String(latestHistory?.status || '').toLowerCase();
 
   welcomeTitle.textContent = `Join ${league.name}`;
   welcomeCopy.textContent = 'This invite link opens a specific league. Review the details below, then request access when you are ready.';
@@ -522,6 +546,57 @@ async function renderInvitePreview(user, inviteCode) {
     return;
   }
 
+  if (latestHistoryStatus === 'rejected' || latestHistoryStatus === 'canceled' || latestHistoryStatus === 'cancelled') {
+    const wasRejected = latestHistoryStatus === 'rejected';
+    const reviewedLabel = latestHistory?.reviewed_at
+      ? new Date(latestHistory.reviewed_at).toLocaleString()
+      : latestHistory?.created_at
+        ? new Date(latestHistory.created_at).toLocaleString()
+        : '';
+    welcomeActions.innerHTML = `
+      <div class="info-card welcome-card">
+        <h3>${wasRejected ? 'Previous Request Rejected' : 'Request Canceled'}</h3>
+        <p class="muted">
+          ${wasRejected
+            ? 'Your last request for this league was not approved. You can send a fresh request if you still want access.'
+            : 'Your earlier request was canceled. You can send a fresh request whenever you are ready.'}
+        </p>
+        <div class="welcome-meta-row">
+          <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>
+          <span class="welcome-meta-chip">${league.tournament}</span>
+          <span class="welcome-meta-chip">${wasRejected ? 'Rejected' : 'Canceled'}${reviewedLabel ? ` • ${reviewedLabel}` : ''}</span>
+        </div>
+        <button id="resend-join-request" type="button" class="primary auth-primary-button">${wasRejected ? 'Send Request Again' : 'Send Join Request'}</button>
+        <button id="back-to-home" type="button" class="ghost welcome-inline-action">Back</button>
+      </div>
+    `;
+    document.getElementById('back-to-home')?.addEventListener('click', () => {
+      window.history.replaceState({}, '', '/welcome');
+      renderHome(user);
+    });
+    document.getElementById('resend-join-request')?.addEventListener('click', async () => {
+      let closeLoading = null;
+      try {
+        const button = document.getElementById('resend-join-request');
+        if (button) {
+          button.disabled = true;
+          button.textContent = 'Sending...';
+        }
+        closeLoading = showLoading('Sending join request...');
+        await callApi('/api/auth/join-request', {
+          method: 'POST',
+          body: JSON.stringify({ invite_code: league.invite_code }),
+        });
+        await finalizeJoinRequestSubmission('Join request sent.');
+      } catch (error) {
+        showError(error);
+      } finally {
+        if (closeLoading) closeLoading();
+      }
+    });
+    return;
+  }
+
   welcomeActions.innerHTML = `
       <div class="info-card welcome-card">
         <h3>${league.name}</h3>
@@ -553,7 +628,7 @@ async function renderInvitePreview(user, inviteCode) {
         method: 'POST',
         body: JSON.stringify({ invite_code: league.invite_code }),
       });
-      await finalizeRequestAction('Join request sent.');
+      await finalizeJoinRequestSubmission('Join request sent.');
     } catch (error) {
       showError(error);
     } finally {
