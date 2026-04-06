@@ -8,6 +8,8 @@ class NotificationManager {
     this.isSyncing = false;
     this.hasBootstrapped = false;
     this.syncIntervalMs = 15000;
+    this.minSyncGapMs = 7000;
+    this.lastSyncStartedAt = 0;
     this.storageKey = 'league-ledger-notifications';
     this.trackerStorageKey = '';
     this.notificationBtn = document.getElementById('notification-btn');
@@ -108,7 +110,7 @@ class NotificationManager {
 
   async ensureServerSyncStarted() {
     if (this.hasBootstrapped) {
-      this.syncServerNotifications();
+      this.syncServerNotifications(null, true);
       return;
     }
     await this.bootstrapServerSync();
@@ -129,7 +131,7 @@ class NotificationManager {
       this.updateBadge();
       this.renderNotifications();
 
-      await this.syncServerNotifications(this.user);
+      await this.syncServerNotifications(this.user, true);
       this.syncTimer = window.setInterval(() => {
         this.syncServerNotifications();
       }, this.syncIntervalMs);
@@ -163,9 +165,14 @@ class NotificationManager {
     }
   }
 
-  async syncServerNotifications(currentUser = null) {
+  async syncServerNotifications(currentUser = null, force = false) {
     if (!this.user || this.isSyncing) return;
+    const now = Date.now();
+    if (!force && this.lastSyncStartedAt && (now - this.lastSyncStartedAt) < this.minSyncGapMs) {
+      return;
+    }
     this.isSyncing = true;
+    this.lastSyncStartedAt = now;
 
     try {
       const latestUser = currentUser || (await callApi('/api/auth/me')).user || this.user;
@@ -611,6 +618,9 @@ class NotificationManager {
 
 // Initialize notification manager
 export function initNotifications() {
+  if (window.notificationManager instanceof NotificationManager) {
+    return window.notificationManager;
+  }
   window.notificationManager = new NotificationManager();
   return window.notificationManager;
 }
