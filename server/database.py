@@ -24,10 +24,45 @@ _supabase_signature: tuple[str, str] | None = None
 logger = logging.getLogger(__name__)
 
 
+def _env_flag(name: str) -> bool | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _is_production_runtime() -> bool:
+    return os.getenv("APP_ENV", "development").strip().lower() == "production"
+
+
+def should_use_supabase() -> bool:
+    # Keep local and non-production environments fully on SQLite, even if
+    # Supabase credentials are present in a copied .env from production.
+    if not _is_production_runtime():
+        return False
+
+    provider = (os.getenv("DATABASE_PROVIDER") or os.getenv("LEAGUE_LEDGER_DATABASE") or "").strip().lower()
+    if provider == "sqlite":
+        return False
+    if provider == "supabase":
+        return True
+
+    use_supabase = _env_flag("USE_SUPABASE")
+    if use_supabase is not None:
+        return use_supabase
+
+    return True
+
+
 def get_supabase_client() -> Client | None:
     global _supabase_client, _supabase_signature
 
-    if not SUPABASE_AVAILABLE:
+    if not SUPABASE_AVAILABLE or not should_use_supabase():
         return None
 
     supabase_url = os.getenv("SUPABASE_URL")
@@ -60,10 +95,10 @@ def init_database() -> None:
         init_supabase_schema()
         return
 
-    if os.getenv("VERCEL"):
+    if _is_production_runtime() and should_use_supabase():
         raise RuntimeError(
             "Supabase environment variables (SUPABASE_URL and SUPABASE_ANON_KEY) "
-            "must be set in Vercel deployment. SQLite is not supported in serverless functions."
+            "must be set when the app is configured to use Supabase in production."
         )
 
     init_sqlite_db()

@@ -65,6 +65,24 @@ function scheduleProactiveRefresh() {
 }
 
 const WORKFLOW_ROUTES = ['/setup', '/players', '/matches', '/winners', '/ledger', '/league-settings'];
+const HEADER_NAV_DESTINATIONS = [
+  { value: '/welcome', label: 'Home', adminOnly: false },
+  { value: '/stats', label: 'Stats Dashboard', adminOnly: false },
+  { value: '/league-details', label: 'League Details', adminOnly: false },
+  { value: '/setup', label: 'League Workflow', adminOnly: true },
+  { value: '/league-settings', label: 'League Settings', adminOnly: true },
+];
+const PAGE_LABEL_BY_ROUTE = {
+  '/welcome': 'Home',
+  '/stats': 'Stats Dashboard',
+  '/league-details': 'League Details',
+  '/setup': 'League Workflow',
+  '/players': 'League Workflow',
+  '/matches': 'League Workflow',
+  '/winners': 'League Workflow',
+  '/ledger': 'League Workflow',
+  '/league-settings': 'League Settings',
+};
 
 const DEFAULT_WORKFLOW_STATE = {
   currentPage: '/setup',
@@ -593,6 +611,25 @@ function syncAllMobileSelectProxies() {
   mobileSelectRegistry.forEach((select) => syncMobileSelectProxy(select));
 }
 
+function isDesktopHeaderNavViewport() {
+  return Boolean(window.matchMedia && window.matchMedia('(min-width: 1025px)').matches);
+}
+
+function closeHeaderDropdowns(except = null) {
+  document.querySelectorAll('.header-league-menu.is-open, .header-command-menu.is-open').forEach((menu) => {
+    if (except && menu === except) return;
+    menu.classList.remove('is-open');
+    const trigger = menu.querySelector('.header-league-trigger, .header-command-trigger');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+document.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element) || target.closest('.header-league-menu, .header-command-menu')) return;
+  closeHeaderDropdowns();
+});
+
 export function registerMobileSelectProxy(select, config = {}) {
   if (!select) return null;
   const proxyParts = ensureMobileSelectProxyShell(select, config);
@@ -605,9 +642,341 @@ export function registerMobileSelectProxy(select, config = {}) {
   return proxyParts?.proxy || null;
 }
 
+export function enhanceHeaderNavSelect(select) {
+  if (!select) return null;
+
+  select.classList.add('header-select-source');
+  const selectId = ensureMobileSelectId(select);
+  let nav = document.querySelector(`.header-desktop-nav[data-select-id="${selectId}"]`);
+  if (!nav) {
+    nav = document.createElement('nav');
+    nav.className = 'header-desktop-nav';
+    nav.dataset.selectId = selectId;
+    nav.setAttribute('aria-label', 'Primary navigation');
+    const shell = select.closest(`.mobile-select-shell[data-select-id="${selectId}"]`) || select.parentElement;
+    shell?.insertAdjacentElement('afterend', nav);
+  }
+
+  const currentValue = String(select.value || '');
+  nav.innerHTML = [...select.options].map((option) => {
+    const active = String(option.value) === currentValue;
+    return `
+      <button
+        type="button"
+        class="header-nav-pill${active ? ' is-active' : ''}"
+        data-nav-value="${option.value}">
+        ${option.textContent || ''}
+      </button>
+    `;
+  }).join('');
+
+  nav.querySelectorAll('[data-nav-value]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextValue = button.getAttribute('data-nav-value') || '';
+      if (!nextValue || nextValue === select.value) return;
+      select.value = nextValue;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  });
+
+  return nav;
+}
+
+export function enhanceHeaderLeagueSwitcher(select) {
+  if (!select) return null;
+
+  select.classList.add('header-select-source');
+  const selectId = ensureMobileSelectId(select);
+  let menu = document.querySelector(`.header-league-menu[data-select-id="${selectId}"]`);
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.className = 'header-league-menu';
+    menu.dataset.selectId = selectId;
+    menu.innerHTML = `
+      <button type="button" class="header-league-trigger" aria-haspopup="menu" aria-expanded="false">
+        <span class="header-league-copy"></span>
+        <span class="header-league-chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="header-league-panel" role="menu"></div>
+    `;
+    const shell = select.closest(`.mobile-select-shell[data-select-id="${selectId}"]`) || select.parentElement;
+    shell?.insertAdjacentElement('afterend', menu);
+  }
+
+  const trigger = menu.querySelector('.header-league-trigger');
+  const copy = menu.querySelector('.header-league-copy');
+  const panel = menu.querySelector('.header-league-panel');
+  const selectedOption = select.options[select.selectedIndex];
+  if (copy) {
+    copy.textContent = selectedOption?.textContent?.trim() || 'Choose league';
+  }
+  if (panel) {
+    panel.innerHTML = [...select.options].map((option) => {
+      const active = String(option.value) === String(select.value);
+      return `
+        <button
+          type="button"
+          class="header-league-option${active ? ' is-active' : ''}"
+          data-league-value="${option.value}"
+          role="menuitemradio"
+          aria-checked="${active ? 'true' : 'false'}">
+          <span class="header-league-option-check" aria-hidden="true">${active ? '✓' : ''}</span>
+          <span>${option.textContent || ''}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  if (trigger && !trigger.dataset.bound) {
+    trigger.addEventListener('click', () => {
+      if (!isDesktopHeaderNavViewport()) return;
+      const willOpen = !menu.classList.contains('is-open');
+      closeHeaderDropdowns(menu);
+      menu.classList.toggle('is-open', willOpen);
+      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    trigger.dataset.bound = 'true';
+  }
+
+  panel?.querySelectorAll('[data-league-value]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const nextValue = button.getAttribute('data-league-value') || '';
+      if (!nextValue || nextValue === select.value) {
+        closeHeaderDropdowns();
+        return;
+      }
+      select.value = nextValue;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      closeHeaderDropdowns();
+    });
+  });
+
+  return menu;
+}
+
+function ensureHeaderCommandMenu() {
+  const host = document.querySelector('.header-actions') || document.querySelector('.header-center');
+  if (!host) return null;
+
+  let menu = host.querySelector('.header-command-menu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.className = 'header-command-menu';
+    menu.innerHTML = `
+      <button type="button" class="header-command-trigger" aria-haspopup="menu" aria-expanded="false">
+        <span class="header-command-copy">
+          <span class="header-command-copy-label">Navigate</span>
+          <span class="header-command-copy-value"></span>
+        </span>
+        <span class="header-command-chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div class="header-command-panel" role="menu">
+        <div class="header-command-section header-command-section-pages is-open">
+          <button type="button" class="header-command-section-toggle is-static" data-command-section="pages" aria-expanded="true">
+            <span class="header-command-section-label">Choose destination</span>
+          </button>
+          <div class="header-command-options" data-command-options="pages"></div>
+        </div>
+        <div class="header-command-section header-command-section-leagues hidden">
+          <button type="button" class="header-command-section-toggle" data-command-section="leagues" aria-expanded="false">
+            <span class="header-command-section-label">Choose league</span>
+            <span class="header-command-section-chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="header-command-options" data-command-options="leagues"></div>
+        </div>
+        <div class="header-command-section header-command-section-admin hidden">
+          <button type="button" class="header-command-section-toggle" data-command-section="admin" aria-expanded="false">
+            <span class="header-command-section-label">Admin shortcuts</span>
+            <span class="header-command-section-chevron" aria-hidden="true">⌄</span>
+          </button>
+          <div class="header-command-options" data-command-options="admin"></div>
+        </div>
+        <div class="header-command-footer">
+          <button type="button" class="header-command-option header-command-option-logout" data-command-kind="logout">
+            <span class="header-command-option-copy">Log out</span>
+            <span class="header-command-option-check" aria-hidden="true">↗</span>
+          </button>
+        </div>
+      </div>
+    `;
+    const notificationWrapper = host.querySelector('.notification-wrapper');
+    const logoutBtn = host.querySelector('#logout-btn');
+    if (logoutBtn) {
+      host.insertBefore(menu, logoutBtn);
+    } else if (notificationWrapper?.nextSibling) {
+      host.insertBefore(menu, notificationWrapper.nextSibling);
+    } else {
+      host.appendChild(menu);
+    }
+  }
+
+  const trigger = menu.querySelector('.header-command-trigger');
+  if (trigger && !trigger.dataset.bound) {
+    trigger.addEventListener('click', () => {
+      const willOpen = !menu.classList.contains('is-open');
+      closeHeaderDropdowns(menu);
+      menu.classList.toggle('is-open', willOpen);
+      trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    trigger.dataset.bound = 'true';
+  }
+
+  menu.querySelectorAll('.header-command-section-toggle').forEach((button) => {
+    if (button.dataset.bound) return;
+    button.addEventListener('click', () => {
+      if (button.classList.contains('is-static')) return;
+      const section = button.closest('.header-command-section');
+      if (!section) return;
+      const willOpen = !section.classList.contains('is-open');
+      section.classList.toggle('is-open', willOpen);
+      button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    });
+    button.dataset.bound = 'true';
+  });
+
+  return menu;
+}
+
+function buildHeaderCommandOption(value, label, active = false, kind = 'page') {
+  return `
+    <button
+      type="button"
+      class="header-command-option${active ? ' is-active' : ''}"
+      data-command-kind="${kind}"
+      data-command-value="${value}">
+      <span class="header-command-option-copy">${label}</span>
+      <span class="header-command-option-check" aria-hidden="true">${active ? '✓' : ''}</span>
+    </button>
+  `;
+}
+
+export function refreshHeaderCommandMenu(user = null) {
+  const topNav = document.getElementById('top-nav');
+  const leagueSelect = document.getElementById('league-switcher');
+  const headerContent = document.querySelector('.header-content');
+  const menu = ensureHeaderCommandMenu();
+  if (!headerContent || !menu || !topNav) return;
+
+  headerContent.classList.add('header-content-command-nav');
+  topNav.classList.add('header-select-source');
+  if (leagueSelect) {
+    leagueSelect.classList.add('header-select-source');
+  }
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) logoutBtn.classList.add('hidden');
+
+  const effectiveRole = String(
+    user?.league_role
+    || localStorage.getItem(STORAGE_KEYS.role)
+    || ''
+  ).toLowerCase();
+  const isAdmin = effectiveRole === 'admin';
+  const currentPath = window.location.pathname;
+  const currentPage = PAGE_LABEL_BY_ROUTE[currentPath]
+    || topNav.options[topNav.selectedIndex]?.textContent?.trim()
+    || 'League Workflow';
+  const value = menu.querySelector('.header-command-copy-value');
+  if (value) {
+    value.textContent = currentPage;
+  }
+
+  const pagesHost = menu.querySelector('[data-command-options="pages"]');
+  if (pagesHost) {
+    const pageOptions = HEADER_NAV_DESTINATIONS.filter((item) => isAdmin || !item.adminOnly);
+    pagesHost.innerHTML = pageOptions
+      .map((item) => buildHeaderCommandOption(item.value, item.label, item.value === currentPath, 'page'))
+      .join('');
+
+    pagesHost.querySelectorAll('[data-command-kind="page"]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const nextValue = button.getAttribute('data-command-value') || '';
+        if (!nextValue || nextValue === currentPath) {
+          closeHeaderDropdowns();
+          return;
+        }
+        navigateTo(nextValue);
+        closeHeaderDropdowns();
+      });
+    });
+  }
+  const adminSection = menu.querySelector('.header-command-section-admin');
+  const adminHost = menu.querySelector('[data-command-options="admin"]');
+  if (adminSection && adminHost) {
+    adminSection.classList.toggle('hidden', !isAdmin);
+    if (!isAdmin) {
+      adminSection.classList.remove('is-open');
+      adminSection.querySelector('.header-command-section-toggle')?.setAttribute('aria-expanded', 'false');
+    }
+    if (isAdmin) {
+      const shortcuts = [
+        { value: '/matches', label: 'Match Entry' },
+        { value: '/winners', label: 'Winner Assignment' },
+      ];
+      adminHost.innerHTML = shortcuts
+        .map((item) => buildHeaderCommandOption(item.value, item.label, item.value === currentPath, 'admin'))
+        .join('');
+
+      adminHost.querySelectorAll('[data-command-kind="admin"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextValue = button.getAttribute('data-command-value') || '';
+          if (!nextValue || nextValue === window.location.pathname) {
+            closeHeaderDropdowns();
+            return;
+          }
+          navigateTo(nextValue);
+        });
+      });
+    } else {
+      adminHost.innerHTML = '';
+    }
+  }
+
+  const leagueSection = menu.querySelector('.header-command-section-leagues');
+  const leagueHost = menu.querySelector('[data-command-options="leagues"]');
+  const leagues = leagueSelect ? [...leagueSelect.options] : [];
+  if (leagueSection && leagueHost) {
+    const showLeagues = leagues.length > 1;
+    leagueSection.classList.toggle('hidden', !showLeagues);
+    if (!showLeagues) {
+      leagueSection.classList.remove('is-open');
+      leagueSection.querySelector('.header-command-section-toggle')?.setAttribute('aria-expanded', 'false');
+    }
+    if (showLeagues) {
+      leagueHost.innerHTML = leagues
+        .map((option) => buildHeaderCommandOption(option.value, option.textContent || '', String(option.value) === String(leagueSelect.value), 'league'))
+        .join('');
+
+      leagueHost.querySelectorAll('[data-command-kind="league"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const nextValue = button.getAttribute('data-command-value') || '';
+          if (!nextValue || nextValue === leagueSelect.value) {
+            closeHeaderDropdowns();
+            return;
+          }
+          leagueSelect.value = nextValue;
+          leagueSelect.dispatchEvent(new Event('change', { bubbles: true }));
+          closeHeaderDropdowns();
+        });
+      });
+    } else {
+      leagueHost.innerHTML = '';
+    }
+  }
+
+  const logoutAction = menu.querySelector('[data-command-kind="logout"]');
+  if (logoutAction && !logoutAction.dataset.bound) {
+    logoutAction.addEventListener('click', () => {
+      clearAuthStorage();
+      window.location.replace('/login');
+    });
+    logoutAction.dataset.bound = 'true';
+  }
+}
+
 function initTopNav(currentPath) {
   const topNav = document.getElementById('top-nav');
   if (!topNav) return;
+  document.querySelector('.header-content')?.classList.add('header-content-command-nav');
 
   if ([...topNav.options].some((option) => option.value === currentPath)) {
     topNav.value = currentPath;
@@ -615,14 +984,9 @@ function initTopNav(currentPath) {
 
   topNav.addEventListener('change', () => {
     const target = topNav.value;
-    if (WORKFLOW_ROUTES.includes(target)) setCurrentWorkflowPage(target);
-    window.location.href = target;
+    navigateTo(target);
   });
-
-  registerMobileSelectProxy(topNav, {
-    variant: 'compact',
-    placeholder: 'Navigate',
-  });
+  refreshHeaderCommandMenu();
 }
 
 function initStepNav(currentPath) {
@@ -658,7 +1022,9 @@ export function ensureLeagueSwitcher(user) {
   const existing = document.getElementById('league-switcher');
   if (existing) existing.remove();
   const headerCenter = document.querySelector('.header-center');
+  const headerContent = document.querySelector('.header-content');
   headerCenter?.classList.remove('has-league-switcher');
+  headerContent?.classList.remove('header-content-has-league-switcher');
   if (memberships.length < 2) return;
 
   const select = document.createElement('select');
@@ -679,10 +1045,6 @@ export function ensureLeagueSwitcher(user) {
     writeWorkflowState(readWorkflowState());
     window.location.reload();
   });
-  registerMobileSelectProxy(select, {
-    variant: 'compact',
-    placeholder: 'Choose league',
-  });
 
   const topNav = document.getElementById('top-nav');
   const fallbackParent =
@@ -693,10 +1055,31 @@ export function ensureLeagueSwitcher(user) {
   if (topNav && topNav.parentElement) {
     topNav.parentElement.insertBefore(select, topNav);
     topNav.parentElement.classList.add('has-league-switcher');
+    headerContent?.classList.add('header-content-has-league-switcher');
   } else if (fallbackParent) {
     fallbackParent.insertBefore(select, fallbackParent.firstChild);
     fallbackParent.classList.add('has-league-switcher');
+    headerContent?.classList.add('header-content-has-league-switcher');
   }
+
+  refreshHeaderCommandMenu();
+}
+
+export function populateHeaderIdentity(user) {
+  const authRole = document.getElementById('auth-role');
+  if (!authRole) return;
+
+  authRole.classList.add('auth-pill', 'auth-pill-identity');
+  const username = String(user?.user_id || '').trim();
+  const activeLeagueName = String(
+    user?.active_league_name
+    || user?.league?.name
+    || ''
+  ).trim();
+  authRole.innerHTML = `
+    <span class="auth-pill-line auth-pill-line-primary">${username}</span>
+    <span class="auth-pill-line auth-pill-line-secondary">${activeLeagueName || 'Active league'}</span>
+  `;
 }
 
 export async function initWorkflowShell(currentPath) {
@@ -745,10 +1128,7 @@ export async function initWorkflowShell(currentPath) {
     return null;
   }
 
-  const authRole = document.getElementById('auth-role');
-  if (authRole) {
-    authRole.textContent = `${user.user_id}`;
-  }
+  populateHeaderIdentity(user);
 
   updateHeaderLeagueContext(user);
   ensureLeagueSwitcher(user);

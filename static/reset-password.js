@@ -54,6 +54,25 @@ const form = document.getElementById('reset-password-form');
 const result = document.getElementById('reset-password-result');
 const submitButton = form?.querySelector('button[type="submit"]');
 
+function initPasswordToggles(root = document) {
+  root.querySelectorAll('[data-password-toggle]').forEach((button) => {
+    if (button.dataset.bound === 'true') return;
+    button.addEventListener('click', () => {
+      const field = button.closest('.password-field');
+      const input = field?.querySelector('input');
+      if (!input) return;
+      const showIcon = button.querySelector('.password-toggle-icon-show');
+      const hideIcon = button.querySelector('.password-toggle-icon-hide');
+      const revealing = input.type === 'password';
+      input.type = revealing ? 'text' : 'password';
+      button.setAttribute('aria-label', revealing ? 'Hide password' : 'Show password');
+      showIcon?.classList.toggle('hidden', revealing);
+      hideIcon?.classList.toggle('hidden', !revealing);
+    });
+    button.dataset.bound = 'true';
+  });
+}
+
 function getResetToken() {
   const token = new URLSearchParams(window.location.search).get('token');
   return token ? token.trim() : '';
@@ -108,6 +127,7 @@ form?.addEventListener('submit', async (event) => {
 });
 
 initThemeToggle();
+initPasswordToggles(form);
 
 if (!getResetToken() && submitButton) {
   submitButton.disabled = true;
