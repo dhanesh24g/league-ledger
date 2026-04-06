@@ -488,7 +488,6 @@ class NotificationManager {
 
     this.removeNotification(notificationId);
     await this.syncServerNotifications();
-    this.closeJoinRequestReview();
   }
 
   openJoinRequestReview(notification) {
@@ -520,15 +519,23 @@ class NotificationManager {
       feedback.textContent = action === 'approve' ? 'Approving request...' : 'Rejecting request...';
       try {
         await this.submitJoinRequestReview(request.request_id, action, notification.id, request.league_id);
+        feedback.textContent = action === 'approve' ? 'Request approved. Refreshing…' : 'Request rejected. Refreshing…';
         showToast(action === 'approve' ? 'Join request approved.' : 'Join request rejected.', 'success');
+        window.setTimeout(() => {
+          window.location.reload();
+        }, 180);
       } catch (error) {
         console.warn('Join request review failed:', error);
         const message = error instanceof Error ? error.message : 'Request failed';
         if (/not found/i.test(message)) {
           this.removeNotification(notification.id);
           await this.syncServerNotifications();
-          this.closeJoinRequestReview();
+          feedback.classList.remove('is-error');
+          feedback.textContent = 'This request is no longer pending. Refreshing…';
           showToast('This request is no longer pending.', 'info');
+          window.setTimeout(() => {
+            window.location.reload();
+          }, 180);
           return;
         }
         feedback.classList.add('is-error');

@@ -36,6 +36,23 @@ let previousFocus = null;
 let joinModalBindingsReady = false;
 let routeChoiceBindingsReady = false;
 
+async function finalizeRequestAction(successMessage) {
+  clearUserCache();
+  if (window.notificationManager?.syncServerNotifications) {
+    try {
+      await window.notificationManager.syncServerNotifications();
+    } catch (_) {
+      // no-op
+    }
+  }
+  if (successMessage) {
+    showToast(successMessage, 'success');
+  }
+  window.setTimeout(() => {
+    window.location.reload();
+  }, 180);
+}
+
 function renderButtonLink(label, href, kind = 'primary') {
   return `<a class="button-link ${kind} auth-primary-button" href="${href}">${label}</a>`;
 }
@@ -345,8 +362,7 @@ async function renderJoinRequests(user) {
             headers: button.dataset.leagueId ? { 'X-League-ID': button.dataset.leagueId } : undefined,
             body: JSON.stringify({ role: 'read' }),
           });
-          showToast('Join request approved.', 'success');
-          await renderJoinRequests(user);
+          await finalizeRequestAction('Join request approved.');
         } catch (error) {
           showError(error);
         } finally {
@@ -369,8 +385,7 @@ async function renderJoinRequests(user) {
             method: 'POST',
             headers: button.dataset.leagueId ? { 'X-League-ID': button.dataset.leagueId } : undefined,
           });
-          showToast('Join request rejected.', 'success');
-          await renderJoinRequests(user);
+          await finalizeRequestAction('Join request rejected.');
         } catch (error) {
           showError(error);
         } finally {
@@ -435,18 +450,20 @@ function renderRequestHistory(user) {
     button.addEventListener('click', async () => {
       const confirmed = window.confirm('Cancel this pending join request?');
       if (!confirmed) return;
+      let closeLoading = null;
+      let restoreButton = null;
       try {
-        button.disabled = true;
-        button.classList.add('is-loading');
+        restoreButton = setButtonLoading(button, 'Cancelling...');
+        closeLoading = showLoading('Cancelling request...');
         await callApi(`/api/league/requests/${button.dataset.requestId}/cancel`, {
           method: 'POST',
         });
-        clearUserCache();
-        await refreshWelcomeView();
+        await finalizeRequestAction('Join request canceled.');
       } catch (error) {
-        window.alert(error instanceof Error ? error.message : String(error));
-        button.disabled = false;
-        button.classList.remove('is-loading');
+        showError(error);
+      } finally {
+        if (restoreButton) restoreButton();
+        if (closeLoading) closeLoading();
       }
     });
   });
@@ -519,20 +536,23 @@ async function renderInvitePreview(user, inviteCode) {
     renderHome(user);
   });
   document.getElementById('send-join-request')?.addEventListener('click', async () => {
+    let closeLoading = null;
     try {
       const button = document.getElementById('send-join-request');
       if (button) {
         button.disabled = true;
         button.textContent = 'Sending...';
       }
+      closeLoading = showLoading('Sending join request...');
       await callApi('/api/auth/join-request', {
         method: 'POST',
         body: JSON.stringify({ invite_code: league.invite_code }),
       });
-      clearUserCache();
-      await refreshWelcomeView();
+      await finalizeRequestAction('Join request sent.');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : String(error));
+      showError(error);
+    } finally {
+      if (closeLoading) closeLoading();
     }
   });
 }

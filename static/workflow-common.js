@@ -350,13 +350,15 @@ async function refreshAccessToken() {
 }
 
 export async function callApi(url, options = {}, retryOnAuthError = true) {
+  const mergedHeaders = {
+    'Content-Type': 'application/json',
+    ...authHeaders(),
+    ...((options && options.headers) || {}),
+  };
+
   const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...authHeaders(),
-      ...(options.headers || {}),
-    },
     ...options,
+    headers: mergedHeaders,
   });
 
   if (response.status === 401) {
