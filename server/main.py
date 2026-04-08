@@ -176,6 +176,12 @@ def sitemap() -> FileResponse:
     return FileResponse(STATIC_DIR / "sitemap.xml", media_type="application/xml")
 
 
+@app.get("/robots.txt")
+def robots() -> FileResponse:
+    """Serve robots.txt"""
+    return FileResponse(STATIC_DIR / "robots.txt", media_type="text/plain")
+
+
 @app.get("/logo.png")
 def logo() -> FileResponse:
     """Serve logo"""
