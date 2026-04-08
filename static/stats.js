@@ -1291,14 +1291,14 @@ async function init() {
   if (user.active_league_id) {
     setActiveLeagueId(user.active_league_id);
   }
-  updateHeaderLeagueContext(user);
-  ensureLeagueSwitcher(user);
-  refreshHeaderCommandMenu();
-
   const effectiveRole = user.league_role === 'admin' ? 'admin' : 'read';
   localStorage.setItem('league-ledger-user-role', effectiveRole);
   localStorage.setItem('league-ledger-username', user.user_id);
   localStorage.setItem('league-ledger-full-name', user.full_name || user.user_id);
+  updateHeaderLeagueContext(user);
+  ensureLeagueSwitcher(user);
+  refreshHeaderCommandMenu(user);
+
   populateHeaderIdentity(user);
   if (effectiveRole !== 'admin') {
     setReadNavigationMode();
