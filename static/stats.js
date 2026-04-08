@@ -112,39 +112,6 @@ function closeMobileSelect() {
   setModalState(mobileSelectModal, false);
 }
 
-function renderDesktopHeaderNav() {
-  if (!topNav) return;
-  document.querySelector('.header-content')?.classList.add('header-content-modern-nav');
-  topNav.classList.add('header-select-source');
-
-  let nav = document.querySelector(`.header-desktop-nav[data-select-id="${topNav.id}"]`);
-  if (!nav) {
-    nav = document.createElement('nav');
-    nav.className = 'header-desktop-nav';
-    nav.dataset.selectId = topNav.id;
-    nav.setAttribute('aria-label', 'Primary navigation');
-    topNav.parentElement?.insertBefore(nav, topNav.nextSibling);
-  }
-
-  nav.innerHTML = [...topNav.options].map((option) => {
-    const active = String(option.value) === String(topNav.value);
-    return `
-      <button type="button" class="header-nav-pill${active ? ' is-active' : ''}" data-nav-value="${option.value}">
-        ${escapeHtml(option.textContent || '')}
-      </button>
-    `;
-  }).join('');
-
-  nav.querySelectorAll('[data-nav-value]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const nextValue = button.getAttribute('data-nav-value') || '';
-      if (!nextValue || nextValue === topNav.value) return;
-      topNav.value = nextValue;
-      topNav.dispatchEvent(new Event('change', { bubbles: true }));
-    });
-  });
-}
-
 function ensureMobileSelectProxy(select, config = {}) {
   if (!select) return null;
 
