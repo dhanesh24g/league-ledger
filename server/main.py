@@ -170,6 +170,12 @@ def debug_supabase() -> dict[str, Any]:
     return debug_info
 
 
+@app.get("/sitemap.xml")
+def sitemap() -> FileResponse:
+    """Serve sitemap"""
+    return FileResponse(STATIC_DIR / "sitemap.xml", media_type="application/xml")
+
+
 @app.get("/logo.png")
 def logo() -> FileResponse:
     """Serve logo"""
