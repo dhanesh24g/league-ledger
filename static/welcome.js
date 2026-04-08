@@ -71,10 +71,6 @@ async function finalizeJoinRequestSubmission(successMessage) {
   }
 }
 
-function renderButtonLink(label, href, kind = 'primary') {
-  return `<a class="button-link ${kind} auth-primary-button" href="${href}">${label}</a>`;
-}
-
 function getInviteCodeFromLocation() {
   const match = window.location.pathname.match(/^\/join\/([^/]+)$/);
   return match ? decodeURIComponent(match[1]) : '';
