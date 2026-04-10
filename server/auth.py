@@ -202,11 +202,55 @@ def _google_client_id() -> str:
         "GOOGLE_OAUTH_CLIENT_ID",
         "NEXT_PUBLIC_GOOGLE_CLIENT_ID",
         "GOOGLE_WEB_CLIENT_ID",
+        "GOOGLE_SIGNIN_CLIENT_ID",
+        "GOOGLE_GSI_CLIENT_ID",
+        "GOOGLE_IDENTITY_CLIENT_ID",
     ):
         value = os.getenv(env_name, "").strip()
         if value:
             return value
     return ""
+
+
+def _is_missing_google_sub_error(exc: Exception) -> bool:
+    detail = str(exc).lower()
+    if "google_sub" not in detail:
+        return False
+    return any(
+        marker in detail
+        for marker in (
+            "column",
+            "schema cache",
+            "does not exist",
+            "not found",
+            "could not find",
+            "unknown",
+        )
+    )
+
+
+def _supabase_find_user_by_google_identity(supabase: Any, google_profile: dict[str, Any]) -> tuple[dict[str, Any] | None, bool]:
+    try:
+        response = (
+            supabase.table("users")
+            .select("*")
+            .or_(f"google_sub.eq.{google_profile['google_sub']},email.eq.{google_profile['email']}")
+            .limit(1)
+            .execute()
+        )
+        return (response.data[0] if response.data else None, True)
+    except Exception as exc:
+        if not _is_missing_google_sub_error(exc):
+            raise
+        logger.warning("Supabase users.google_sub is unavailable; falling back to email-only Google auth lookup")
+        response = (
+            supabase.table("users")
+            .select("*")
+            .eq("email", google_profile["email"])
+            .limit(1)
+            .execute()
+        )
+        return (response.data[0] if response.data else None, False)
 
 
 def hash_password(password: str) -> str:
@@ -1074,22 +1118,33 @@ def signup_user(
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
+        insert_payload = {
+            "first_name": effective_first_name,
+            "last_name": effective_last_name,
+            "user_id": normalized_user_id,
+            "email": normalized_email,
+            "google_sub": google_profile["google_sub"] if google_profile else None,
+            "password_hash": password_hash,
+        }
         try:
-            supabase.table("users").insert(
-                {
-                    "first_name": effective_first_name,
-                    "last_name": effective_last_name,
-                    "user_id": normalized_user_id,
-                    "email": normalized_email,
-                    "google_sub": google_profile["google_sub"] if google_profile else None,
-                    "password_hash": password_hash,
-                }
-            ).execute()
+            supabase.table("users").insert(insert_payload).execute()
         except Exception as exc:
             detail = str(exc).lower()
-            if "duplicate" in detail or "unique" in detail:
+            if google_profile and _is_missing_google_sub_error(exc):
+                logger.warning("Supabase users.google_sub is unavailable; retrying Google signup insert without google_sub")
+                try:
+                    fallback_payload = dict(insert_payload)
+                    fallback_payload.pop("google_sub", None)
+                    supabase.table("users").insert(fallback_payload).execute()
+                except Exception as fallback_exc:
+                    fallback_detail = str(fallback_exc).lower()
+                    if "duplicate" in fallback_detail or "unique" in fallback_detail:
+                        raise HTTPException(status_code=409, detail="User ID or email already exists") from fallback_exc
+                    raise HTTPException(status_code=500, detail=f"Database error: {str(fallback_exc)}") from fallback_exc
+            elif "duplicate" in detail or "unique" in detail:
                 raise HTTPException(status_code=409, detail="User ID or email already exists") from exc
-            raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
+            else:
+                raise HTTPException(status_code=500, detail=f"Database error: {str(exc)}") from exc
         _invalidate_user_id_cache()
         user = get_user_profile_by_user_id(normalized_user_id)
         if not user:
@@ -1164,18 +1219,16 @@ def authenticate_google(credential: str, requested_league_id: int | None = None)
     if get_supabase_client():
         supabase = get_supabase_client()
         assert supabase is not None
-        response = (
-            supabase.table("users")
-            .select("*")
-            .or_(f"google_sub.eq.{google_profile['google_sub']},email.eq.{google_profile['email']}")
-            .limit(1)
-            .execute()
-        )
-        if not response.data:
+        user, google_sub_supported = _supabase_find_user_by_google_identity(supabase, google_profile)
+        if not user:
             raise HTTPException(status_code=404, detail="No account found for this Google identity. Finish signup first.")
-        user = response.data[0]
-        if not user.get("google_sub"):
-            supabase.table("users").update({"google_sub": google_profile["google_sub"]}).eq("id", int(user["id"])).execute()
+        if google_sub_supported and not user.get("google_sub"):
+            try:
+                supabase.table("users").update({"google_sub": google_profile["google_sub"]}).eq("id", int(user["id"])).execute()
+            except Exception as exc:
+                if not _is_missing_google_sub_error(exc):
+                    raise
+                logger.warning("Supabase users.google_sub update skipped because the column is unavailable")
         return get_user_profile_by_id(int(user["id"]), requested_league_id=requested_league_id) or {}
 
     with DatabaseManager() as connection:

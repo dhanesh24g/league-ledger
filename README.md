@@ -49,6 +49,32 @@ Open in browser:
 
 `http://127.0.0.1:8001`
 
+## Google Auth Setup
+
+Google sign-in and Google-assisted signup are already wired in the app, but they stay disabled until a Google Web client ID is configured.
+
+Set one of these environment variables:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_OAUTH_CLIENT_ID`
+- `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+- `GOOGLE_WEB_CLIENT_ID`
+- `GOOGLE_SIGNIN_CLIENT_ID`
+- `GOOGLE_GSI_CLIENT_ID`
+- `GOOGLE_IDENTITY_CLIENT_ID`
+
+Recommended setup:
+
+1. Create a Google OAuth Web application in Google Cloud Console.
+2. Add your deployed domain and local dev origin as authorized JavaScript origins.
+3. Add the client ID to Vercel for:
+   - `Production`
+   - `Preview`
+   - `Development`
+4. Add the same client ID locally in `.env` if you want to test Google auth on your machine.
+
+This app verifies the Google ID token server-side and links returning users by `google_sub` or email. No separate Google client secret is required for the current frontend-driven sign-in flow.
+
 ## Quick validation flow
 
 1. Setup league
