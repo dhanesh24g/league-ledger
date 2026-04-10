@@ -17,7 +17,7 @@ SERVER_DIR = Path(__file__).resolve().parent
 load_dotenv(SERVER_DIR / ".env")
 load_dotenv(BASE_DIR / ".env")
 
-app = FastAPI(title="Dream11 League Prototype")
+app = FastAPI(title="Fantasy League Prototype")
 app.include_router(api_router)
 
 
