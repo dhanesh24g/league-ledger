@@ -2,10 +2,25 @@ const loginForm = document.getElementById('login-form');
 const loginHint = document.getElementById('login-hint');
 const googleLoginBtn = document.getElementById('google-login-btn');
 const googleLoginHint = document.getElementById('google-login-hint');
+const googleLoginBtnLabel = googleLoginBtn?.querySelector('span:last-child');
 
 let authConfig = { google_enabled: false, google_client_id: null };
 let googleIdentityScriptPromise = null;
 let googleClientInitialized = false;
+
+function setGoogleButtonAvailability(button, labelNode, enabled, unavailableLabel = 'Google unavailable') {
+  if (!button) return;
+  button.disabled = !enabled;
+  button.setAttribute('aria-disabled', String(!enabled));
+  button.classList.toggle('is-unavailable', !enabled);
+  button.title = enabled ? 'Continue with Google' : unavailableLabel;
+  if (labelNode && !enabled) {
+    labelNode.textContent = unavailableLabel;
+  }
+  if (labelNode && enabled) {
+    labelNode.textContent = 'Continue with Google';
+  }
+}
 
 function initPasswordToggles(root = document) {
   root.querySelectorAll('[data-password-toggle]').forEach((button) => {
@@ -177,12 +192,12 @@ function initThemeToggle() {
 
 function initGoogleLogin() {
   if (!authConfig.google_enabled || !authConfig.google_client_id) {
-    googleLoginBtn.disabled = true;
-    setGoogleState('error', 'Google sign-in is not configured in this environment yet.');
+    setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, false, 'Google sign-in unavailable');
+    setGoogleState('error', 'Google sign-in is unavailable until the Google client ID is configured for this environment.');
     return;
   }
 
-  googleLoginBtn.disabled = false;
+  setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, true);
   setGoogleState('success', 'Tap to continue with Google when needed.');
 
   const loadGoogleIdentityScript = async () => {
@@ -236,7 +251,7 @@ function initGoogleLogin() {
     } catch (error) {
       setGoogleState('error', error instanceof Error ? error.message : String(error));
     } finally {
-      googleLoginBtn.disabled = false;
+      setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, true);
     }
   });
 }
@@ -261,6 +276,8 @@ async function initLogin() {
     initGoogleLogin();
   } catch (err) {
     setLoginHintState('');
+    setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, false, 'Google unavailable');
+    setGoogleState('error', 'Google sign-in could not be initialized right now. Please try again later.');
   }
 }
 

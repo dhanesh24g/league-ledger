@@ -4,12 +4,27 @@ const googleSignupBtn = document.getElementById('google-signup-btn');
 const googleSignupHint = document.getElementById('google-signup-hint');
 const userIdStatus = document.getElementById('user-id-status');
 const suggestionsRow = document.getElementById('user-id-suggestions');
+const googleSignupBtnLabel = googleSignupBtn?.querySelector('span:last-child');
 
 let authConfig = { google_enabled: false, google_client_id: null };
 let userIdCheckTimer = null;
 let lastSuggestedSeed = '';
 let googleIdentityScriptPromise = null;
 let googleClientInitialized = false;
+
+function setGoogleButtonAvailability(button, labelNode, enabled, unavailableLabel = 'Google unavailable') {
+  if (!button) return;
+  button.disabled = !enabled;
+  button.setAttribute('aria-disabled', String(!enabled));
+  button.classList.toggle('is-unavailable', !enabled);
+  button.title = enabled ? 'Continue with Google' : unavailableLabel;
+  if (labelNode && !enabled) {
+    labelNode.textContent = unavailableLabel;
+  }
+  if (labelNode && enabled) {
+    labelNode.textContent = 'Continue with Google';
+  }
+}
 
 function initPasswordToggles(root = document) {
   root.querySelectorAll('[data-password-toggle]').forEach((button) => {
@@ -212,12 +227,12 @@ async function handleGoogleCredential(credential) {
 
 function initGoogleSignup() {
   if (!authConfig.google_enabled || !authConfig.google_client_id) {
-    googleSignupBtn.disabled = true;
-    setGoogleState('error', 'Google sign-up is not configured in this environment yet.');
+    setGoogleButtonAvailability(googleSignupBtn, googleSignupBtnLabel, false, 'Google sign-up unavailable');
+    setGoogleState('error', 'Google sign-up is unavailable until the Google client ID is configured for this environment.');
     return;
   }
 
-  googleSignupBtn.disabled = false;
+  setGoogleButtonAvailability(googleSignupBtn, googleSignupBtnLabel, true);
   setGoogleState('success', 'Tap to continue with Google when needed.');
 
   const loadGoogleIdentityScript = async () => {
@@ -267,7 +282,7 @@ function initGoogleSignup() {
     } catch (error) {
       setGoogleState('error', error instanceof Error ? error.message : String(error));
     } finally {
-      googleSignupBtn.disabled = false;
+      setGoogleButtonAvailability(googleSignupBtn, googleSignupBtnLabel, true);
     }
   });
 }
@@ -281,9 +296,15 @@ async function initSignup() {
     return;
   }
 
-  authConfig = await callApi('/api/auth/config');
-  signupHint.textContent = 'Create your account to continue.';
-  initGoogleSignup();
+  try {
+    authConfig = await callApi('/api/auth/config');
+    signupHint.textContent = 'Create your account to continue.';
+    initGoogleSignup();
+  } catch (err) {
+    signupHint.textContent = 'Create your account to continue.';
+    setGoogleButtonAvailability(googleSignupBtn, googleSignupBtnLabel, false, 'Google unavailable');
+    setGoogleState('error', 'Google sign-up could not be initialized right now. Please try again later.');
+  }
   await refreshSuggestions(true);
 }
 
