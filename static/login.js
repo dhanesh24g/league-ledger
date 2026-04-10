@@ -2,24 +2,29 @@ const loginForm = document.getElementById('login-form');
 const loginHint = document.getElementById('login-hint');
 const googleLoginBtn = document.getElementById('google-login-btn');
 const googleLoginHint = document.getElementById('google-login-hint');
-const googleLoginBtnLabel = googleLoginBtn?.querySelector('span:last-child');
+const googleLoginRenderRoot = document.getElementById('google-login-render-root');
 
 let authConfig = { google_enabled: false, google_client_id: null };
 let googleIdentityScriptPromise = null;
 let googleClientInitialized = false;
 
-function setGoogleButtonAvailability(button, labelNode, enabled, unavailableLabel = 'Google unavailable') {
-  if (!button) return;
-  button.disabled = !enabled;
-  button.setAttribute('aria-disabled', String(!enabled));
-  button.classList.toggle('is-unavailable', !enabled);
-  button.title = enabled ? 'Continue with Google' : unavailableLabel;
-  if (labelNode && !enabled) {
-    labelNode.textContent = unavailableLabel;
-  }
-  if (labelNode && enabled) {
-    labelNode.textContent = 'Continue with Google';
-  }
+function renderUnavailableGoogleButton(root, unavailableLabel) {
+  if (!root) return;
+  root.innerHTML = `<div class="auth-google-button-fallback" aria-disabled="true">${unavailableLabel}</div>`;
+  googleLoginBtn?.setAttribute('aria-disabled', 'true');
+  googleLoginBtn?.classList.add('is-unavailable');
+}
+
+function clearUnavailableGoogleButton(root) {
+  if (!root) return;
+  root.innerHTML = '';
+  googleLoginBtn?.setAttribute('aria-disabled', 'false');
+  googleLoginBtn?.classList.remove('is-unavailable');
+}
+
+function googleButtonWidth(root) {
+  const measured = Math.round(root?.clientWidth || 0);
+  return Math.min(Math.max(measured || 280, 240), 380);
 }
 
 function initPasswordToggles(root = document) {
@@ -192,12 +197,12 @@ function initThemeToggle() {
 
 function initGoogleLogin() {
   if (!authConfig.google_enabled || !authConfig.google_client_id) {
-    setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, false, 'Google sign-in unavailable');
+    renderUnavailableGoogleButton(googleLoginRenderRoot, 'Google sign-in unavailable');
     setGoogleState('error', 'Google sign-in is unavailable until the Google client ID is configured for this environment.');
     return;
   }
 
-  setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, true);
+  clearUnavailableGoogleButton(googleLoginRenderRoot);
   setGoogleState('success', 'Tap to continue with Google when needed.');
 
   const loadGoogleIdentityScript = async () => {
@@ -241,19 +246,28 @@ function initGoogleLogin() {
     googleClientInitialized = true;
   };
 
-  googleLoginBtn.addEventListener('click', async () => {
+  const renderGoogleButton = async () => {
     try {
-      googleLoginBtn.disabled = true;
       setGoogleState('success', 'Loading Google sign-in…');
       await ensureGoogleClient();
-      google.accounts.id.prompt();
-      setGoogleState('success', 'Continue in the Google sign-in popup.');
+      if (!googleLoginRenderRoot) return;
+      googleLoginRenderRoot.innerHTML = '';
+      google.accounts.id.renderButton(googleLoginRenderRoot, {
+        type: 'standard',
+        theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'outline' : 'filled_blue',
+        size: 'large',
+        shape: 'pill',
+        text: 'continue_with',
+        width: googleButtonWidth(googleLoginRenderRoot),
+      });
+      setGoogleState('success', 'Continue with Google using the button above.');
     } catch (error) {
+      renderUnavailableGoogleButton(googleLoginRenderRoot, 'Google sign-in unavailable');
       setGoogleState('error', error instanceof Error ? error.message : String(error));
-    } finally {
-      setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, true);
     }
-  });
+  };
+
+  renderGoogleButton().catch(() => { });
 }
 
 async function initLogin() {
@@ -276,7 +290,7 @@ async function initLogin() {
     initGoogleLogin();
   } catch (err) {
     setLoginHintState('');
-    setGoogleButtonAvailability(googleLoginBtn, googleLoginBtnLabel, false, 'Google unavailable');
+    renderUnavailableGoogleButton(googleLoginRenderRoot, 'Google unavailable');
     setGoogleState('error', 'Google sign-in could not be initialized right now. Please try again later.');
   }
 }
