@@ -41,6 +41,55 @@ const payoutController = createPayoutController({
   totalTarget: overridePayoutTotal,
   onChange: persistDraft,
 });
+const matchDateInput = matchForm?.elements.match_date;
+const syncMatchDateProxy = setupMobileDateProxy(matchDateInput);
+
+function formatMatchDateLabel(value) {
+  if (!value) return 'Select match date';
+  const [year, month, day] = String(value).split('-').map((part) => Number(part));
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return value;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
+function setupMobileDateProxy(input) {
+  if (!input) return () => {};
+
+  const shell = document.createElement('div');
+  shell.className = 'mobile-date-shell';
+  input.classList.add('mobile-date-source');
+  input.insertAdjacentElement('afterend', shell);
+  shell.appendChild(input);
+
+  const proxy = document.createElement('div');
+  proxy.className = 'mobile-date-proxy';
+  proxy.setAttribute('aria-hidden', 'true');
+  proxy.innerHTML = `
+    <span class="mobile-date-proxy-copy"></span>
+    <span class="mobile-date-proxy-icon" aria-hidden="true">⌄</span>
+  `;
+  shell.appendChild(proxy);
+
+  const copy = proxy.querySelector('.mobile-date-proxy-copy');
+  const sync = () => {
+    const hasValue = Boolean(input.value);
+    if (copy) {
+      copy.textContent = formatMatchDateLabel(input.value);
+      copy.classList.toggle('is-placeholder', !hasValue);
+    }
+    proxy.classList.toggle('is-disabled', Boolean(input.disabled));
+  };
+
+  input.addEventListener('input', sync);
+  input.addEventListener('change', sync);
+  sync();
+  return sync;
+}
 
 function getSelectedParticipantIds() {
   return [...participantPicker.querySelectorAll('input[type="checkbox"]:checked')]
@@ -190,6 +239,7 @@ function applyRoleBasedUI() {
   controls.forEach((control) => {
     control.disabled = !isAdmin;
   });
+  syncMatchDateProxy();
 }
 
 function toggleOverrideSection(forceValue) {
@@ -299,6 +349,7 @@ function renderDraft() {
 
   payoutController.updateTotal();
   suppressDraftSync = false;
+  syncMatchDateProxy();
 }
 
 addOverridePayoutBtn.addEventListener('click', () => {
@@ -315,6 +366,11 @@ enableOverrides.addEventListener('change', () => toggleOverrideSection(enableOve
 
 ['match_date', 'team1', 'team2', 'winner_count'].forEach((name) => {
   matchForm.elements[name].addEventListener('input', persistDraft);
+});
+
+matchDateInput?.addEventListener('change', () => {
+  syncMatchDateProxy();
+  persistDraft();
 });
 
 ['team1', 'team2'].forEach((name) => {
@@ -374,6 +430,7 @@ matchForm.addEventListener('submit', async (event) => {
     clearMatchDraft();
     suppressDraftSync = true;
     matchForm.reset();
+    syncMatchDateProxy();
     toggleOverrideSection(false);
     applyParticipantSelection(currentPlayers.map((player) => Number(player.id)), { persist: false });
     suppressDraftSync = false;
