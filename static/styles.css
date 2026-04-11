@@ -2907,6 +2907,14 @@ h3 {
   opacity: 0.72;
 }
 
+.mobile-date-shell {
+  display: contents;
+}
+
+.mobile-date-proxy {
+  display: none;
+}
+
 @media (max-width: 700px) {
   .matches-page .form-group input[type="date"] {
     min-height: 48px;
@@ -2919,6 +2927,64 @@ h3 {
   .matches-page .form-group input[type="date"]::-webkit-date-and-time-value {
     min-height: 1.2em;
     padding: 0;
+  }
+
+  .matches-page .mobile-date-shell {
+    position: relative;
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .matches-page .mobile-date-shell .mobile-date-source {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 48px !important;
+    min-height: 48px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    opacity: 0.015 !important;
+    z-index: 3 !important;
+    color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    pointer-events: auto !important;
+  }
+
+  .matches-page .mobile-date-proxy {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    height: 48px;
+    min-height: 48px;
+    padding: 0 0.9rem;
+    border: 1px solid var(--input-border);
+    border-radius: 14px;
+    background: var(--input-bg);
+    color: var(--text);
+    box-shadow: var(--input-shadow);
+  }
+
+  .matches-page .mobile-date-proxy-copy {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+    line-height: 1.2;
+  }
+
+  .matches-page .mobile-date-proxy-copy.is-placeholder,
+  .matches-page .mobile-date-proxy-icon {
+    color: var(--muted);
+  }
+
+  .matches-page .mobile-date-proxy.is-disabled {
+    opacity: 0.64;
   }
 }
 
