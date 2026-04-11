@@ -556,6 +556,7 @@ function ensureMobileSelectProxyShell(select, config = {}) {
 
   const selectId = ensureMobileSelectId(select);
   const variant = config.variant === 'full' ? 'full' : 'compact';
+  const placeholder = config.placeholder || 'Choose an option';
 
   let shell = select.closest(`.mobile-select-shell[data-select-id="${selectId}"]`);
   if (!shell) {
@@ -568,6 +569,7 @@ function ensureMobileSelectProxyShell(select, config = {}) {
 
   shell.classList.toggle('mobile-select-shell-full', variant === 'full');
   shell.classList.toggle('mobile-select-shell-compact', variant !== 'full');
+  shell.dataset.placeholder = placeholder;
 
   let proxy = shell.querySelector(`.mobile-select-proxy[data-select-id="${selectId}"]`);
   if (!proxy) {
@@ -585,11 +587,7 @@ function ensureMobileSelectProxyShell(select, config = {}) {
   }
 
   const syncProxyCopy = () => {
-    const selectedOption = select.options[select.selectedIndex];
-    const label = selectedOption?.textContent?.trim() || config.placeholder || 'Choose an option';
-    const copy = proxy.querySelector('.mobile-select-proxy-copy');
-    if (copy) copy.textContent = label;
-    proxy.disabled = Boolean(select.disabled);
+    updateMobileSelectProxyCopy(select, proxy, shell.dataset.placeholder || placeholder);
   };
 
   if (!select.dataset.mobileSelectProxyBound) {
@@ -601,6 +599,15 @@ function ensureMobileSelectProxyShell(select, config = {}) {
   return { shell, proxy };
 }
 
+function updateMobileSelectProxyCopy(select, proxy, placeholder = 'Choose an option') {
+  if (!select || !proxy) return;
+  const selectedOption = select.options[select.selectedIndex];
+  const label = selectedOption?.textContent?.trim() || placeholder || 'Choose an option';
+  const copy = proxy.querySelector('.mobile-select-proxy-copy');
+  if (copy) copy.textContent = label;
+  proxy.disabled = Boolean(select.disabled);
+}
+
 export function syncMobileSelectProxy(select) {
   if (!select) return;
   const selectId = ensureMobileSelectId(select);
@@ -610,6 +617,7 @@ export function syncMobileSelectProxy(select) {
   select.classList.toggle('mobile-select-source', mobile);
   shell?.classList.toggle('mobile-select-shell-active', mobile);
   proxy?.classList.toggle('hidden', !mobile);
+  updateMobileSelectProxyCopy(select, proxy, shell?.dataset.placeholder);
 }
 
 function syncAllMobileSelectProxies() {
