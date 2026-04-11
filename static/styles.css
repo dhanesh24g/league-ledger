@@ -2889,8 +2889,11 @@ h3 {
   box-sizing: border-box;
   display: block;
   line-height: 1.2;
-  appearance: none;
-  -webkit-appearance: none;
+  color-scheme: dark;
+}
+
+[data-theme="light"] .matches-page .form-group input[type="date"] {
+  color-scheme: light;
 }
 
 .matches-page .form-group input[type="date"]::-webkit-date-and-time-value {
