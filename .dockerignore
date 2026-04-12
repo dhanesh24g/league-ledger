@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Logs
+*.log
+
+# Local environment files (keep secrets out of image)
+.env
+.env.local
+.env.*.local
+
+# Vercel
+.vercel/
+vercel.json
+
+# Documentation
+docs/
+
+# Test files
+test_*.py
+*_test.py
