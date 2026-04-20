@@ -49,6 +49,51 @@ Open in browser:
 
 `http://127.0.0.1:8001`
 
+## Run with Docker
+
+### Prerequisites
+- Docker installed on your machine
+- Docker Compose installed
+
+### Build and run
+
+```bash
+cd /Users/parveenshaikh/Study/AI/Courses/Git-Repo/league-ledger/league-ledger
+docker-compose up --build
+```
+
+The app will be available at: `http://localhost:8001`
+
+### Docker commands
+
+```bash
+# Build and start containers
+docker-compose up --build
+
+# Run in background
+docker-compose up -d
+
+# Stop containers
+docker-compose down
+
+# View logs
+docker-compose logs -f
+
+# Rebuild after code changes
+docker-compose up --build
+```
+
+### Environment variables (optional)
+
+To use Supabase or Google Auth with Docker, add your credentials to `docker-compose.yml`:
+
+```yaml
+environment:
+  SUPABASE_URL: your_supabase_url
+  SUPABASE_SERVICE_ROLE_KEY: your_supabase_key
+  GOOGLE_CLIENT_ID: your_google_client_id
+```
+
 ## Google Auth Setup
 
 Google sign-in and Google-assisted signup are already wired in the app, but they stay disabled until a Google Web client ID is configured.
