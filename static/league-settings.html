@@ -123,14 +123,16 @@
       <form id="alias-add-form" class="alias-add-form" autocomplete="off">
         <div class="alias-add-fields">
           <label class="alias-field">
-            <span>Fantasy-app name</span>
-            <input id="alias-new-text" type="text" maxlength="160" placeholder="e.g. ravi_bhai" required />
+            <span>Username / team name on the fantasy app</span>
+            <input id="alias-new-text" type="text" maxlength="160" placeholder="e.g. ravi_bhai, CSK_Fan_07" required />
+            <small class="muted">As it appears on Dream11, My11Circle, MPL, etc.</small>
           </label>
           <label class="alias-field">
-            <span>Maps to player</span>
+            <span>League Ledger player this name belongs to</span>
             <select id="alias-new-player" required>
               <option value="">— Select a player —</option>
             </select>
+            <small class="muted">We will auto-assign this player next time we see the name above.</small>
           </label>
           <button type="submit" class="primary">Add Mapping</button>
         </div>

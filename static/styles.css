@@ -11234,6 +11234,89 @@ th {
   }
 }
 
+/* ---------- Upload Result CTA (AI screenshot scan) ---------- */
+
+.scan-cta {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px solid rgba(122, 60, 255, 0.55);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #7a3cff 0%, #46c4ff 100%);
+  color: #ffffff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(122, 60, 255, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+}
+
+.scan-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(122, 60, 255, 0.38);
+}
+
+.scan-cta:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 4px 12px rgba(122, 60, 255, 0.28);
+}
+
+.scan-cta:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.scan-cta-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Diagonal shimmer sweep — draws the admin's eye without being loud. */
+.scan-cta::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(120deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.45) 50%,
+      transparent 100%);
+  transform: skewX(-20deg);
+  animation: scan-cta-shimmer 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.scan-cta:disabled::before {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes scan-cta-shimmer {
+  0% {
+    left: -60%;
+  }
+
+  55% {
+    left: 120%;
+  }
+
+  100% {
+    left: 120%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-cta::before {
+    animation: none;
+  }
+}
+
 /* ---------- AI screenshot scan modal ---------- */
 
 .scan-modal {

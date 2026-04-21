@@ -109,8 +109,11 @@
       <div class="inline-form">
         <select id="match-select"></select>
         <button id="load-winner-form" type="button">Load Assignment</button>
-        <button id="scan-result" type="button" class="ghost hidden" title="Upload a leaderboard screenshot">📷 Scan
-          Result</button>
+        <button id="scan-result" type="button" class="scan-cta hidden"
+          title="Upload a leaderboard screenshot and let AI assign winners">
+          <span class="scan-cta-icon" aria-hidden="true">📤</span>
+          <span class="scan-cta-label">Upload Result</span>
+        </button>
         <button id="reopen-match" type="button" class="ghost hidden">Reopen Match</button>
         <button id="mark-cancelled" type="button" class="ghost">Washout / Cancelled</button>
         <button id="send-telegram-update" type="button" class="ghost">Send to Telegram</button>

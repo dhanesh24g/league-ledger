@@ -135,10 +135,13 @@ function updateMatchActionState() {
   // Scan button must be evaluated before any early-return so it's never left
   // in its initial hidden state when `match` is momentarily undefined
   // (e.g. during the direct-admin-flow hand-off from /matches -> /winners).
+  // Visibility depends only on admin + non-canceled match so the feature stays
+  // discoverable even when AI_VISION_ENABLED is off. If vision is unavailable,
+  // the click handler shows a helpful configuration message.
   if (scanResultBtn) {
-    const canScan = isAdmin && !!match && !isCanceled && scanState.aiAvailable !== false;
-    scanResultBtn.classList.toggle('hidden', !canScan);
-    scanResultBtn.disabled = !canScan;
+    const canShow = isAdmin && !!match && !isCanceled;
+    scanResultBtn.classList.toggle('hidden', !canShow);
+    scanResultBtn.disabled = !canShow;
   }
 
   if (!match || !isAdmin) return;
@@ -1413,13 +1416,18 @@ async function startScanForMatch(matchId, file) {
   }
 }
 
-scanResultBtn?.addEventListener('click', () => {
+scanResultBtn?.addEventListener('click', async () => {
   if (authUser.league_role !== 'admin') {
     showError('Only admin can scan results.');
     return;
   }
   if (!matchSelect.value) {
     showError('Choose a match first.');
+    return;
+  }
+  const available = await checkVisionAvailability();
+  if (!available) {
+    showError('AI screenshot scan is not enabled on this server. Set AI_VISION_ENABLED=1 and OPENAI_API_KEY in server/.env, then restart.');
     return;
   }
   scanFileInput?.click();
@@ -1465,11 +1473,6 @@ async function init() {
   applyRoleBasedUI();
   appState = await callApi('/api/state');
   renderMatchSelect();
-
-  if (authUser.league_role === 'admin') {
-    checkVisionAvailability().then(() => updateMatchActionState()).catch(() => { });
-  }
-
   updateMatchActionState();
   renderMatchSummary(matchSelect.value);
 
