@@ -22,7 +22,21 @@ from .integrations import (
     send_telegram_message,
     set_telegram_webhook,
 )
-from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+from .ai import (
+    LeaderboardRow,
+    PlayerRef,
+    extract_leaderboard,
+    normalize_alias,
+    resolve as resolve_alias,
+)
+from .schemas import (
+    AliasEntry,
+    BulkAliasPayload,
+    LeaguePayload,
+    MatchPayload,
+    PlayerPayload,
+    WinnersPayload,
+)
 
 logger = logging.getLogger(__name__)
 TELEGRAM_EXPIRED_SESSION_RETENTION_DAYS = 30
@@ -532,6 +546,282 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
         c.execute("UPDATE matches SET status = 'completed' WHERE id = ?", (match_id,))
 
     return {"message": "Winners saved"}
+
+
+def extract_winners_from_screenshot(
+    match_id: int,
+    image_bytes: bytes,
+    mime_type: str,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    """Call vision LLM + alias matcher to produce a draft winners payload.
+
+    The admin must still confirm and save via the existing
+    `POST /api/matches/{match_id}/winners` endpoint. This function never
+    writes to `winner_entries`.
+    """
+
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail="Screenshot extraction is not yet available on the hosted deployment.",
+        )
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        match_row = c.execute(
+            "SELECT * FROM matches WHERE id = ? AND league_id = ?",
+            (match_id, league_id),
+        ).fetchone()
+        league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
+        if not match_row or not league_row:
+            raise HTTPException(status_code=404, detail="League or match not found")
+        if str(match_row["status"] or "").lower() == "canceled":
+            raise HTTPException(status_code=409, detail="This match is marked as washout/cancelled")
+
+        players = _sync_active_members_to_players(c, league_id)
+        players_by_id = {int(p["id"]): str(p["name"]) for p in players}
+        participant_ids = (
+            parse_participant_ids(match_row["participant_ids_json"])
+            or list(players_by_id.keys())
+        )
+        eligible = [
+            PlayerRef(id=pid, name=players_by_id[pid])
+            for pid in participant_ids
+            if pid in players_by_id
+        ]
+
+        alias_rows = c.execute(
+            "SELECT alias, player_id FROM player_aliases WHERE league_id = ?",
+            (league_id,),
+        ).fetchall()
+        alias_lookup: dict[str, int] = {
+            str(row["alias"]): int(row["player_id"]) for row in alias_rows
+        }
+
+        winner_limit = int(match_row["winner_count"] or league_row["default_winner_count"])
+
+    rows: list[LeaderboardRow] = extract_leaderboard(image_bytes, mime_type)
+
+    ranked_rows: list[dict[str, Any]] = []
+    used_player_ids: set[int] = set()
+    rank_to_players: dict[int, list[int]] = {}
+
+    for row in rows:
+        if row.rank > winner_limit:
+            break
+        match = resolve_alias(row.display_name, eligible, alias_lookup)
+
+        player_id = match.player_id
+        if player_id is not None and player_id in used_player_ids:
+            player_id = None
+            match_payload = {
+                "player_id": None,
+                "player_name": None,
+                "confidence": 0.0,
+                "source": "none",
+            }
+        else:
+            match_payload = {
+                "player_id": match.player_id,
+                "player_name": match.player_name,
+                "confidence": match.confidence,
+                "source": match.source,
+            }
+
+        if player_id is not None:
+            used_player_ids.add(player_id)
+            rank_to_players.setdefault(row.rank, []).append(player_id)
+
+        ranked_rows.append(
+            {
+                "rank": row.rank,
+                "display_name": row.display_name,
+                "points": row.points,
+                "match": match_payload,
+            }
+        )
+
+    draft_ranks = [
+        {"rank": rank, "player_ids": player_ids}
+        for rank, player_ids in sorted(rank_to_players.items())
+    ]
+
+    return {
+        "match_id": match_id,
+        "winner_limit": winner_limit,
+        "rows": ranked_rows,
+        "draft": {"ranks": draft_ranks},
+        "eligible_players": [
+            {"id": ref.id, "name": ref.name} for ref in eligible
+        ],
+    }
+
+
+def list_player_aliases(user: dict[str, Any]) -> dict[str, Any]:
+    """Return every alias in the active league, grouped for UI consumption."""
+
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail="Alias management is not yet available on the hosted deployment.",
+        )
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        rows = c.execute(
+            """
+            SELECT
+                pa.id,
+                pa.alias,
+                pa.alias_display,
+                pa.player_id,
+                pa.created_at,
+                pa.confirmed_by_user_id,
+                p.name AS player_name
+            FROM player_aliases pa
+            LEFT JOIN players p ON p.id = pa.player_id
+            WHERE pa.league_id = ?
+            ORDER BY lower(pa.alias_display) ASC
+            """,
+            (league_id,),
+        ).fetchall()
+        players = _sync_active_members_to_players(c, league_id)
+
+    return {
+        "aliases": [
+            {
+                "id": int(row["id"]),
+                "alias": str(row["alias"]),
+                "alias_display": str(row["alias_display"]),
+                "player_id": int(row["player_id"]) if row["player_id"] is not None else None,
+                "player_name": str(row["player_name"] or ""),
+                "created_at": str(row["created_at"] or ""),
+                "confirmed_by_user_id": int(row["confirmed_by_user_id"])
+                if row["confirmed_by_user_id"] is not None
+                else None,
+            }
+            for row in rows
+        ],
+        "players": [
+            {"id": int(p["id"]), "name": str(p["name"])}
+            for p in players
+        ],
+    }
+
+
+def update_player_alias(
+    alias_id: int,
+    player_id: int,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    """Reassign an existing alias to a different player."""
+
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail="Alias management is not yet available on the hosted deployment.",
+        )
+
+    league_id = _league_id_from_user(user)
+    saved_user_id = user.get("id")
+
+    with DatabaseManager() as c:
+        existing = c.execute(
+            "SELECT id FROM player_aliases WHERE id = ? AND league_id = ?",
+            (int(alias_id), league_id),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Alias not found")
+
+        player = c.execute(
+            "SELECT id FROM players WHERE id = ? AND league_id = ?",
+            (int(player_id), league_id),
+        ).fetchone()
+        if not player:
+            raise HTTPException(status_code=400, detail="Player is not part of this league")
+
+        c.execute(
+            """
+            UPDATE player_aliases
+            SET player_id = ?,
+                confirmed_by_user_id = ?
+            WHERE id = ? AND league_id = ?
+            """,
+            (int(player_id), saved_user_id, int(alias_id), league_id),
+        )
+
+    return {"message": "Alias updated"}
+
+
+def delete_player_alias(alias_id: int, user: dict[str, Any]) -> dict[str, str]:
+    """Remove a single alias from the active league."""
+
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail="Alias management is not yet available on the hosted deployment.",
+        )
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        cursor = c.execute(
+            "DELETE FROM player_aliases WHERE id = ? AND league_id = ?",
+            (int(alias_id), league_id),
+        )
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Alias not found")
+
+    return {"message": "Alias removed"}
+
+
+def save_player_aliases(payload: BulkAliasPayload, user: dict[str, Any]) -> dict[str, Any]:
+    """Persist admin-confirmed aliases so future screenshots auto-match."""
+
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        raise HTTPException(
+            status_code=501,
+            detail="Alias persistence is not yet available on the hosted deployment.",
+        )
+
+    league_id = _league_id_from_user(user)
+    saved_user_id = user.get("id")
+    saved_count = 0
+
+    if not payload.entries:
+        return {"saved": 0}
+
+    with DatabaseManager() as c:
+        players = _sync_active_members_to_players(c, league_id)
+        valid_player_ids = {int(p["id"]) for p in players}
+
+        for entry in payload.entries:
+            normalized = normalize_alias(entry.alias)
+            if not normalized:
+                continue
+            if int(entry.player_id) not in valid_player_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Alias references a player outside this league",
+                )
+
+            display = (entry.alias_display or entry.alias).strip() or entry.alias.strip()
+            c.execute(
+                """
+                INSERT INTO player_aliases (
+                    league_id, player_id, alias, alias_display, confirmed_by_user_id
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(league_id, alias) DO UPDATE SET
+                    player_id = excluded.player_id,
+                    alias_display = excluded.alias_display,
+                    confirmed_by_user_id = excluded.confirmed_by_user_id
+                """,
+                (league_id, int(entry.player_id), normalized, display, saved_user_id),
+            )
+            saved_count += 1
+
+    return {"saved": saved_count}
 
 
 def cancel_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:

@@ -250,6 +250,27 @@ def _create_sqlite_tables(connection: sqlite3.Connection) -> None:
 
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS player_aliases (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            league_id INTEGER NOT NULL,
+            player_id INTEGER NOT NULL,
+            alias TEXT NOT NULL,
+            alias_display TEXT NOT NULL,
+            confirmed_by_user_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(league_id, alias),
+            FOREIGN KEY(league_id) REFERENCES league(id),
+            FOREIGN KEY(player_id) REFERENCES players(id),
+            FOREIGN KEY(confirmed_by_user_id) REFERENCES users(id)
+        )
+        """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_player_aliases_player ON player_aliases(player_id)"
+    )
+
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,

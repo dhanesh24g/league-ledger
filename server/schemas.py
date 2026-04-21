@@ -87,3 +87,17 @@ class TelegramConnectSessionPayload(BaseModel):
 
 class TelegramNotifyMatchPayload(BaseModel):
     match_id: int = Field(ge=1)
+
+
+class AliasEntry(BaseModel):
+    player_id: int = Field(ge=1)
+    alias: str = Field(min_length=1, max_length=160)
+    alias_display: str | None = Field(default=None, max_length=160)
+
+
+class BulkAliasPayload(BaseModel):
+    entries: list[AliasEntry] = Field(default_factory=list, max_length=50)
+
+
+class AliasUpdatePayload(BaseModel):
+    player_id: int = Field(ge=1)

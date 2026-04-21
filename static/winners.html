@@ -109,10 +109,14 @@
       <div class="inline-form">
         <select id="match-select"></select>
         <button id="load-winner-form" type="button">Load Assignment</button>
+        <button id="scan-result" type="button" class="ghost hidden" title="Upload a leaderboard screenshot">📷 Scan
+          Result</button>
         <button id="reopen-match" type="button" class="ghost hidden">Reopen Match</button>
         <button id="mark-cancelled" type="button" class="ghost">Washout / Cancelled</button>
         <button id="send-telegram-update" type="button" class="ghost">Send to Telegram</button>
       </div>
+      <input id="scan-file-input" type="file" accept="image/png,image/jpeg,image/webp" class="hidden"
+        aria-hidden="true" />
 
       <div id="winner-match-summary" class="workflow-match-summary"></div>
       <form id="winners-form" class="stack"></form>
@@ -123,6 +127,25 @@
       </div>
     </section>
   </main>
+
+  <div id="scan-modal" class="scan-modal hidden" aria-hidden="true">
+    <div class="scan-modal-backdrop" data-close-scan-modal></div>
+    <section class="scan-modal-panel" role="dialog" aria-modal="true" aria-labelledby="scan-modal-title">
+      <header class="scan-modal-head">
+        <div>
+          <span class="scan-modal-kicker">AI Assist</span>
+          <h2 id="scan-modal-title">Review extracted winners</h2>
+          <p id="scan-modal-subtitle" class="muted small"></p>
+        </div>
+        <button id="close-scan-modal" type="button" class="ghost" aria-label="Close">✕</button>
+      </header>
+      <div id="scan-modal-body" class="scan-modal-body"></div>
+      <footer class="scan-modal-foot">
+        <button id="scan-cancel" type="button" class="ghost">Cancel</button>
+        <button id="scan-confirm" type="button" class="primary" disabled>Save Winners</button>
+      </footer>
+    </section>
+  </div>
 
   <div id="telegram-modal" class="telegram-modal hidden" aria-hidden="true">
     <div class="telegram-modal-backdrop" data-close-telegram-modal></div>

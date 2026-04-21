@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 
 from .auth import (
     approve_join_request,
@@ -31,7 +31,10 @@ from .auth import (
     signup_user,
     update_membership_role,
 )
+from .ai import vision_available
 from .schemas import (
+    AliasUpdatePayload,
+    BulkAliasPayload,
     ForgotPasswordPayload,
     GoogleTokenPayload,
     JoinRequestPayload,
@@ -60,7 +63,10 @@ from .service import (
     cancel_match,
     create_telegram_connect_session,
     delete_player,
+    delete_player_alias,
+    extract_winners_from_screenshot,
     get_ledger,
+    list_player_aliases,
     reopen_match,
     get_stats,
     get_state,
@@ -68,8 +74,10 @@ from .service import (
     get_telegram_status,
     process_telegram_webhook,
     register_telegram_webhook,
+    save_player_aliases,
     save_winners,
     send_match_update_to_telegram,
+    update_player_alias,
     upsert_league,
 )
 
@@ -112,6 +120,56 @@ def create_match(payload: MatchPayload, user: dict[str, Any] = Depends(require_a
 @router.post("/matches/{match_id}/winners")
 def set_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
     return save_winners(match_id, payload, user)
+
+
+@router.get("/ai/vision/status")
+def ai_vision_status(user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+    return {"available": vision_available()}
+
+
+@router.post("/matches/{match_id}/winners/extract")
+async def extract_winners(
+    match_id: int,
+    screenshot: UploadFile = File(...),
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    image_bytes = await screenshot.read()
+    return extract_winners_from_screenshot(
+        match_id,
+        image_bytes,
+        screenshot.content_type or "",
+        user,
+    )
+
+
+@router.post("/player-aliases/bulk")
+def bulk_save_aliases(
+    payload: BulkAliasPayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return save_player_aliases(payload, user)
+
+
+@router.get("/player-aliases")
+def list_aliases(user: dict[str, Any] = Depends(require_admin)) -> dict[str, Any]:
+    return list_player_aliases(user)
+
+
+@router.patch("/player-aliases/{alias_id}")
+def patch_alias(
+    alias_id: int,
+    payload: AliasUpdatePayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return update_player_alias(alias_id, payload.player_id, user)
+
+
+@router.delete("/player-aliases/{alias_id}")
+def remove_alias(
+    alias_id: int,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, str]:
+    return delete_player_alias(alias_id, user)
 
 
 @router.post("/matches/{match_id}/cancel")
