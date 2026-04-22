@@ -11236,20 +11236,16 @@ th {
 
 /* ---------- Upload Result CTA (AI screenshot scan) ---------- */
 
+/* Inherits base button sizing (padding, font, border-radius) so it lines up
+   with the adjacent .ghost buttons. We only override background/border/shadow
+   to differentiate it as the primary AI action. */
 .scan-cta {
   position: relative;
   overflow: hidden;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
   border: 1px solid rgba(122, 60, 255, 0.55);
-  border-radius: 10px;
   background: linear-gradient(135deg, #7a3cff 0%, #46c4ff 100%);
   color: #ffffff;
   font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
   box-shadow: 0 6px 18px rgba(122, 60, 255, 0.28);
   transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }

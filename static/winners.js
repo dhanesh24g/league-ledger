@@ -22,7 +22,6 @@ import { initNotifications } from '/static/notifications.js';
 import { rankIcon } from '/static/payouts.js';
 
 const matchSelect = document.getElementById('match-select');
-const loadWinnerBtn = document.getElementById('load-winner-form');
 const reopenMatchBtn = document.getElementById('reopen-match');
 const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
@@ -79,7 +78,7 @@ function clearWinnerFeedback() {
 
 function applyRoleBasedUI() {
   const isAdmin = authUser.league_role === 'admin';
-  [loadWinnerBtn, cancelMatchBtn, continueLedgerBtn, sendTelegramUpdateBtn].forEach((element) => {
+  [cancelMatchBtn, continueLedgerBtn, sendTelegramUpdateBtn].forEach((element) => {
     element.disabled = !isAdmin;
   });
 
@@ -125,7 +124,6 @@ function updateMatchActionState() {
   const isCanceled = status === 'canceled';
   const isCompleted = status === 'completed';
 
-  loadWinnerBtn.disabled = !isAdmin || !match || isCanceled;
   cancelMatchBtn.disabled = !isAdmin || !match || isCanceled;
   reopenMatchBtn?.classList.toggle('hidden', !isCanceled || !isAdmin || !match);
   if (reopenMatchBtn) {
@@ -145,7 +143,6 @@ function updateMatchActionState() {
   }
 
   if (!match || !isAdmin) return;
-  loadWinnerBtn.textContent = isCompleted ? 'Edit Assignment' : 'Load Assignment';
   cancelMatchBtn.textContent = isCanceled ? 'Washout Recorded' : 'Washout / Cancelled';
   if (sendTelegramUpdateBtn) {
     sendTelegramUpdateBtn.disabled = !isAdmin || !match;
@@ -464,7 +461,6 @@ function renderMatchSelect() {
     option.value = '';
     option.textContent = 'No matches yet';
     matchSelect.appendChild(option);
-    loadWinnerBtn.disabled = true;
     cancelMatchBtn.disabled = true;
     if (winnerMatchSummary) {
       winnerMatchSummary.innerHTML = '<div class="feed-item">Create a match first, then assign winners here.</div>';
@@ -975,20 +971,6 @@ async function saveWinners(match, options = {}) {
     if (restoreSaveButton) restoreSaveButton();
   }
 }
-
-loadWinnerBtn.addEventListener('click', () => {
-  if (authUser.league_role !== 'admin') {
-    showError('Only admin can assign winners.');
-    return;
-  }
-  if (!matchSelect.value) {
-    showError('Choose a match first.');
-    return;
-  }
-  setSelectedMatchId(matchSelect.value);
-  updateMatchActionState();
-  renderWinnerForm(matchSelect.value);
-});
 
 matchSelect.addEventListener('change', () => {
   setSelectedMatchId(matchSelect.value);
