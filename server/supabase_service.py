@@ -28,7 +28,20 @@ from .integrations import (
     send_telegram_message,
     set_telegram_webhook,
 )
-from .schemas import LeaguePayload, MatchPayload, PlayerPayload, WinnersPayload
+from .ai import (
+    LeaderboardRow,
+    PlayerRef,
+    extract_leaderboard,
+    normalize_alias,
+    resolve as resolve_alias,
+)
+from .schemas import (
+    BulkAliasPayload,
+    LeaguePayload,
+    MatchPayload,
+    PlayerPayload,
+    WinnersPayload,
+)
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 20.0
@@ -1369,3 +1382,271 @@ def get_stats(user: dict[str, Any]) -> dict[str, Any]:
     }
     _cache_set(league_id, "stats", response)
     return response
+
+
+# ---------------------------------------------------------------------------
+# Player-alias management (AI screenshot scan)
+# ---------------------------------------------------------------------------
+
+
+def _fetch_alias_rows(supabase: Any, league_id: int) -> list[dict[str, Any]]:
+    response = (
+        supabase.table("player_aliases")
+        .select("id,alias,alias_display,player_id,created_at,confirmed_by_user_id")
+        .eq("league_id", league_id)
+        .execute()
+    )
+    return list(response.data or [])
+
+
+def list_player_aliases(user: dict[str, Any]) -> dict[str, Any]:
+    """Supabase equivalent of the SQLite alias listing."""
+
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    alias_rows = _fetch_alias_rows(supabase, league_id)
+    players = _sync_active_members_to_players(supabase, league_id)
+    player_name_by_id = {int(p["id"]): str(p["name"]) for p in players}
+
+    aliases = [
+        {
+            "id": int(row["id"]),
+            "alias": str(row["alias"]),
+            "alias_display": str(row["alias_display"]),
+            "player_id": int(row["player_id"]) if row.get("player_id") is not None else None,
+            "player_name": player_name_by_id.get(int(row["player_id"]), "")
+            if row.get("player_id") is not None
+            else "",
+            "created_at": str(row.get("created_at") or ""),
+            "confirmed_by_user_id": int(row["confirmed_by_user_id"])
+            if row.get("confirmed_by_user_id") is not None
+            else None,
+        }
+        for row in alias_rows
+    ]
+    aliases.sort(key=lambda item: str(item["alias_display"]).lower())
+
+    return {
+        "aliases": aliases,
+        "players": [
+            {"id": int(p["id"]), "name": str(p["name"])} for p in players
+        ],
+    }
+
+
+def update_player_alias(alias_id: int, player_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    existing = (
+        supabase.table("player_aliases")
+        .select("id")
+        .eq("id", int(alias_id))
+        .eq("league_id", league_id)
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Alias not found")
+
+    players = _sync_active_members_to_players(supabase, league_id)
+    if int(player_id) not in {int(p["id"]) for p in players}:
+        raise HTTPException(status_code=400, detail="Player is not part of this league")
+
+    supabase.table("player_aliases").update(
+        {
+            "player_id": int(player_id),
+            "confirmed_by_user_id": int(user.get("id")) if user.get("id") is not None else None,
+        }
+    ).eq("id", int(alias_id)).eq("league_id", league_id).execute()
+
+    return {"message": "Alias updated"}
+
+
+def delete_player_alias(alias_id: int, user: dict[str, Any]) -> dict[str, str]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    response = (
+        supabase.table("player_aliases")
+        .delete()
+        .eq("id", int(alias_id))
+        .eq("league_id", league_id)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Alias not found")
+    return {"message": "Alias removed"}
+
+
+def save_player_aliases(payload: BulkAliasPayload, user: dict[str, Any]) -> dict[str, Any]:
+    """Upsert admin-confirmed aliases on Supabase.
+
+    Uses a unique (league_id, alias) constraint so corrections (admin overriding
+    an earlier AI suggestion) naturally overwrite the prior mapping.
+    """
+
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    if not payload.entries:
+        return {"saved": 0}
+
+    league_id = _league_id_from_user(user)
+    saved_user_id = int(user.get("id")) if user.get("id") is not None else None
+
+    players = _sync_active_members_to_players(supabase, league_id)
+    valid_player_ids = {int(p["id"]) for p in players}
+
+    rows_to_upsert: list[dict[str, Any]] = []
+    for entry in payload.entries:
+        normalized = normalize_alias(entry.alias)
+        if not normalized:
+            continue
+        if int(entry.player_id) not in valid_player_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="Alias references a player outside this league",
+            )
+        display = (entry.alias_display or entry.alias).strip() or entry.alias.strip()
+        rows_to_upsert.append(
+            {
+                "league_id": league_id,
+                "player_id": int(entry.player_id),
+                "alias": normalized,
+                "alias_display": display,
+                "confirmed_by_user_id": saved_user_id,
+            }
+        )
+
+    if not rows_to_upsert:
+        return {"saved": 0}
+
+    supabase.table("player_aliases").upsert(
+        rows_to_upsert,
+        on_conflict="league_id,alias",
+    ).execute()
+
+    return {"saved": len(rows_to_upsert)}
+
+
+def extract_winners_from_screenshot(
+    match_id: int,
+    image_bytes: bytes,
+    mime_type: str,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    """Supabase equivalent of the SQLite screenshot extractor.
+
+    Reads match + league + players + aliases from Supabase, calls the vision
+    model, runs alias resolution locally, and returns a draft winners payload
+    for admin confirmation. Never writes to winner_entries.
+    """
+
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    match_response = (
+        supabase.table("matches")
+        .select("*")
+        .eq("id", int(match_id))
+        .eq("league_id", league_id)
+        .limit(1)
+        .execute()
+    )
+    league_response = (
+        supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
+    )
+    if not match_response.data or not league_response.data:
+        raise HTTPException(status_code=404, detail="League or match not found")
+
+    match_row = match_response.data[0]
+    league_row = league_response.data[0]
+    if str(match_row.get("status") or "").lower() == "canceled":
+        raise HTTPException(status_code=409, detail="This match is marked as washout/cancelled")
+
+    players = _sync_active_members_to_players(supabase, league_id)
+    players_by_id = {int(p["id"]): str(p["name"]) for p in players}
+    participant_ids = (
+        parse_participant_ids(match_row.get("participant_ids_json"))
+        or list(players_by_id.keys())
+    )
+    eligible = [
+        PlayerRef(id=pid, name=players_by_id[pid])
+        for pid in participant_ids
+        if pid in players_by_id
+    ]
+
+    alias_rows = _fetch_alias_rows(supabase, league_id)
+    alias_lookup: dict[str, int] = {
+        str(row["alias"]): int(row["player_id"])
+        for row in alias_rows
+        if row.get("player_id") is not None
+    }
+
+    winner_limit = int(match_row.get("winner_count") or league_row.get("default_winner_count") or 0)
+
+    rows: list[LeaderboardRow] = extract_leaderboard(image_bytes, mime_type)
+
+    ranked_rows: list[dict[str, Any]] = []
+    used_player_ids: set[int] = set()
+    rank_to_players: dict[int, list[int]] = {}
+
+    for row in rows:
+        if row.rank > winner_limit:
+            break
+        match = resolve_alias(row.display_name, eligible, alias_lookup)
+
+        player_id = match.player_id
+        if player_id is not None and player_id in used_player_ids:
+            player_id = None
+            match_payload = {
+                "player_id": None,
+                "player_name": None,
+                "confidence": 0.0,
+                "source": "none",
+            }
+        else:
+            match_payload = {
+                "player_id": match.player_id,
+                "player_name": match.player_name,
+                "confidence": match.confidence,
+                "source": match.source,
+            }
+
+        if player_id is not None:
+            used_player_ids.add(player_id)
+            rank_to_players.setdefault(row.rank, []).append(player_id)
+
+        ranked_rows.append(
+            {
+                "rank": row.rank,
+                "display_name": row.display_name,
+                "points": row.points,
+                "match": match_payload,
+            }
+        )
+
+    draft_ranks = [
+        {"rank": rank, "player_ids": player_ids}
+        for rank, player_ids in sorted(rank_to_players.items())
+    ]
+
+    return {
+        "match_id": int(match_id),
+        "winner_limit": winner_limit,
+        "rows": ranked_rows,
+        "draft": {"ranks": draft_ranks},
+        "eligible_players": [
+            {"id": ref.id, "name": ref.name} for ref in eligible
+        ],
+    }

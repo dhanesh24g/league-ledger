@@ -60,6 +60,11 @@ try:
         reopen_match as supabase_reopen_match,
         upsert_league as supabase_upsert_league,
         save_winners as supabase_save_winners,
+        extract_winners_from_screenshot as supabase_extract_winners_from_screenshot,
+        save_player_aliases as supabase_save_player_aliases,
+        list_player_aliases as supabase_list_player_aliases,
+        update_player_alias as supabase_update_player_alias,
+        delete_player_alias as supabase_delete_player_alias,
     )
 
     SUPABASE_SERVICE_AVAILABLE = True
@@ -562,10 +567,7 @@ def extract_winners_from_screenshot(
     """
 
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        raise HTTPException(
-            status_code=501,
-            detail="Screenshot extraction is not yet available on the hosted deployment.",
-        )
+        return supabase_extract_winners_from_screenshot(match_id, image_bytes, mime_type, user)
 
     league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
@@ -662,10 +664,7 @@ def list_player_aliases(user: dict[str, Any]) -> dict[str, Any]:
     """Return every alias in the active league, grouped for UI consumption."""
 
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        raise HTTPException(
-            status_code=501,
-            detail="Alias management is not yet available on the hosted deployment.",
-        )
+        return supabase_list_player_aliases(user)
 
     league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
@@ -718,10 +717,7 @@ def update_player_alias(
     """Reassign an existing alias to a different player."""
 
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        raise HTTPException(
-            status_code=501,
-            detail="Alias management is not yet available on the hosted deployment.",
-        )
+        return supabase_update_player_alias(alias_id, player_id, user)
 
     league_id = _league_id_from_user(user)
     saved_user_id = user.get("id")
@@ -758,10 +754,7 @@ def delete_player_alias(alias_id: int, user: dict[str, Any]) -> dict[str, str]:
     """Remove a single alias from the active league."""
 
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        raise HTTPException(
-            status_code=501,
-            detail="Alias management is not yet available on the hosted deployment.",
-        )
+        return supabase_delete_player_alias(alias_id, user)
 
     league_id = _league_id_from_user(user)
     with DatabaseManager() as c:
@@ -779,10 +772,7 @@ def save_player_aliases(payload: BulkAliasPayload, user: dict[str, Any]) -> dict
     """Persist admin-confirmed aliases so future screenshots auto-match."""
 
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
-        raise HTTPException(
-            status_code=501,
-            detail="Alias persistence is not yet available on the hosted deployment.",
-        )
+        return supabase_save_player_aliases(payload, user)
 
     league_id = _league_id_from_user(user)
     saved_user_id = user.get("id")
