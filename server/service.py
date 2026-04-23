@@ -65,6 +65,7 @@ try:
         list_player_aliases as supabase_list_player_aliases,
         update_player_alias as supabase_update_player_alias,
         delete_player_alias as supabase_delete_player_alias,
+        get_match_winners as supabase_get_match_winners,
     )
 
     SUPABASE_SERVICE_AVAILABLE = True
@@ -766,6 +767,58 @@ def delete_player_alias(alias_id: int, user: dict[str, Any]) -> dict[str, str]:
             raise HTTPException(status_code=404, detail="Alias not found")
 
     return {"message": "Alias removed"}
+
+
+def get_match_winners(match_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    """Return saved winners for a match, grouped by rank.
+
+    Lightweight read used by the winners page to hydrate the form on load for
+    completed matches. Washout refund rows (rank = 0) are excluded.
+    """
+
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_get_match_winners(match_id, user)
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        match_row = c.execute(
+            "SELECT id, status FROM matches WHERE id = ? AND league_id = ?",
+            (int(match_id), league_id),
+        ).fetchone()
+        if not match_row:
+            raise HTTPException(status_code=404, detail="Match not found")
+
+        winner_rows = c.execute(
+            """
+            SELECT we.rank, we.player_id, COALESCE(p.name, '') AS player_name
+            FROM winner_entries we
+            LEFT JOIN players p ON p.id = we.player_id
+            WHERE we.match_id = ?
+            ORDER BY we.rank ASC, we.player_id ASC
+            """,
+            (int(match_id),),
+        ).fetchall()
+
+    ranks: dict[int, list[dict[str, Any]]] = {}
+    for row in winner_rows:
+        rank = int(row["rank"])
+        if rank <= 0:
+            continue
+        ranks.setdefault(rank, []).append(
+            {
+                "player_id": int(row["player_id"]),
+                "player_name": str(row["player_name"] or ""),
+            }
+        )
+
+    return {
+        "match_id": int(match_id),
+        "status": str(match_row["status"] or ""),
+        "ranks": [
+            {"rank": rank, "players": players}
+            for rank, players in sorted(ranks.items())
+        ],
+    }
 
 
 def save_player_aliases(payload: BulkAliasPayload, user: dict[str, Any]) -> dict[str, Any]:

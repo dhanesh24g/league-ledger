@@ -1537,6 +1537,58 @@ def save_player_aliases(payload: BulkAliasPayload, user: dict[str, Any]) -> dict
     return {"saved": len(rows_to_upsert)}
 
 
+def get_match_winners(match_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    """Supabase equivalent of get_match_winners. Lightweight: two indexed queries."""
+
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    match_response = (
+        supabase.table("matches")
+        .select("id,status")
+        .eq("id", int(match_id))
+        .eq("league_id", league_id)
+        .limit(1)
+        .execute()
+    )
+    if not match_response.data:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    winners_response = (
+        supabase.table("winner_entries")
+        .select("rank,player_id")
+        .eq("match_id", int(match_id))
+        .order("rank")
+        .execute()
+    )
+
+    players = _sync_active_members_to_players(supabase, league_id)
+    name_by_id = {int(p["id"]): str(p["name"]) for p in players}
+
+    ranks: dict[int, list[dict[str, Any]]] = {}
+    for row in winners_response.data or []:
+        rank = int(row["rank"])
+        if rank <= 0:
+            continue
+        ranks.setdefault(rank, []).append(
+            {
+                "player_id": int(row["player_id"]),
+                "player_name": name_by_id.get(int(row["player_id"]), ""),
+            }
+        )
+
+    return {
+        "match_id": int(match_id),
+        "status": str(match_response.data[0].get("status") or ""),
+        "ranks": [
+            {"rank": rank, "players": players_list}
+            for rank, players_list in sorted(ranks.items())
+        ],
+    }
+
+
 def extract_winners_from_screenshot(
     match_id: int,
     image_bytes: bytes,
