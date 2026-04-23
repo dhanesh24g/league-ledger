@@ -350,8 +350,10 @@ async function refreshAccessToken() {
 }
 
 export async function callApi(url, options = {}, retryOnAuthError = true) {
+  const body = options && options.body;
+  const isMultipart = typeof FormData !== 'undefined' && body instanceof FormData;
   const mergedHeaders = {
-    'Content-Type': 'application/json',
+    ...(isMultipart ? {} : { 'Content-Type': 'application/json' }),
     ...authHeaders(),
     ...((options && options.headers) || {}),
   };

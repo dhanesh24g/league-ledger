@@ -107,6 +107,44 @@
       <div id="league-settings-members" class="feed"></div>
     </section>
 
+    <section id="alias-panel" class="panel active league-settings-panel-spaced alias-panel hidden">
+      <div class="alias-panel-head">
+        <div>
+          <h2>Screenshot Name Mappings</h2>
+          <p class="muted">
+            These mappings let the AI screenshot scanner on the Winners page recognise each
+            fantasy-app handle and auto-assign the right player. New mappings are learned
+            automatically whenever you save winners from a screenshot — edit or remove them here.
+          </p>
+        </div>
+        <span id="alias-count-chip" class="status-chip status-neutral">0 mappings</span>
+      </div>
+
+      <form id="alias-add-form" class="alias-add-form" autocomplete="off">
+        <div class="alias-add-fields">
+          <label class="alias-field">
+            <span>Username / team name on the fantasy app</span>
+            <input id="alias-new-text" type="text" maxlength="160" placeholder="e.g. ravi_bhai, CSK_Fan_07" required />
+            <small class="muted">As it appears on Dream11, My11Circle, MPL, etc.</small>
+          </label>
+          <label class="alias-field">
+            <span>League Ledger player this name belongs to</span>
+            <select id="alias-new-player" required>
+              <option value="">— Select a player —</option>
+            </select>
+            <small class="muted">We will auto-assign this player next time we see the name above.</small>
+          </label>
+          <button type="submit" class="primary">Add Mapping</button>
+        </div>
+      </form>
+
+      <div class="alias-toolbar">
+        <input id="alias-search" type="search" placeholder="Search aliases or players..." aria-label="Filter aliases" />
+      </div>
+
+      <div id="alias-list" class="alias-list"></div>
+    </section>
+
     <section class="panel active league-settings-panel-spaced">
       <h2>Next Up</h2>
       <div class="feed-item">

@@ -22,7 +22,6 @@ import { initNotifications } from '/static/notifications.js';
 import { rankIcon } from '/static/payouts.js';
 
 const matchSelect = document.getElementById('match-select');
-const loadWinnerBtn = document.getElementById('load-winner-form');
 const reopenMatchBtn = document.getElementById('reopen-match');
 const cancelMatchBtn = document.getElementById('mark-cancelled');
 const continueLedgerBtn = document.getElementById('continue-ledger');
@@ -34,6 +33,22 @@ const pageBrand = document.getElementById('page-brand');
 const telegramModal = document.getElementById('telegram-modal');
 const telegramModalBody = document.getElementById('telegram-modal-body');
 const closeTelegramModalBtn = document.getElementById('close-telegram-modal');
+const scanResultBtn = document.getElementById('scan-result');
+const scanFileInput = document.getElementById('scan-file-input');
+const scanModal = document.getElementById('scan-modal');
+const scanModalBody = document.getElementById('scan-modal-body');
+const scanModalSubtitle = document.getElementById('scan-modal-subtitle');
+const scanConfirmBtn = document.getElementById('scan-confirm');
+const scanCancelBtn = document.getElementById('scan-cancel');
+const closeScanModalBtn = document.getElementById('close-scan-modal');
+
+let scanState = {
+  matchId: null,
+  rows: [],
+  eligiblePlayers: [],
+  winnerLimit: 0,
+  aiAvailable: null,
+};
 
 let authUser = { username: '', role: 'read' };
 let appState = { league: null, players: [], matches: [] };
@@ -63,7 +78,7 @@ function clearWinnerFeedback() {
 
 function applyRoleBasedUI() {
   const isAdmin = authUser.league_role === 'admin';
-  [loadWinnerBtn, cancelMatchBtn, continueLedgerBtn, sendTelegramUpdateBtn].forEach((element) => {
+  [cancelMatchBtn, continueLedgerBtn, sendTelegramUpdateBtn].forEach((element) => {
     element.disabled = !isAdmin;
   });
 
@@ -109,15 +124,25 @@ function updateMatchActionState() {
   const isCanceled = status === 'canceled';
   const isCompleted = status === 'completed';
 
-  loadWinnerBtn.disabled = !isAdmin || !match || isCanceled;
   cancelMatchBtn.disabled = !isAdmin || !match || isCanceled;
   reopenMatchBtn?.classList.toggle('hidden', !isCanceled || !isAdmin || !match);
   if (reopenMatchBtn) {
     reopenMatchBtn.disabled = !isAdmin || !match || !isCanceled;
   }
 
+  // Scan button must be evaluated before any early-return so it's never left
+  // in its initial hidden state when `match` is momentarily undefined
+  // (e.g. during the direct-admin-flow hand-off from /matches -> /winners).
+  // Visibility depends only on admin + non-canceled match so the feature stays
+  // discoverable even when AI_VISION_ENABLED is off. If vision is unavailable,
+  // the click handler shows a helpful configuration message.
+  if (scanResultBtn) {
+    const canShow = isAdmin && !!match && !isCanceled;
+    scanResultBtn.classList.toggle('hidden', !canShow);
+    scanResultBtn.disabled = !canShow;
+  }
+
   if (!match || !isAdmin) return;
-  loadWinnerBtn.textContent = isCompleted ? 'Edit Assignment' : 'Load Assignment';
   cancelMatchBtn.textContent = isCanceled ? 'Washout Recorded' : 'Washout / Cancelled';
   if (sendTelegramUpdateBtn) {
     sendTelegramUpdateBtn.disabled = !isAdmin || !match;
@@ -436,7 +461,6 @@ function renderMatchSelect() {
     option.value = '';
     option.textContent = 'No matches yet';
     matchSelect.appendChild(option);
-    loadWinnerBtn.disabled = true;
     cancelMatchBtn.disabled = true;
     if (winnerMatchSummary) {
       winnerMatchSummary.innerHTML = '<div class="feed-item">Create a match first, then assign winners here.</div>';
@@ -948,20 +972,6 @@ async function saveWinners(match, options = {}) {
   }
 }
 
-loadWinnerBtn.addEventListener('click', () => {
-  if (authUser.league_role !== 'admin') {
-    showError('Only admin can assign winners.');
-    return;
-  }
-  if (!matchSelect.value) {
-    showError('Choose a match first.');
-    return;
-  }
-  setSelectedMatchId(matchSelect.value);
-  updateMatchActionState();
-  renderWinnerForm(matchSelect.value);
-});
-
 matchSelect.addEventListener('change', () => {
   setSelectedMatchId(matchSelect.value);
   updateMatchActionState();
@@ -1125,6 +1135,311 @@ window.addEventListener('keydown', (event) => {
     closeTelegramModal();
   }
 });
+
+// ---------- AI screenshot scan flow ----------
+
+function setScanModalOpen(isOpen) {
+  if (!scanModal) return;
+  scanModal.classList.toggle('hidden', !isOpen);
+  scanModal.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+  document.body.classList.toggle('modal-open', isOpen);
+}
+
+function closeScanModal() {
+  setScanModalOpen(false);
+  scanState = { matchId: null, rows: [], eligiblePlayers: [], winnerLimit: 0, aiAvailable: scanState.aiAvailable };
+  if (scanModalBody) scanModalBody.innerHTML = '';
+  if (scanModalSubtitle) scanModalSubtitle.textContent = '';
+  if (scanConfirmBtn) scanConfirmBtn.disabled = true;
+  if (scanFileInput) scanFileInput.value = '';
+}
+
+async function checkVisionAvailability() {
+  if (scanState.aiAvailable !== null) return scanState.aiAvailable;
+  try {
+    const result = await callApi('/api/ai/vision/status');
+    scanState.aiAvailable = !!result?.available;
+  } catch (_) {
+    scanState.aiAvailable = false;
+  }
+  return scanState.aiAvailable;
+}
+
+function playerOptionsHtml(eligible, selectedId) {
+  const selected = selectedId == null ? '' : String(selectedId);
+  const options = eligible
+    .map((p) => `<option value="${p.id}" ${String(p.id) === selected ? 'selected' : ''}>${escapeHtml(p.name)}</option>`)
+    .join('');
+  return `<option value="">— Unassigned —</option>${options}`;
+}
+
+function renderScanRows() {
+  if (!scanModalBody) return;
+  const rows = scanState.rows || [];
+  if (!rows.length) {
+    scanModalBody.innerHTML = '<p class="muted">No leaderboard rows were extracted.</p>';
+    scanConfirmBtn.disabled = true;
+    return;
+  }
+
+  const eligibleByName = scanState.eligiblePlayers
+    .map((p) => `<strong>${escapeHtml(p.name)}</strong>`)
+    .join(', ');
+
+  const rowsHtml = rows.map((row, idx) => {
+    const match = row.match || {};
+    const badge = match.source === 'alias'
+      ? '<span class="scan-badge scan-badge-ok">alias</span>'
+      : match.source === 'exact'
+        ? '<span class="scan-badge scan-badge-ok">exact</span>'
+        : match.source === 'fuzzy'
+          ? `<span class="scan-badge scan-badge-warn">fuzzy ${Math.round((match.confidence || 0) * 100)}%</span>`
+          : '<span class="scan-badge scan-badge-bad">pick player</span>';
+    const pointsChip = row.points != null ? `<span class="scan-points">${escapeHtml(row.points)} pts</span>` : '';
+    return `
+      <div class="scan-row" data-row-index="${idx}">
+        <div class="scan-row-left">
+          <span class="scan-rank">#${row.rank}</span>
+          <div class="scan-row-name">
+            <strong>${escapeHtml(row.display_name)}</strong>
+            ${pointsChip}
+          </div>
+        </div>
+        <div class="scan-row-right">
+          ${badge}
+          <select class="scan-player-select" data-row-index="${idx}" aria-label="Select player for rank ${row.rank}">
+            ${playerOptionsHtml(scanState.eligiblePlayers, match.player_id)}
+          </select>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  scanModalBody.innerHTML = `
+    <p class="muted small scan-eligible">Eligible players: ${eligibleByName}</p>
+    <div class="scan-rows">${rowsHtml}</div>
+    <p class="muted small scan-footnote">AI suggestions are pre-selected. Review every rank before saving — you can override any pick. Confirmed names are remembered for future screenshots.</p>
+  `;
+
+  scanModalBody.querySelectorAll('.scan-player-select').forEach((select) => {
+    select.addEventListener('change', (event) => {
+      const idx = Number(event.currentTarget.dataset.rowIndex);
+      const row = scanState.rows[idx];
+      if (!row) return;
+      const value = event.currentTarget.value;
+      row.match = value
+        ? { player_id: Number(value), player_name: null, confidence: 1.0, source: 'manual' }
+        : { player_id: null, player_name: null, confidence: 0.0, source: 'none' };
+      validateScanSelection();
+    });
+  });
+
+  validateScanSelection();
+}
+
+function validateScanSelection() {
+  const rows = scanState.rows || [];
+  const assigned = rows.map((r) => r?.match?.player_id).filter((id) => id != null);
+  const unique = new Set(assigned);
+  const hasDuplicates = unique.size !== assigned.length;
+  const count = assigned.length;
+
+  const minimumRequired = Math.min(scanState.winnerLimit || rows.length, rows.length);
+  scanConfirmBtn.disabled = hasDuplicates || count < minimumRequired || count === 0;
+
+  if (scanModalSubtitle) {
+    if (hasDuplicates) {
+      scanModalSubtitle.textContent = 'Two ranks point to the same player — fix before saving.';
+    } else if (count < minimumRequired) {
+      scanModalSubtitle.textContent = `Assign a player to every rank (${count}/${minimumRequired} done).`;
+    } else {
+      scanModalSubtitle.textContent = `${count} rank${count === 1 ? '' : 's'} ready. Review and save.`;
+    }
+  }
+}
+
+function buildRanksPayloadFromScan() {
+  const rankToIds = new Map();
+  scanState.rows.forEach((row) => {
+    const pid = row?.match?.player_id;
+    if (!pid) return;
+    const list = rankToIds.get(row.rank) || [];
+    list.push(Number(pid));
+    rankToIds.set(row.rank, list);
+  });
+  return [...rankToIds.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([rank, player_ids]) => ({ rank, player_ids }));
+}
+
+function buildAliasEntriesFromScan() {
+  // Active-learning feedback loop: persist every confirmed screenshot name -> player
+  // mapping so future screenshots auto-resolve. The server upserts on
+  // (league_id, alias) so corrections (admin overriding an AI suggestion) naturally
+  // overwrite a previously-wrong mapping.
+  //
+  // We skip two cases:
+  //  - unassigned rows (no player_id)
+  //  - exact matches against the player's own name (adds no learning value)
+  const entries = [];
+  const playerNameById = new Map(
+    (scanState.eligiblePlayers || []).map((p) => [Number(p.id), String(p.name || '').trim().toLowerCase()]),
+  );
+
+  scanState.rows.forEach((row) => {
+    const pid = row?.match?.player_id;
+    if (!pid) return;
+    const displayName = String(row.display_name || '').trim();
+    if (!displayName) return;
+    const playerName = playerNameById.get(Number(pid)) || '';
+    if (playerName && displayName.toLowerCase() === playerName) return;
+    entries.push({
+      player_id: Number(pid),
+      alias: displayName,
+      alias_display: displayName,
+    });
+  });
+  return entries;
+}
+
+async function submitScanSelection() {
+  const matchId = scanState.matchId;
+  if (!matchId) return;
+  const match = appState.matches.find((item) => String(item.id) === String(matchId));
+  if (!match) {
+    showError('Match no longer available.');
+    return;
+  }
+
+  const ranksPayload = buildRanksPayloadFromScan();
+  if (!ranksPayload.length) {
+    showError('Pick at least one winner before saving.');
+    return;
+  }
+
+  let closeLoading = null;
+  let restoreConfirm = null;
+  try {
+    restoreConfirm = setButtonLoading(scanConfirmBtn, 'Saving...');
+    closeLoading = showLoading('Saving winners...');
+
+    await callApi(`/api/matches/${matchId}/winners`, {
+      method: 'POST',
+      body: JSON.stringify({ ranks: ranksPayload }),
+    });
+
+    // Best-effort alias persistence; never block save on this.
+    const aliasEntries = buildAliasEntriesFromScan();
+    if (aliasEntries.length) {
+      try {
+        await callApi('/api/player-aliases/bulk', {
+          method: 'POST',
+          body: JSON.stringify({ entries: aliasEntries }),
+        });
+      } catch (aliasError) {
+        console.warn('Alias save failed (non-fatal):', aliasError);
+      }
+    }
+
+    clearWinnerDraft(matchId);
+    appState = await callApi('/api/state');
+    renderMatchSelect();
+    matchSelect.value = String(matchId);
+    setSelectedMatchId(String(matchId));
+    updateMatchActionState();
+    renderMatchSummary(String(matchId));
+    renderWinnerForm(String(matchId));
+    closeScanModal();
+    showSuccess('Winners saved from screenshot.');
+
+    await openTelegramModal({
+      matchId,
+      reason: `Match update for ${match.title} has been recorded successfully. Send it to Telegram now?`,
+    });
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (restoreConfirm) restoreConfirm();
+    if (closeLoading) closeLoading();
+  }
+}
+
+async function startScanForMatch(matchId, file) {
+  const available = await checkVisionAvailability();
+  if (!available) {
+    showError('AI screenshot extraction is not configured on this server.');
+    return;
+  }
+
+  let closeLoading = null;
+  try {
+    closeLoading = showLoading('Reading screenshot...');
+    const formData = new FormData();
+    formData.append('screenshot', file);
+
+    const response = await callApi(`/api/matches/${matchId}/winners/extract`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    scanState = {
+      matchId,
+      rows: Array.isArray(response.rows) ? response.rows : [],
+      eligiblePlayers: Array.isArray(response.eligible_players) ? response.eligible_players : [],
+      winnerLimit: Number(response.winner_limit || 0),
+      aiAvailable: true,
+    };
+    renderScanRows();
+    setScanModalOpen(true);
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (closeLoading) closeLoading();
+  }
+}
+
+scanResultBtn?.addEventListener('click', async () => {
+  if (authUser.league_role !== 'admin') {
+    showError('Only admin can scan results.');
+    return;
+  }
+  if (!matchSelect.value) {
+    showError('Choose a match first.');
+    return;
+  }
+  const available = await checkVisionAvailability();
+  if (!available) {
+    showError('AI screenshot scan is not enabled on this server. Set AI_VISION_ENABLED=1 and OPENAI_API_KEY in server/.env, then restart.');
+    return;
+  }
+  scanFileInput?.click();
+});
+
+scanFileInput?.addEventListener('change', async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  const matchId = matchSelect.value;
+  event.target.value = '';
+  if (!matchId) {
+    showError('Choose a match first.');
+    return;
+  }
+  await startScanForMatch(Number(matchId), file);
+});
+
+scanCancelBtn?.addEventListener('click', closeScanModal);
+closeScanModalBtn?.addEventListener('click', closeScanModal);
+scanModal?.querySelectorAll('[data-close-scan-modal]').forEach((node) => {
+  node.addEventListener('click', closeScanModal);
+});
+scanConfirmBtn?.addEventListener('click', submitScanSelection);
+window.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && scanModal && !scanModal.classList.contains('hidden')) {
+    closeScanModal();
+  }
+});
+
+// ---------- End AI scan flow ----------
 
 async function init() {
   initNotifications();

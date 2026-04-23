@@ -120,6 +120,28 @@ Recommended setup:
 
 This app verifies the Google ID token server-side and links returning users by `google_sub` or email. No separate Google client secret is required for the current frontend-driven sign-in flow.
 
+## AI Screenshot Winner Scan (optional)
+
+Admins can upload a fantasy-app leaderboard screenshot and let an LLM pre-fill the winners, rank by rank. The admin still confirms and saves — nothing is written to the ledger without explicit approval.
+
+Enable locally by adding to `server/.env`:
+
+```
+AI_VISION_ENABLED=1
+OPENAI_API_KEY=sk-...
+# Optional (defaults to gpt-4o-mini):
+# AI_VISION_MODEL=gpt-4o
+```
+
+On restart, the `player_aliases` table is auto-created (SQLite). For Supabase, run the Postgres migration separately — prod paths currently return `501` until wired.
+
+Flow:
+
+1. Go to `/winners`, pick a match.
+2. Click **📷 Scan Result** and upload a PNG/JPEG/WebP screenshot (<= 6 MB).
+3. Review AI suggestions in the modal. Override any rank via the player dropdown.
+4. Click **Save Winners** — this calls the existing winners endpoint (no bypass of tie/payout logic). Confirmed name → player mappings are remembered for future screenshots.
+
 ## Quick validation flow
 
 1. Setup league
