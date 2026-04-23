@@ -840,6 +840,31 @@ function applyWinnerDraft(match, onWinnerChange) {
   });
 }
 
+async function hydrateSavedWinners(match, onWinnerChange) {
+  const matchId = String(match.id);
+  const data = await callApi(`/api/matches/${matchId}/winners`);
+
+  // Bail out if the user switched to a different match while fetching.
+  if (String(matchSelect.value) !== matchId) return;
+  // Bail out if the user started typing in the meantime (preserve their edits).
+  const liveDraft = getWinnerDraft(match.id);
+  if (liveDraft?.ranks && Object.keys(liveDraft.ranks).length) return;
+
+  const ranks = {};
+  (data?.ranks || []).forEach((entry) => {
+    const names = (entry.players || [])
+      .map((player) => String(player?.player_name || '').trim())
+      .filter(Boolean);
+    if (names.length) ranks[String(entry.rank)] = names;
+  });
+  if (!Object.keys(ranks).length) return;
+
+  setWinnerDraft(match.id, { ranks });
+  applyWinnerDraft(match, onWinnerChange);
+  refreshConsumedRankCards(match);
+  updateWinnerFeedback(match);
+}
+
 function renderWinnerForm(matchId) {
   winnersForm.innerHTML = '';
   clearWinnerFeedback();
@@ -912,6 +937,19 @@ function renderWinnerForm(matchId) {
   applyWinnerDraft(match, onWinnerChange);
   refreshConsumedRankCards(match);
   updateWinnerFeedback(match);
+
+  // Lazy hydration: for completed matches with no local draft, pull saved
+  // winners from the server in the background so the form reflects persisted
+  // state. Non-blocking — the empty rank cards are already on screen; names
+  // appear when the fetch returns (typically <100ms).
+  const status = String(match.status || '').toLowerCase();
+  const existingDraft = getWinnerDraft(match.id);
+  const hasDraftRanks = !!(existingDraft?.ranks && Object.keys(existingDraft.ranks).length);
+  if (status === 'completed' && !hasDraftRanks) {
+    hydrateSavedWinners(match, onWinnerChange).catch((error) => {
+      console.warn('Winner hydration skipped:', error);
+    });
+  }
 
   saveWinnersBtn = document.createElement('button');
   saveWinnersBtn.type = 'submit';
@@ -1341,7 +1379,27 @@ async function submitScanSelection() {
       }
     }
 
-    clearWinnerDraft(matchId);
+    // Seed the winners-form draft with the just-confirmed selections so the
+    // background form reflects the saved state (industry-standard behaviour
+    // after a scan-and-confirm flow). renderWinnerForm reads from the draft
+    // via applyWinnerDraft, so setting this before the render populates the
+    // input rows with the correct names.
+    const nameByPlayerId = new Map(
+      (scanState.eligiblePlayers || []).map((p) => [Number(p.id), String(p.name || '')]),
+    );
+    const draftRanks = {};
+    scanState.rows.forEach((row) => {
+      const pid = Number(row?.match?.player_id || 0);
+      if (!pid) return;
+      if (Number(row.rank) > Number(scanState.winnerLimit || 0)) return;
+      const name = nameByPlayerId.get(pid);
+      if (!name) return;
+      const key = String(row.rank);
+      if (!draftRanks[key]) draftRanks[key] = [];
+      draftRanks[key].push(name);
+    });
+    setWinnerDraft(matchId, { ranks: draftRanks });
+
     appState = await callApi('/api/state');
     renderMatchSelect();
     matchSelect.value = String(matchId);

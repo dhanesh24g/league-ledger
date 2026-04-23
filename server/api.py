@@ -66,6 +66,7 @@ from .service import (
     delete_player_alias,
     extract_winners_from_screenshot,
     get_ledger,
+    get_match_winners,
     list_player_aliases,
     reopen_match,
     get_stats,
@@ -120,6 +121,13 @@ def create_match(payload: MatchPayload, user: dict[str, Any] = Depends(require_a
 @router.post("/matches/{match_id}/winners")
 def set_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
     return save_winners(match_id, payload, user)
+
+
+@router.get("/matches/{match_id}/winners")
+def read_match_winners(
+    match_id: int, user: dict[str, Any] = Depends(require_active_member)
+) -> dict[str, Any]:
+    return get_match_winners(match_id, user)
 
 
 @router.get("/ai/vision/status")
