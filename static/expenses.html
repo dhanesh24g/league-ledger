@@ -107,14 +107,21 @@
         style="margin:12px 0;padding:12px 14px;border-radius:8px;border:1px solid rgba(238,82,83,0.45);background:rgba(238,82,83,0.12);color:#ee5253;font-size:0.9rem;line-height:1.4;">
       </div>
 
-      <div class="expenses-toolbar">
-        <input id="expenses-search" type="search" placeholder="Search player..." autocomplete="off">
-        <select id="expenses-status-filter" aria-label="Filter by status">
-          <option value="all">All statuses</option>
-          <option value="owes">Owes (loser to pay)</option>
-          <option value="owed">Owed (winner to receive)</option>
-          <option value="settled">Settled</option>
-        </select>
+      <div class="expenses-toolbar" role="search">
+        <div class="expenses-toolbar-field expenses-toolbar-search">
+          <span class="expenses-toolbar-icon" aria-hidden="true">🔍</span>
+          <input id="expenses-search" type="search" placeholder="Search player" autocomplete="off"
+            aria-label="Search player">
+        </div>
+        <div class="expenses-toolbar-field">
+          <label for="expenses-status-filter" class="expenses-toolbar-label">Status</label>
+          <select id="expenses-status-filter" aria-label="Filter by status">
+            <option value="all">All</option>
+            <option value="owes">Owes</option>
+            <option value="owed">Owed</option>
+            <option value="settled">Settled</option>
+          </select>
+        </div>
         <span id="expenses-result-count" class="muted small"></span>
       </div>
 

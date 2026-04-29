@@ -130,9 +130,12 @@ function updateSortIndicators() {
     if (th.dataset.sortKey === sortState.key) {
       indicator.textContent = sortState.dir === 'asc' ? '▲' : '▼';
       th.classList.add('sort-active');
+      th.setAttribute('aria-sort', sortState.dir === 'asc' ? 'ascending' : 'descending');
     } else {
-      indicator.textContent = '';
+      // Idle hint so the user can tell the column is sortable.
+      indicator.textContent = '⇅';
       th.classList.remove('sort-active');
+      th.setAttribute('aria-sort', 'none');
     }
   });
 }
