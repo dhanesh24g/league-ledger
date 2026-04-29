@@ -11726,6 +11726,7 @@ th {
 
 /* ---------- Match Edit Modal (mobile polish) ---------- */
 @media (max-width: 760px) {
+
   /* Force the edit modal's date+VS row to stack on mobile so neither column
      gets squished. The matches-page rule already handles .form-row globally,
      but the modal's date input needs explicit full-width handling. */
@@ -11760,7 +11761,7 @@ th {
   }
 }
 
-/* ---------- Expenses page (mobile polish) ---------- */
+/* ---------- Expenses page ---------- */
 .expenses-page .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -11768,6 +11769,153 @@ th {
 
 .expenses-page .table-scroll table {
   min-width: 720px;
+}
+
+.expenses-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.08));
+  background: var(--panel, rgba(255, 255, 255, 0.03));
+}
+
+.expenses-toolbar-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.expenses-toolbar-search {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 160px;
+  max-width: 360px;
+}
+
+.expenses-toolbar-search .expenses-toolbar-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.95em;
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+.expenses-toolbar #expenses-search {
+  width: 100%;
+  padding: 9px 12px 9px 32px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  font: inherit;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.expenses-toolbar #expenses-search::placeholder {
+  opacity: 0.55;
+}
+
+.expenses-toolbar #expenses-search:focus,
+.expenses-toolbar #expenses-status-filter:focus {
+  outline: none;
+  border-color: var(--accent-solid, #6366f1);
+  box-shadow: 0 0 0 3px var(--input-focus-ring, rgba(99, 102, 241, 0.22));
+}
+
+.expenses-toolbar-label {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted, rgba(255, 255, 255, 0.55));
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.expenses-toolbar #expenses-status-filter {
+  padding: 8px 28px 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--panel-2, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  font: inherit;
+  min-height: 38px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.expenses-toolbar #expenses-result-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.sortable-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.sortable-table th.sortable:hover {
+  color: var(--accent-solid, #818cf8);
+}
+
+.sortable-table th.sort-active {
+  color: var(--accent-solid, #818cf8);
+}
+
+.sortable-table th .sort-indicator {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.75em;
+  min-width: 0.8em;
+  text-align: center;
+  opacity: 0.55;
+  transition: opacity 0.12s ease;
+}
+
+.sortable-table th.sortable:hover .sort-indicator,
+.sortable-table th.sort-active .sort-indicator {
+  opacity: 1;
+}
+
+@media (max-width: 760px) {
+  .expenses-toolbar {
+    flex-wrap: wrap;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .expenses-toolbar-search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .expenses-toolbar-field:not(.expenses-toolbar-search) {
+    flex: 1 1 100%;
+  }
+
+  .expenses-toolbar #expenses-search,
+  .expenses-toolbar #expenses-status-filter {
+    min-height: 42px;
+    font-size: 16px;
+  }
+
+  .expenses-toolbar #expenses-status-filter {
+    flex: 1;
+  }
+
+  .expenses-toolbar #expenses-result-count {
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
 }
 
 @media (max-width: 760px) {

@@ -606,11 +606,17 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
             payout_end_rank = min(winner_limit, rank + tie_size - 1)
             pooled_amount = sum(float(payouts.get(r, 0.0)) for r in range(rank, payout_end_rank + 1))
             split_amount = round(pooled_amount / tie_size, 2) if tie_size else 0.0
+            # Pool integrity: avoid losing sub-cent fractions in a tie split.
+            # E.g. 100.00 / 3 = 33.33 per player => 99.99 distributed (1c loss).
+            # Give the rounding remainder to the first player so the sum
+            # matches the pooled amount exactly.
+            remainder = round(pooled_amount - split_amount * tie_size, 2) if tie_size else 0.0
 
-            for player_id in winners:
+            for idx, player_id in enumerate(winners):
+                amount = round(split_amount + (remainder if idx == 0 else 0.0), 2)
                 c.execute(
                     "INSERT INTO winner_entries (match_id, rank, player_id, amount) VALUES (?, ?, ?, ?)",
-                    (match_id, rank, player_id, split_amount),
+                    (match_id, rank, player_id, amount),
                 )
 
             rank += max(1, tie_size)

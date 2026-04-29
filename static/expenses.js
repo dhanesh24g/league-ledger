@@ -13,6 +13,10 @@ const expensesSummary = document.getElementById('expenses-summary');
 const paymentsFeed = document.getElementById('payments-feed');
 const addPaymentBtn = document.getElementById('add-payment-btn');
 const poolBanner = document.getElementById('pool-integrity-banner');
+const searchInput = document.getElementById('expenses-search');
+const statusFilter = document.getElementById('expenses-status-filter');
+const resultCount = document.getElementById('expenses-result-count');
+const sortableHeaders = document.querySelectorAll('.sortable-table th.sortable');
 
 const paymentModal = document.getElementById('payment-modal');
 const paymentForm = document.getElementById('payment-form');
@@ -29,6 +33,12 @@ const paymentModalTitle = document.getElementById('payment-modal-title');
 let authUser = { username: '', role: 'read' };
 let currentRows = [];
 let currentPayments = [];
+let currentCompletedMatches = 0;
+
+const STATUS_ORDER = { owes: 0, owed: 1, settled: 2 };
+let sortState = { key: 'name', dir: 'asc' };
+let searchQuery = '';
+let statusFilterValue = 'all';
 
 function isAdmin() {
   return authUser.league_role === 'admin';
@@ -58,13 +68,17 @@ function statusChip(status, balance) {
   return `<span class="status-chip ${cls}">${label}</span>`;
 }
 
-function renderSummaryRows(data) {
+function renderSummaryRows(rows) {
   expensesBody.innerHTML = '';
-  if (!data.rows.length) {
-    expensesBody.innerHTML = '<tr><td colspan="8">No players yet.</td></tr>';
+  if (!rows.length) {
+    const totalRows = currentRows.length;
+    const empty = totalRows
+      ? 'No players match the current search/filter.'
+      : 'No players yet.';
+    expensesBody.innerHTML = `<tr><td colspan="8" class="muted small" style="text-align:center;padding:18px;">${empty}</td></tr>`;
     return;
   }
-  data.rows.forEach((row) => {
+  rows.forEach((row) => {
     const tr = document.createElement('tr');
     const balanceClass = row.balance === 0 ? '' : (row.balance > 0 ? 'pos' : 'neg');
     tr.innerHTML = `
@@ -79,6 +93,66 @@ function renderSummaryRows(data) {
     `;
     expensesBody.appendChild(tr);
   });
+}
+
+function compareValues(a, b, key) {
+  if (key === 'name') {
+    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+  }
+  if (key === 'status') {
+    const av = STATUS_ORDER[a.status] ?? 99;
+    const bv = STATUS_ORDER[b.status] ?? 99;
+    if (av !== bv) return av - bv;
+    return Number(b.balance || 0) - Number(a.balance || 0);
+  }
+  return Number(a[key] || 0) - Number(b[key] || 0);
+}
+
+function getViewRows() {
+  const q = searchQuery.trim().toLowerCase();
+  let rows = currentRows.filter((row) => {
+    if (statusFilterValue !== 'all' && row.status !== statusFilterValue) return false;
+    if (q && !String(row.name || '').toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  rows = rows.slice().sort((a, b) => {
+    const cmp = compareValues(a, b, sortState.key);
+    return sortState.dir === 'asc' ? cmp : -cmp;
+  });
+  return rows;
+}
+
+function updateSortIndicators() {
+  sortableHeaders.forEach((th) => {
+    const indicator = th.querySelector('.sort-indicator');
+    if (!indicator) return;
+    if (th.dataset.sortKey === sortState.key) {
+      indicator.textContent = sortState.dir === 'asc' ? '▲' : '▼';
+      th.classList.add('sort-active');
+      th.setAttribute('aria-sort', sortState.dir === 'asc' ? 'ascending' : 'descending');
+    } else {
+      // Idle hint so the user can tell the column is sortable.
+      indicator.textContent = '⇅';
+      th.classList.remove('sort-active');
+      th.setAttribute('aria-sort', 'none');
+    }
+  });
+}
+
+function applyView() {
+  const visible = getViewRows();
+  renderSummaryRows(visible);
+  updateSortIndicators();
+  if (resultCount) {
+    if (currentRows.length === 0) {
+      resultCount.textContent = '';
+    } else if (visible.length === currentRows.length) {
+      resultCount.textContent = `${visible.length} player${visible.length === 1 ? '' : 's'}`;
+    } else {
+      resultCount.textContent = `${visible.length} of ${currentRows.length} players`;
+    }
+  }
 }
 
 function renderPaymentsFeed(payments) {
@@ -164,7 +238,7 @@ function closeModal() {
   paymentPlayerInput.disabled = false;
 }
 
-function renderPoolIntegrity(rows) {
+function renderPoolIntegrity(rows, completedMatches) {
   if (!poolBanner) return;
   const totals = rows.reduce(
     (acc, row) => {
@@ -175,7 +249,11 @@ function renderPoolIntegrity(rows) {
     { spent: 0, won: 0 },
   );
   const drift = Math.round((totals.won - totals.spent) * 100) / 100;
-  if (Math.abs(drift) < 0.01) {
+  // Allow a small tolerance for accumulated rounding from tie splits
+  // (e.g. dividing a 100 pool 3 ways gives 33.33 each => 99.99). Tolerate
+  // ~1c per completed match, with a 5c floor.
+  const tolerance = Math.max(0.05, 0.01 * Number(completedMatches || 0));
+  if (Math.abs(drift) <= tolerance + 0.0001) {
     poolBanner.classList.add('hidden');
     poolBanner.textContent = '';
     return;
@@ -191,11 +269,37 @@ async function refresh() {
   const data = await callApi('/api/settlements');
   currentRows = data.rows || [];
   currentPayments = data.payments || [];
+  currentCompletedMatches = data.completed_matches || 0;
   expensesSummary.textContent = `Completed matches: ${data.completed_matches} | Entry fee: ${fmt(data.entry_fee)} | Balance = Net + Collected − Distributed.`;
-  renderSummaryRows(data);
+  applyView();
   renderPaymentsFeed(currentPayments);
-  renderPoolIntegrity(currentRows);
+  renderPoolIntegrity(currentRows, data.completed_matches);
 }
+
+searchInput?.addEventListener('input', (event) => {
+  searchQuery = event.target.value;
+  applyView();
+});
+
+statusFilter?.addEventListener('change', (event) => {
+  statusFilterValue = event.target.value;
+  applyView();
+});
+
+sortableHeaders.forEach((th) => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sortKey;
+    if (!key) return;
+    if (sortState.key === key) {
+      sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortState.key = key;
+      // numeric columns default to descending (largest first); text to asc.
+      sortState.dir = th.classList.contains('num') ? 'desc' : 'asc';
+    }
+    applyView();
+  });
+});
 
 async function handleSave() {
   const playerId = Number(paymentPlayerInput.value);
