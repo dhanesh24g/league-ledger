@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZDJLNDFYR9"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-ZDJLNDFYR9');
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>League Ledger Expenses</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/favicon.png">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    (function () {
+      try {
+        var token = localStorage.getItem("league-ledger-token");
+        if (!token) {
+          window.location.replace("/login");
+          return;
+        }
+        var key = "dhaneshlabs-theme";
+        var stored = localStorage.getItem(key);
+        var theme = (stored === "light" || stored === "dark")
+          ? stored
+          : (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { }
+    })();
+  </script>
+</head>
+
+<body class="ledger-page expenses-page">
+  <button id="theme-toggle" class="theme-toggle theme-toggle-segmented" type="button" aria-label="Theme setting">
+    <span class="theme-option" id="light-icon"><span class="theme-option-glyph">☀</span></span>
+    <span class="theme-option" id="dark-icon"><span class="theme-option-glyph">☾</span></span>
+  </button>
+
+  <header class="app-header">
+    <div class="header-content">
+      <a href="/welcome" class="brand brand-home-link" aria-label="Go to home">
+        <img src="/logo.png" alt="Dhanesh Labs logo" class="logo" />
+        <div class="brand-text">
+          <span class="brand-name">Dhanesh Labs</span>
+          <span class="app-name">Expenses</span>
+        </div>
+      </a>
+
+      <div class="header-center">
+        <select id="top-nav" aria-label="Quick navigation">
+          <option value="/welcome">Home</option>
+          <option value="/expenses">Expenses</option>
+          <option value="/stats">Stats Dashboard</option>
+          <option value="/league-settings">League Settings</option>
+        </select>
+      </div>
+
+      <div class="header-actions">
+        <div class="notification-wrapper">
+          <button id="notification-btn" class="notification-btn ghost" type="button" aria-label="Notifications">
+            <span class="notification-icon">🔔</span>
+            <span id="notification-badge" class="notification-badge hidden">0</span>
+          </button>
+          <div id="notification-dropdown" class="notification-dropdown hidden">
+            <div class="notification-header">
+              <h3>Notifications</h3>
+              <button id="clear-notifications" class="ghost small" type="button">Clear All</button>
+            </div>
+            <div id="notification-list" class="notification-list">
+              <p class="muted small">No new notifications</p>
+            </div>
+          </div>
+        </div>
+        <span id="auth-role" class="muted small"></span>
+        <button id="logout-btn" type="button" class="ghost">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <header class="shell-header">
+    <p>Track real-world cash settlement against the league pool. Admin records payments; everyone sees balances.</p>
+  </header>
+
+  <main class="shell-main">
+    <section class="panel active ledger-panel">
+      <div class="workflow-section-head">
+        <div>
+          <h2>Expenses &amp; Settlements</h2>
+          <p id="expenses-summary" class="muted">Balance = Net (Won − Spent) + Collected − Distributed.</p>
+        </div>
+        <button id="add-payment-btn" type="button" class="primary hidden">+ Record Payment</button>
+      </div>
+
+      <div id="pool-integrity-banner" class="hidden" role="status"
+        style="margin:12px 0;padding:12px 14px;border-radius:8px;border:1px solid rgba(238,82,83,0.45);background:rgba(238,82,83,0.12);color:#ee5253;font-size:0.9rem;line-height:1.4;">
+      </div>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Player</th>
+              <th>Spent</th>
+              <th>Won</th>
+              <th>Net</th>
+              <th>Collected</th>
+              <th>Distributed</th>
+              <th>Balance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="expenses-body"></tbody>
+        </table>
+      </div>
+
+      <div class="workflow-section-head" style="margin-top:24px;">
+        <div>
+          <h3>Payment History</h3>
+          <p class="muted small">All cash movements recorded so far. Admin can edit or remove entries.</p>
+        </div>
+      </div>
+      <div id="payments-feed" class="feed"></div>
+
+      <div class="flow-controls">
+        <a class="button-link ghost" href="/welcome">Back to Home</a>
+      </div>
+    </section>
+  </main>
+
+  <div id="payment-modal" class="scan-modal hidden" aria-hidden="true">
+    <div class="scan-modal-backdrop" data-close-payment-modal></div>
+    <section class="scan-modal-panel" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
+      <header class="scan-modal-head">
+        <div>
+          <span class="scan-modal-kicker">Settlement</span>
+          <h2 id="payment-modal-title">Record a payment</h2>
+          <p id="payment-modal-subtitle" class="muted small">Cash collected from a loser, or paid out to a winner.</p>
+        </div>
+        <button id="close-payment-modal" type="button" class="ghost" aria-label="Close"
+          data-close-payment-modal>✕</button>
+      </header>
+      <div class="scan-modal-body">
+        <form id="payment-form" class="match-form-grid">
+          <input type="hidden" id="payment_id">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="payment_player">Player</label>
+              <select id="payment_player" name="player_id" required></select>
+            </div>
+            <div class="form-group">
+              <label for="payment_direction">Direction</label>
+              <select id="payment_direction" name="direction" required>
+                <option value="collected">Collected (player paid in)</option>
+                <option value="distributed">Distributed (paid out to player)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="payment_amount">Amount</label>
+              <input type="number" id="payment_amount" name="amount" min="0" step="0.01" required>
+            </div>
+            <div class="form-group">
+              <label for="payment_paid_on">Paid On</label>
+              <input type="date" id="payment_paid_on" name="paid_on">
+            </div>
+          </div>
+          <div class="form-group full">
+            <label for="payment_note">Note (optional)</label>
+            <input type="text" id="payment_note" name="note" maxlength="300"
+              placeholder="e.g. UPI ref, cash, reminder note">
+          </div>
+        </form>
+      </div>
+      <footer class="scan-modal-foot">
+        <button id="payment-delete-btn" type="button" class="ghost hidden"
+          style="margin-right:auto;color:#ee5253;">Delete</button>
+        <button id="payment-cancel-btn" type="button" class="ghost" data-close-payment-modal>Cancel</button>
+        <button id="payment-save-btn" type="button" class="primary">Save Payment</button>
+      </footer>
+    </section>
+  </div>
+
+  <script type="module" src="/static/expenses.js"></script>
+</body>
+
+</html>

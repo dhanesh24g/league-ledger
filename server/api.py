@@ -46,6 +46,8 @@ from .schemas import (
     PlayerPayload,
     RefreshTokenPayload,
     ResetPasswordPayload,
+    SettlementPaymentPayload,
+    SettlementPaymentUpdatePayload,
     SignupPayload,
     TelegramConnectSessionPayload,
     TelegramNotifyMatchPayload,
@@ -61,14 +63,17 @@ from .integrations import (
 from .service import (
     add_match,
     add_player,
+    add_settlement_payment,
     cancel_match,
     create_telegram_connect_session,
     delete_player,
     delete_player_alias,
+    delete_settlement_payment,
     extract_winners_from_screenshot,
     get_ledger,
     get_match_winners,
     list_player_aliases,
+    list_settlements,
     reopen_match,
     get_stats,
     get_state,
@@ -81,6 +86,7 @@ from .service import (
     send_match_update_to_telegram,
     update_match,
     update_player_alias,
+    update_settlement_payment,
     upsert_league,
 )
 
@@ -204,6 +210,36 @@ def set_match_reopened(match_id: int, user: dict[str, Any] = Depends(require_adm
 @router.get("/ledger")
 def ledger(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, Any]:
     return get_ledger(user)
+
+
+@router.get("/settlements")
+def read_settlements(user: dict[str, Any] = Depends(require_active_member)) -> dict[str, Any]:
+    return list_settlements(user)
+
+
+@router.post("/settlements")
+def create_settlement_payment(
+    payload: SettlementPaymentPayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return add_settlement_payment(payload, user)
+
+
+@router.patch("/settlements/{payment_id}")
+def edit_settlement_payment(
+    payment_id: int,
+    payload: SettlementPaymentUpdatePayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return update_settlement_payment(payment_id, payload, user)
+
+
+@router.delete("/settlements/{payment_id}")
+def remove_settlement_payment(
+    payment_id: int,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, Any]:
+    return delete_settlement_payment(payment_id, user)
 
 
 @router.get("/stats")

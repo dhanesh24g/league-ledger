@@ -242,6 +242,12 @@ function openRouteChoiceModal(membership) {
         continueLabel: 'League Settings',
         description: 'Governance controls, roles policy and admin-level management.',
       },
+      {
+        route: '/expenses',
+        title: 'Open Expenses',
+        continueLabel: 'Expenses',
+        description: 'Track who still owes and who is owed; record cash collected or distributed.',
+      },
     ]
     : [
       {
@@ -255,6 +261,12 @@ function openRouteChoiceModal(membership) {
         title: 'Open League Details',
         continueLabel: 'League Details',
         description: 'League rules, players, matches, winner amounts and payout settings.',
+      },
+      {
+        route: '/expenses',
+        title: 'Open Expenses',
+        continueLabel: 'Expenses',
+        description: 'See your settlement balance and who still owes or is owed money.',
       },
     ];
   const routeMap = new Map(routeOptions.map((option) => [option.route, option]));
@@ -556,8 +568,8 @@ async function renderInvitePreview(user, inviteCode) {
         <h3>${wasRejected ? 'Previous Request Rejected' : 'Request Canceled'}</h3>
         <p class="muted">
           ${wasRejected
-            ? 'Your last request for this league was not approved. You can send a fresh request if you still want access.'
-            : 'Your earlier request was canceled. You can send a fresh request whenever you are ready.'}
+        ? 'Your last request for this league was not approved. You can send a fresh request if you still want access.'
+        : 'Your earlier request was canceled. You can send a fresh request whenever you are ready.'}
         </p>
         <div class="welcome-meta-row">
           <span class="welcome-meta-chip">${league.sport || 'Cricket'}</span>

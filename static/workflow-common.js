@@ -69,11 +69,13 @@ const HEADER_NAV_DESTINATIONS = [
   { value: '/welcome', label: 'Home' },
   { value: '/stats', label: 'Stats Dashboard' },
   { value: '/league-details', label: 'League Details' },
+  { value: '/expenses', label: 'Expenses' },
 ];
 const PAGE_LABEL_BY_ROUTE = {
   '/welcome': 'Home',
   '/stats': 'Stats Dashboard',
   '/league-details': 'League Details',
+  '/expenses': 'Expenses',
   '/setup': 'League Workflow',
   '/players': 'League Workflow',
   '/matches': 'League Workflow',
@@ -1150,7 +1152,11 @@ export async function initWorkflowShell(currentPath) {
     stepNav.classList.toggle('hidden', !isAdmin || directAdminFlow);
   }
   const canReadPlayers = currentPath === '/players';
-  if (!isAdmin && !canCreateFirstLeague && !canReadPlayers) {
+  // Pages that read-only members are explicitly allowed to view. The
+  // settlements API (`/api/settlements`) is `require_active_member`, so the
+  // Expenses page must be reachable by non-admin users too.
+  const canReadAsMember = ['/expenses'].includes(currentPath);
+  if (!isAdmin && !canCreateFirstLeague && !canReadPlayers && !canReadAsMember) {
     window.location.replace('/welcome');
     return null;
   }
