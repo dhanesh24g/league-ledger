@@ -657,11 +657,11 @@ function renderLadderModal() {
   bindInteractivePie(ladderModalBody, shares, (share) => {
     if (detailTarget) {
       detailTarget.innerHTML = renderLadderSliceDetails(share);
-      if (isMobileStatsViewport()) {
-        window.requestAnimationFrame(() => {
-          detailTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      }
+      // Previously this auto-scrolled the detail panel to the top of the
+      // viewport on mobile, which pushed the pie chart itself off-screen and
+      // forced the user to scroll back up. Instead, rely on the pie chart
+      // being sticky at the top of the modal body (see CSS) so tapping a
+      // slice updates the detail panel below while the chart stays visible.
     }
     ladderModalBody.querySelectorAll('[data-slice-trigger]').forEach((button) => {
       button.classList.toggle('is-active', String(button.getAttribute('data-slice-trigger')) === String(share.player_id));

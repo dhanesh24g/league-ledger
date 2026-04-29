@@ -4513,17 +4513,34 @@ th {
 
   .step-nav {
     display: grid;
-    grid-template-columns: 1fr;
+    /* Keep all workflow steps on a single row on mobile so the top of the
+       page isn't dominated by a tall vertical stack of buttons. */
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
   }
 
   .step-pill,
   .step-pill:first-child,
-  .step-pill:last-child {
+  .step-pill:last-child,
+  .setup-page .step-pill,
+  .players-page .step-pill,
+  .matches-page .step-pill,
+  .winners-page .step-pill,
+  .ledger-page .step-pill {
     clip-path: none;
-    border-radius: 12px;
+    border-radius: 10px;
     min-width: 0;
-    padding: 12px 14px;
+    padding: 8px 4px;
     margin-right: 0;
+    font-size: 11px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .flow-controls button {
@@ -7190,21 +7207,30 @@ th {
   }
 
   .setup-page .step-nav {
-    display: flex;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
     margin-bottom: 12px;
-    overflow-x: auto;
+    overflow-x: visible;
   }
 
   .setup-page .step-pill,
   .setup-page .step-pill:first-child,
   .setup-page .step-pill:last-child {
-    min-width: 126px;
-    padding: 10px 12px;
-    border-radius: 12px;
+    min-width: 0;
+    padding: 8px 4px;
+    border-radius: 10px;
     clip-path: none;
     margin: 0;
-    font-size: 13px;
+    font-size: 11px;
+    line-height: 1.15;
+    text-align: center;
+    white-space: normal;
+    word-break: break-word;
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .setup-page .setup-form-grid {
@@ -10568,27 +10594,59 @@ th {
 
   .stats-page .winner-rank-grid,
   .stats-page .winner-rank-grid-compact {
-    gap: 8px;
+    /* Pack rank cards tightly as a 3-column grid on mobile so users don't
+       have to scroll past a full-width card for every single rank. Cards
+       wrap to additional rows when more than 3 tiers exist. */
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex-direction: initial;
+    gap: 6px;
   }
 
   .stats-page .winner-rank-card {
-    padding: 12px 12px 14px;
-    gap: 10px;
+    padding: 10px 10px 12px;
+    gap: 6px;
+    border-radius: 10px;
   }
 
   .stats-page .winner-rank-head {
     flex-direction: column;
     align-items: flex-start;
     justify-content: flex-start;
-    gap: 8px;
+    gap: 4px;
   }
 
   .stats-page .winner-rank-head>div:first-child {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    min-width: 0;
+    gap: 6px;
+  }
+
+  .stats-page .winner-rank-head strong {
+    font-size: 12px;
+  }
+
+  .stats-page .rank-badge {
+    font-size: 16px;
+  }
+
+  .stats-page .winner-amount {
+    font-size: 11px;
+  }
+
+  .stats-page .winner-rank-meta {
+    gap: 4px;
+  }
+
+  .stats-page .winner-pill-row {
+    gap: 4px;
+  }
+
+  .stats-page .winner-pill {
+    font-size: 11px;
+    padding: 3px 7px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .stats-page .winner-rank-head strong {
@@ -10659,6 +10717,23 @@ th {
 
   .stats-page .ladder-modal-layout {
     gap: 10px;
+  }
+
+  /* Keep the pie chart pinned to the top of the modal body on mobile so that
+     tapping a slice updates the detail panel below without the chart
+     scrolling out of view. Reduce the chart footprint so both can coexist. */
+  .stats-page .ladder-modal-layout .pie-chart-shell-large {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--panel-bg, #0e1430);
+    padding: 6px 0 4px;
+    min-height: 0;
+    margin: 0 auto;
+  }
+
+  .stats-page .ladder-modal-layout .pie-chart-shell-large .pie-chart-svg {
+    width: min(100%, 220px);
   }
 
   .stats-page .pie-slice-detail-card,
