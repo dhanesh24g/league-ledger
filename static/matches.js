@@ -30,6 +30,15 @@ const selectAllParticipantsBtn = document.getElementById('select-all-participant
 const matchesBackLink = document.getElementById('matches-back-link');
 const matchesNextLink = document.getElementById('matches-next-link');
 const pageBrand = document.getElementById('page-brand');
+const matchEditModal = document.getElementById('match-edit-modal');
+const matchEditForm = document.getElementById('match-edit-form');
+const matchEditSaveBtn = document.getElementById('match-edit-save');
+const matchEditDateInput = document.getElementById('edit_match_date');
+const matchEditTeam1Input = document.getElementById('edit_team1');
+const matchEditTeam2Input = document.getElementById('edit_team2');
+const matchEditSubtitle = document.getElementById('match-edit-modal-subtitle');
+
+let editingMatchId = null;
 
 let authUser = { username: '', role: 'read' };
 let suppressDraftSync = false;
@@ -58,7 +67,7 @@ function formatMatchDateLabel(value) {
 }
 
 function setupMobileDateProxy(input) {
-  if (!input) return () => {};
+  if (!input) return () => { };
 
   const shell = document.createElement('div');
   shell.className = 'mobile-date-shell';
@@ -298,6 +307,10 @@ function renderMatches(matches) {
 
     const feedItem = document.createElement('div');
     feedItem.className = 'feed-item workflow-feed-item';
+    const isAdmin = authUser.league_role === 'admin';
+    const editButtonHtml = isAdmin
+      ? `<button type="button" class="ghost small match-edit-trigger" data-edit-match-id="${match.id}">Edit</button>`
+      : '';
     feedItem.innerHTML = `
       <div class="workflow-feed-head">
         <strong>${match.title}</strong>
@@ -305,6 +318,7 @@ function renderMatches(matches) {
           <span class="status-chip ${statusTone}">${match.status}</span>
           <span class="status-chip">${match.match_date}</span>
           <span class="status-chip">${participantNames.length || 0} players</span>
+          ${editButtonHtml}
         </div>
       </div>
       <div class="workflow-feed-meta">
@@ -313,7 +327,110 @@ function renderMatches(matches) {
       </div>
       <p class="muted small">Participants: ${participantPreview || 'Not captured'}${extraCount ? ` +${extraCount} more` : ''}</p>
     `;
+    const editBtn = feedItem.querySelector('.match-edit-trigger');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => openMatchEditModal(match));
+    }
     matchFeed.appendChild(feedItem);
+  });
+}
+
+function parseTitleTeams(title) {
+  const parts = String(title || '').split(/\s+vs\s+/i);
+  return {
+    team1: (parts[0] || '').trim(),
+    team2: (parts.slice(1).join(' vs ') || '').trim(),
+  };
+}
+
+function openMatchEditModal(match) {
+  if (!matchEditModal) return;
+  editingMatchId = match.id;
+  const { team1, team2 } = parseTitleTeams(match.title);
+  matchEditDateInput.value = match.match_date || '';
+  matchEditTeam1Input.value = team1;
+  matchEditTeam2Input.value = team2;
+  if (matchEditSubtitle) {
+    matchEditSubtitle.textContent = `Editing: ${match.title} (${match.match_date})`;
+  }
+  matchEditModal.classList.remove('hidden');
+  matchEditModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeMatchEditModal() {
+  if (!matchEditModal) return;
+  editingMatchId = null;
+  matchEditModal.classList.add('hidden');
+  matchEditModal.setAttribute('aria-hidden', 'true');
+}
+
+async function refreshMatchesState() {
+  const state = await callApi('/api/state');
+  currentLeague = state.league;
+  currentPlayers = state.players;
+  renderParticipantPicker();
+  renderMatches(state.matches);
+}
+
+async function handleMatchEditSave() {
+  if (!editingMatchId) return;
+  const matchId = editingMatchId;
+  const team1 = String(matchEditTeam1Input.value || '').trim().toUpperCase();
+  const team2 = String(matchEditTeam2Input.value || '').trim().toUpperCase();
+  const matchDate = String(matchEditDateInput.value || '').trim();
+
+  if (!team1 || !team2) {
+    showError('Both team names are required.');
+    return;
+  }
+  if (!matchDate) {
+    showError('Match date is required.');
+    return;
+  }
+
+  let closeLoading = null;
+  let restore = null;
+  try {
+    restore = setButtonLoading(matchEditSaveBtn, 'Saving...');
+    closeLoading = showLoading('Updating match...');
+    await callApi(`/api/matches/${matchId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        title: `${team1} vs ${team2}`,
+        match_date: matchDate,
+      }),
+    });
+    queueToast('Match updated.');
+    closeMatchEditModal();
+    await refreshMatchesState();
+  } catch (error) {
+    showError(error);
+  } finally {
+    if (restore) restore();
+    if (closeLoading) closeLoading();
+  }
+}
+
+if (matchEditModal) {
+  matchEditModal.querySelectorAll('[data-close-edit-modal]').forEach((el) => {
+    el.addEventListener('click', closeMatchEditModal);
+  });
+  matchEditSaveBtn?.addEventListener('click', handleMatchEditSave);
+  matchEditForm?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    handleMatchEditSave();
+  });
+  ['edit_team1', 'edit_team2'].forEach((id) => {
+    const input = document.getElementById(id);
+    input?.addEventListener('input', () => {
+      const upper = input.value.toUpperCase();
+      if (input.value !== upper) input.value = upper;
+    });
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !matchEditModal.classList.contains('hidden')) {
+      closeMatchEditModal();
+    }
   });
 }
 

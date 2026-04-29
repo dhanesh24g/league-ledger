@@ -177,6 +177,46 @@
     </section>
   </main>
 
+  <div id="match-edit-modal" class="scan-modal hidden" aria-hidden="true">
+    <div class="scan-modal-backdrop" data-close-edit-modal></div>
+    <section class="scan-modal-panel" role="dialog" aria-modal="true" aria-labelledby="match-edit-modal-title">
+      <header class="scan-modal-head">
+        <div>
+          <span class="scan-modal-kicker">Edit Match</span>
+          <h2 id="match-edit-modal-title">Update match details</h2>
+          <p id="match-edit-modal-subtitle" class="muted small">Fix typos in the date or opponents.</p>
+        </div>
+        <button id="close-match-edit-modal" type="button" class="ghost" aria-label="Close"
+          data-close-edit-modal>✕</button>
+      </header>
+      <div class="scan-modal-body">
+        <form id="match-edit-form" class="match-form-grid">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="edit_match_date">Match Date</label>
+              <input type="date" id="edit_match_date" name="match_date" required>
+            </div>
+            <div class="match-vs-inline">
+              <div class="team-input-group">
+                <label for="edit_team1">Home Team</label>
+                <input type="text" id="edit_team1" name="team1" placeholder="Enter team name" required>
+              </div>
+              <div class="vs-divider"><span>VS</span></div>
+              <div class="team-input-group">
+                <label for="edit_team2">Away Team</label>
+                <input type="text" id="edit_team2" name="team2" placeholder="Enter team name" required>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+      <footer class="scan-modal-foot">
+        <button id="match-edit-cancel" type="button" class="ghost" data-close-edit-modal>Cancel</button>
+        <button id="match-edit-save" type="button" class="primary">Save Changes</button>
+      </footer>
+    </section>
+  </div>
+
   <script type="module" src="/static/matches.js"></script>
 </body>
 

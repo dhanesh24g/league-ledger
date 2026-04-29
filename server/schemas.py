@@ -26,6 +26,11 @@ class MatchPayload(BaseModel):
     participant_ids: list[int] = Field(default_factory=list)
 
 
+class MatchUpdatePayload(BaseModel):
+    title: str | None = Field(default=None, min_length=2, max_length=150)
+    match_date: str | None = Field(default=None, min_length=4, max_length=40)
+
+
 class RankWinners(BaseModel):
     rank: int = Field(ge=1, le=20)
     player_ids: list[int] = Field(default_factory=list)
