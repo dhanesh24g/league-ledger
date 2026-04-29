@@ -564,7 +564,7 @@ function persistWinnerDraft(matchId) {
   setWinnerDraft(matchId, { ranks });
 }
 
-function createWinnerInputRow(rowsContainer, onUpdate, initialName = '') {
+function createWinnerInputRow(rowsContainer, onUpdate, initialName = '', insertAfterRow = null) {
   const row = document.createElement('div');
   row.className = 'rank-select-row';
 
@@ -647,6 +647,16 @@ function createWinnerInputRow(rowsContainer, onUpdate, initialName = '') {
   combo.appendChild(input);
   combo.appendChild(menu);
 
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'ghost add-winner-inline';
+  addBtn.textContent = '+ Add Winner';
+  addBtn.addEventListener('click', () => {
+    const nextRow = createWinnerInputRow(rowsContainer, onUpdate, '', row);
+    nextRow.querySelector('input[type="text"]')?.focus();
+    onUpdate();
+  });
+
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className = 'remove';
@@ -654,16 +664,25 @@ function createWinnerInputRow(rowsContainer, onUpdate, initialName = '') {
   removeBtn.title = 'Remove winner row';
   removeBtn.setAttribute('aria-label', 'Remove winner row');
   removeBtn.addEventListener('click', () => {
+    const fallbackRow = row.nextElementSibling || row.previousElementSibling;
     row.remove();
     if (!rowsContainer.children.length) {
-      createWinnerInputRow(rowsContainer, onUpdate);
+      const replacementRow = createWinnerInputRow(rowsContainer, onUpdate);
+      replacementRow.querySelector('input[type="text"]')?.focus();
+    } else {
+      fallbackRow?.querySelector('input[type="text"]')?.focus();
     }
     onUpdate();
   });
 
   row.appendChild(combo);
+  row.appendChild(addBtn);
   row.appendChild(removeBtn);
-  rowsContainer.appendChild(row);
+  if (insertAfterRow && insertAfterRow.parentElement === rowsContainer) {
+    insertAfterRow.after(row);
+  } else {
+    rowsContainer.appendChild(row);
+  }
   return row;
 }
 
@@ -917,20 +936,10 @@ function renderWinnerForm(matchId) {
     const rowsContainer = document.createElement('div');
     rowsContainer.className = 'stack';
 
-    const addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'ghost';
-    addBtn.textContent = '+ Add Winner';
-    addBtn.addEventListener('click', () => {
-      createWinnerInputRow(rowsContainer, onWinnerChange);
-      onWinnerChange();
-    });
-
     createWinnerInputRow(rowsContainer, onWinnerChange);
 
     card.appendChild(title);
     card.appendChild(rowsContainer);
-    card.appendChild(addBtn);
     winnersForm.appendChild(card);
   }
 

@@ -4221,14 +4221,17 @@ button {
 
 .rank-select-row {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 10px;
   margin-top: 10px;
+  align-items: center;
 }
 
-.rank-select-row .remove {
+.rank-select-row .remove,
+.rank-select-row .add-winner-inline {
   background: var(--panel-2);
   color: var(--text);
+  white-space: nowrap;
 }
 
 .muted {
@@ -4939,7 +4942,7 @@ th {
 }
 
 .rank-select-row {
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
   margin-top: 0;
 }
@@ -4949,15 +4952,10 @@ th {
   width: 100%;
 }
 
-.rank-select-row .remove {
+.rank-select-row .remove,
+.rank-select-row .add-winner-inline {
   white-space: nowrap;
   padding: 10px 14px;
-}
-
-.rank-card>.ghost {
-  justify-self: start;
-  margin-top: 2px;
-  padding: 8px 14px;
 }
 
 @media (max-width: 900px) {
@@ -4978,13 +4976,39 @@ th {
 
 @media (max-width: 760px) {
 
-  .payout-row,
-  .rank-select-row {
+  .payout-row {
     grid-template-columns: 1fr;
   }
 
-  .rank-card>.ghost {
-    justify-self: stretch;
+  /* Keep the winner name input and the trash button on the SAME row on
+     mobile so each rank produces a single tidy row per winner instead of
+     stacking the input above its own delete button. */
+  .rank-select-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .winners-page .rank-select-row .remove,
+  .winners-page .rank-select-row .add-winner-inline {
+    padding: 8px 10px;
+    min-height: 38px;
+  }
+
+  /* Reduce vertical padding/headings inside each rank card so an entire
+     rank with one or two winners fits without extra scrolling. */
+  .winners-page .rank-card {
+    padding: 10px;
+    gap: 6px;
+  }
+
+  .winners-page .rank-card h4 {
+    font-size: 13px;
+    margin-bottom: 2px;
+  }
+
+  .winners-page .rank-select-row .add-winner-inline {
+    font-size: 12px;
   }
 }
 
@@ -5853,15 +5877,6 @@ th {
     font-size: 22px;
   }
 
-  .top-earner-row {
-    grid-template-columns: auto 1fr;
-  }
-
-  .top-earner-amount {
-    grid-column: 2;
-    justify-self: start;
-  }
-
   .chart-lane,
   .rank-distribution-row,
   .zoom-board-lane {
@@ -6704,10 +6719,12 @@ th {
     grid-template-columns: 1fr;
   }
 
+  /* Note: .rank-select-row and .rank-distribution-row intentionally NOT
+     in this list — they keep multi-column layouts on mobile so winner
+     inputs (input + delete button) and rank distribution rows
+     (label | bar | count) stay on a single row. See rules above. */
   .payout-row,
-  .rank-select-row,
   .chart-lane,
-  .rank-distribution-row,
   .zoom-board-lane {
     grid-template-columns: 1fr;
   }
@@ -8518,9 +8535,12 @@ th {
 }
 
 .stats-page .winner-rank-grid-compact {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  /* Keep the winners pane compact on desktop by always packing two rank
+     cards per row. The mobile media query overrides this further down. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
 }
 
 .stats-page .winner-rank-card {
@@ -8535,14 +8555,41 @@ th {
 
 .stats-page .winner-rank-head {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+  justify-content: flex-start;
+  /* Top-align so when the rank label wraps to two lines, the medal sits
+     beside the FIRST line instead of getting vertically centered into a
+     visible gap below the badge. */
+  align-items: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Ensure the medal badge and rank label stay on one inline group so they
+   never break apart vertically (e.g. badge on row 1, "Champion" on row 2).
+   min-width: 0 allows the strong to shrink/wrap inside narrow cards. */
+.stats-page .winner-rank-head>div:first-child {
+  display: inline-flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  flex: 0 1 auto;
+  text-align: left;
 }
 
 .stats-page .winner-rank-head strong {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 1.15;
+  /* Wrap on word boundaries only — keeps "Runner-up" intact instead of
+     splitting at the hyphen, and "Third place" wraps cleanly between words. */
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+  min-width: 0;
+  text-align: left;
 }
 
 .stats-page .winner-rank-meta {
@@ -8553,7 +8600,13 @@ th {
 }
 
 .stats-page .rank-badge {
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.15;
+  flex: 0 0 auto;
+  margin-right: 0;
+  /* Tiny vertical nudge so the medal centers visually with the first line
+     of the rank label (emoji rendering box is taller than the cap height). */
+  margin-top: -1px;
 }
 
 .stats-page .leaderboard-chart {
@@ -10313,6 +10366,7 @@ th {
   }
 
   .stats-page .winner-rank-grid,
+  .stats-page .winner-rank-grid-compact,
   .stats-page .pie-slice-detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -10347,6 +10401,74 @@ th {
   }
 }
 
+@media (min-width: 761px) and (max-width: 1180px),
+  (min-width: 1181px) and (max-width: 1368px) and (hover: none),
+  (min-width: 1181px) and (max-width: 1368px) and (pointer: coarse) {
+  /* Tablet / foldable range: the page is wider than phone, but still too
+     narrow for the fully desktop multi-panel layout. Relax the hardcoded
+     desktop column splits here without touching the phone rules below. */
+  .stats-page .stats-pulse-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stats-page .stats-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stats-page .stats-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .stats-page .stats-overview-column-middle {
+    grid-template-rows: auto;
+  }
+
+  .stats-page .stats-current-user-card {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-self: stretch;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-row {
+    gap: 6px;
+    padding: 8px 9px;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-row strong,
+  .stats-page .stats-feature-card .stats-leader-row span {
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-row strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stats-page .stats-duo-layout,
+  .stats-page .match-spotlight-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-page .match-spotlight-layout {
+    gap: 14px;
+    height: auto;
+  }
+
+  .stats-page .winner-rank-grid,
+  .stats-page .winner-rank-grid-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 760px) {
   .dashboard-modal {
     padding: 10px;
@@ -10376,11 +10498,17 @@ th {
   .stats-page .stats-overview,
   .stats-page .stats-duo-layout,
   .stats-page .match-summary-strip,
-  .stats-page .player-metric-grid,
-  .stats-page .player-metric-stack,
   .stats-page .winner-rank-grid,
   .stats-page .pie-slice-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Player metric cards (Played / Wins / Eligible Payout / etc.) keep two
+     per row on phones so the player snapshot stays compact instead of
+     stacking 6+ full-width cards vertically. */
+  .stats-page .player-metric-grid,
+  .stats-page .player-metric-stack {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .stats-page .stats-duo-layout {
@@ -10548,8 +10676,94 @@ th {
     min-width: 0;
   }
 
+  /* Keep two metric cards per row on mobile (Played / Winning Matches /
+     Best / Total Won …) instead of stacking 5+ full-width rows. The wide
+     "Eligible Payout" card spans both columns thanks to its existing
+     `grid-column: 1 / -1` rule. */
   .stats-page .stats-current-user-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* League Pulse KPI strip — uniformly 2 per row on mobile (including the
+     featured Eligible Payout card). Four KPIs → two tidy rows of two,
+     no full-width spans, so the section ends quickly without dominating
+     the screen. The payout card still keeps its colored treatment via
+     the .stats-kpi-card-payout class. */
+  .stats-page .stats-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stats-page .stats-summary-strip .stats-kpi-card-payout {
+    grid-column: auto;
+  }
+
+  .stats-page .stats-summary-strip .summary-chip {
+    padding: 8px 10px;
+    min-width: 0;
+  }
+
+  .stats-page .stats-summary-strip .summary-chip-label {
+    font-size: 10px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .stats-page .stats-summary-strip .summary-chip strong {
+    font-size: 14px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+  }
+
+  /* Top 3 Earners — pack all three into a single row on mobile. Parent
+     becomes a 3-column grid; each row becomes a vertical mini-card with
+     medal on top, name in the middle, amount underneath. Smaller fonts
+     so even long usernames fit at ~120 px per cell on a 360 px screen. */
+  .stats-page .top-earner-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .stats-page .top-earner-row {
     grid-template-columns: 1fr;
+    grid-auto-flow: row;
+    justify-items: center;
+    text-align: center;
+    gap: 2px;
+    padding: 8px 6px;
+  }
+
+  .stats-page .top-earner-row strong {
+    font-size: 11px;
+    line-height: 1.15;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    max-width: 100%;
+  }
+
+  .stats-page .top-earner-rank {
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .stats-page .top-earner-row .top-earner-amount {
+    grid-column: auto;
+    justify-self: center;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .stats-page .stats-current-user-metric {
+    padding: 8px 10px;
+  }
+
+  .stats-page .stats-current-user-metric span {
+    font-size: 10px;
+  }
+
+  .stats-page .stats-current-user-metric strong {
+    font-size: 13px;
   }
 
   .stats-page .summary-chip,
@@ -10624,15 +10838,17 @@ th {
   }
 
   .stats-page .winner-rank-head>div:first-child {
-    gap: 6px;
+    gap: 3px;
   }
 
   .stats-page .winner-rank-head strong {
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.1;
+    white-space: nowrap;
   }
 
   .stats-page .rank-badge {
-    font-size: 16px;
+    font-size: 14px;
   }
 
   .stats-page .winner-amount {
@@ -10658,11 +10874,6 @@ th {
     line-height: 1.25;
   }
 
-  .stats-page .winner-rank-head strong {
-    font-size: 13px;
-    line-height: 1.25;
-  }
-
   .stats-page .winner-rank-meta {
     width: 100%;
     justify-content: flex-start;
@@ -10678,9 +10889,46 @@ th {
     max-width: 100%;
   }
 
-  .stats-page .chart-lane,
-  .stats-page .rank-distribution-row {
+  .stats-page .stats-feature-card .stats-leader-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-row {
+    gap: 6px;
+    padding: 8px 9px;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-row strong,
+  .stats-page .stats-feature-card .stats-leader-row span {
+    font-size: 12px;
+    line-height: 1.15;
+  }
+
+  .stats-page .stats-feature-card .stats-leader-row strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stats-page .chart-lane {
     grid-template-columns: 1fr;
+  }
+
+  /* Compact: keep label, progress bar, and count on a single row instead of
+     three stacked rows per rank (saves a lot of vertical space). */
+  .stats-page .rank-distribution-row {
+    grid-template-columns: minmax(80px, max-content) minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .stats-page .rank-distribution-label {
+    font-size: 11px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .stats-page .chart-player-avatar,
