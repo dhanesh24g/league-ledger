@@ -52,6 +52,7 @@ const payoutController = createPayoutController({
 });
 const matchDateInput = matchForm?.elements.match_date;
 const syncMatchDateProxy = setupMobileDateProxy(matchDateInput);
+const syncMatchEditDateProxy = setupMobileDateProxy(matchEditDateInput);
 
 function formatMatchDateLabel(value) {
   if (!value) return 'Select match date';
@@ -150,6 +151,7 @@ function syncParticipantSummary() {
   if (!totalPlayers) {
     participantCount.textContent = 'Add players first to build a match roster.';
     renderParticipantBasket([]);
+    updateParticipantHeaderSummary(0, 0);
     return;
   }
 
@@ -158,6 +160,17 @@ function syncParticipantSummary() {
     : 'Select at least two players for this match.';
 
   renderParticipantBasket(selectedIds);
+  updateParticipantHeaderSummary(selectedIds.length, totalPlayers);
+}
+
+function updateParticipantHeaderSummary(selectedCount, totalCount) {
+  const summaryEl = document.getElementById('participant-summary');
+  if (!summaryEl) return;
+  if (!totalCount) {
+    summaryEl.textContent = '';
+    return;
+  }
+  summaryEl.textContent = `(${selectedCount}/${totalCount} selected)`;
 }
 
 function applyEntryModeUI() {
@@ -281,6 +294,9 @@ function persistDraft() {
   setMatchDraft(getDraftPayload());
 }
 
+const MATCHES_COLLAPSE_LIMIT = 3;
+let matchesExpanded = false;
+
 function renderMatches(matches) {
   matchFeed.innerHTML = '';
 
@@ -289,7 +305,11 @@ function renderMatches(matches) {
     return;
   }
 
-  matches.forEach((match) => {
+  const visibleMatches = matchesExpanded
+    ? matches
+    : matches.slice(0, MATCHES_COLLAPSE_LIMIT);
+
+  visibleMatches.forEach((match) => {
     const count = match.winner_count || currentLeague?.default_winner_count || 0;
     const payoutMode = match.payouts && Object.keys(match.payouts).length ? 'Custom payout' : 'Default payout';
     const participantNames = Array.isArray(match.participant_ids)
@@ -333,6 +353,27 @@ function renderMatches(matches) {
     }
     matchFeed.appendChild(feedItem);
   });
+
+  if (matches.length > MATCHES_COLLAPSE_LIMIT) {
+    const controls = document.createElement('div');
+    controls.className = 'feed-collapse-controls';
+    const hidden = matches.length - MATCHES_COLLAPSE_LIMIT;
+    const label = matchesExpanded
+      ? `Show fewer matches`
+      : `Show all ${matches.length} matches (+${hidden} more)`;
+    const chevron = matchesExpanded ? '▴' : '▾';
+    controls.innerHTML = `
+      <button type="button" class="collapse-toggle" aria-expanded="${matchesExpanded}">
+        <span>${label}</span>
+        <span class="collapse-chevron" aria-hidden="true">${chevron}</span>
+      </button>
+    `;
+    controls.querySelector('button').addEventListener('click', () => {
+      matchesExpanded = !matchesExpanded;
+      renderMatches(matches);
+    });
+    matchFeed.appendChild(controls);
+  }
 }
 
 function parseTitleTeams(title) {
@@ -348,6 +389,7 @@ function openMatchEditModal(match) {
   editingMatchId = match.id;
   const { team1, team2 } = parseTitleTeams(match.title);
   matchEditDateInput.value = match.match_date || '';
+  syncMatchEditDateProxy();
   matchEditTeam1Input.value = team1;
   matchEditTeam2Input.value = team2;
   if (matchEditSubtitle) {
@@ -477,6 +519,25 @@ selectAllParticipantsBtn.addEventListener('click', () => {
   const allPlayerIds = currentPlayers.map((player) => Number(player.id));
   applyParticipantSelection(allPlayerIds);
   renderParticipantBasket(allPlayerIds, { animate: true });
+  // Auto-expand when admin takes a roster action.
+  expandParticipantsSection();
+});
+
+const participantsSection = document.getElementById('participants-section');
+const participantsToggleBtn = document.getElementById('participants-toggle');
+function setParticipantsCollapsed(collapsed) {
+  if (!participantsSection || !participantsToggleBtn) return;
+  participantsSection.classList.toggle('is-collapsed', collapsed);
+  participantsToggleBtn.setAttribute('aria-expanded', String(!collapsed));
+  const labelEl = participantsToggleBtn.querySelector('.collapse-label');
+  if (labelEl) labelEl.textContent = collapsed ? 'Manage' : 'Hide';
+}
+function expandParticipantsSection() {
+  setParticipantsCollapsed(false);
+}
+participantsToggleBtn?.addEventListener('click', () => {
+  const isCollapsed = participantsSection?.classList.contains('is-collapsed');
+  setParticipantsCollapsed(!isCollapsed);
 });
 
 enableOverrides.addEventListener('change', () => toggleOverrideSection(enableOverrides.checked));
