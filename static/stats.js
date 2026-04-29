@@ -2,6 +2,7 @@ import {
   callApi,
   clearAuthStorage,
   ensureLeagueSwitcher,
+  initCollapsibles,
   initThemeToggle,
   populateHeaderIdentity,
   refreshHeaderCommandMenu,
@@ -617,23 +618,23 @@ function renderLadderModal() {
     <div class="ladder-modal-layout">
       <div class="pie-chart-shell pie-chart-shell-large">
         ${renderPieChart(shares, {
-          size: 380,
-          radius: 142,
-          innerRadius: 78,
-          label: currentPlayer ? 'Your Payout' : 'Top Earners',
-          centerValue: formatCurrency(currentEligiblePayout),
-          centerSubValue: currentPlayer ? `Win rate ${currentWinRate}` : currentWinRate,
-          totalAmount,
-          interactive: true,
-        })}
+    size: 380,
+    radius: 142,
+    innerRadius: 78,
+    label: currentPlayer ? 'Your Payout' : 'Top Earners',
+    centerValue: formatCurrency(currentEligiblePayout),
+    centerSubValue: currentPlayer ? `Win rate ${currentWinRate}` : currentWinRate,
+    totalAmount,
+    interactive: true,
+  })}
       </div>
       <div class="pie-detail-panel">
         <div id="ladder-slice-detail" class="pie-slice-detail-shell"></div>
         <div class="zoom-board pie-detail-list">
           ${shares.length ? shares.map((share) => {
-            const eligiblePayout = Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee);
-            const payoutTone = getEligiblePayoutTone(eligiblePayout);
-            return `
+    const eligiblePayout = Number(share.total_amount || 0) - (Number(share.matches_played || 0) * entryFee);
+    const payoutTone = getEligiblePayoutTone(eligiblePayout);
+    return `
             <button type="button" class="zoom-board-row pie-detail-row pie-detail-button pie-detail-button-${payoutTone}" data-slice-trigger="${share.player_id}">
               <div class="pie-legend-chip" style="--slice-color:${share.color};"></div>
               <div>
@@ -646,7 +647,7 @@ function renderLadderModal() {
               </div>
             </button>
           `;
-          }).join('') : '<div class="feed-item">No payout data available yet.</div>'}
+  }).join('') : '<div class="feed-item">No payout data available yet.</div>'}
         </div>
       </div>
     </div>
@@ -850,14 +851,14 @@ function renderLeaderboardChart() {
     <button id="open-ladder-modal" type="button" class="pie-chart-button pie-chart-button-block ladder-chart-trigger" aria-label="Open league ladder deep dive">
       <div class="pie-chart-shell pie-chart-shell-plain">
         ${renderPieChart(shares, {
-          size: 420,
-          radius: 160,
-          innerRadius: 88,
-          label: currentPlayer ? 'Your Payout' : 'Top Earners',
-          centerValue: formatCurrency(currentEligiblePayout),
-          centerSubValue: currentPlayer ? `Win rate ${currentWinRate}` : currentWinRate,
-          totalAmount,
-        })}
+    size: 420,
+    radius: 160,
+    innerRadius: 88,
+    label: currentPlayer ? 'Your Payout' : 'Top Earners',
+    centerValue: formatCurrency(currentEligiblePayout),
+    centerSubValue: currentPlayer ? `Win rate ${currentWinRate}` : currentWinRate,
+    totalAmount,
+  })}
       </div>
     </button>
   `;
@@ -1244,6 +1245,7 @@ async function init() {
   initNotifications();
   setupHeader();
   setupModal();
+  initCollapsibles();
   renderLoadingState();
 
   const profile = await callApi('/api/auth/me');

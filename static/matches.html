@@ -128,18 +128,27 @@
           </div>
         </div>
 
-        <div class="full soft-box">
+        <div class="full soft-box collapsible is-collapsed" id="participants-section">
           <div class="line-head">
             <div>
-              <h3>Who Is Playing?</h3>
+              <h3>Who Is Playing? <span id="participant-summary" class="collapse-summary"></span></h3>
               <p class="muted small">These players will be charged entry, appear in history, and be eligible for
                 winners.</p>
             </div>
-            <button type="button" id="select-all-participants" class="ghost">Select All Players</button>
+            <div class="workflow-chip-row" style="gap:8px;">
+              <button type="button" id="select-all-participants" class="ghost">Select All Players</button>
+              <button type="button" id="participants-toggle" class="collapse-toggle" aria-expanded="false"
+                aria-controls="participants-body">
+                <span class="collapse-label">Manage</span>
+                <span class="collapse-chevron" aria-hidden="true">▾</span>
+              </button>
+            </div>
           </div>
-          <div id="participant-picker" class="participant-picker"></div>
-          <p id="participant-count" class="muted small"></p>
-          <div id="participant-basket" class="participant-basket hidden" aria-live="polite"></div>
+          <div id="participants-body" class="collapse-body">
+            <div id="participant-picker" class="participant-picker"></div>
+            <p id="participant-count" class="muted small"></p>
+            <div id="participant-basket" class="participant-basket hidden" aria-live="polite"></div>
+          </div>
         </div>
 
         <label class="full toggle">

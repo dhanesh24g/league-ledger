@@ -91,40 +91,80 @@
   </header>
 
   <main class="shell-main">
-    <section class="panel active stats-panel stats-panel-overview">
-      <h2>League Pulse</h2>
-      <p class="muted">A quick read on the current leaders, money table, and how the season is unfolding.</p>
-      <div class="stats-pulse-layout">
-        <div id="stats-summary-strip" class="stats-summary-strip"></div>
-        <div id="stats-overview" class="stats-overview"></div>
+    <section class="panel active stats-panel stats-panel-overview collapsible">
+      <div class="panel-collapse-head">
+        <div>
+          <h2>League Pulse</h2>
+          <p class="muted">A quick read on the current leaders, money table, and how the season is unfolding.</p>
+        </div>
+        <button type="button" class="collapse-toggle panel-collapse-toggle" aria-expanded="true">
+          <span class="collapse-label">Hide</span>
+          <span class="collapse-chevron" aria-hidden="true">▾</span>
+        </button>
+      </div>
+      <div class="collapse-body">
+        <div class="stats-pulse-layout">
+          <div id="stats-summary-strip" class="stats-summary-strip"></div>
+          <div id="stats-overview" class="stats-overview"></div>
+        </div>
       </div>
     </section>
 
     <div class="stats-duo-layout">
-      <section class="panel active stats-panel">
-        <h2>Match Winners</h2>
-        <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
-        <div class="inline-form">
-          <select id="match-filter"></select>
+      <section class="panel active stats-panel collapsible is-collapsed">
+        <div class="panel-collapse-head">
+          <div>
+            <h2>Match Winners</h2>
+            <p class="muted">Read every match like a mini scoreboard with champions, payouts, and refund signals.</p>
+          </div>
+          <button type="button" class="collapse-toggle panel-collapse-toggle" aria-expanded="false">
+            <span class="collapse-label">Show</span>
+            <span class="collapse-chevron" aria-hidden="true">▾</span>
+          </button>
         </div>
-        <div id="match-winners-card" class="feed"></div>
+        <div class="collapse-body">
+          <div class="inline-form">
+            <select id="match-filter"></select>
+          </div>
+          <div id="match-winners-card" class="feed"></div>
+        </div>
       </section>
 
-      <section class="panel active stats-panel stats-panel-spaced">
-        <h2>League Ladder</h2>
-        <p class="muted">Payout split at a glance. Tap for player details.</p>
-        <div id="leaderboard-chart" class="leaderboard-chart"></div>
+      <section class="panel active stats-panel stats-panel-spaced collapsible is-collapsed">
+        <div class="panel-collapse-head">
+          <div>
+            <h2>League Ladder</h2>
+            <p class="muted">Payout split at a glance. Tap for player details.</p>
+          </div>
+          <button type="button" class="collapse-toggle panel-collapse-toggle" aria-expanded="false">
+            <span class="collapse-label">Show</span>
+            <span class="collapse-chevron" aria-hidden="true">▾</span>
+          </button>
+        </div>
+        <div class="collapse-body">
+          <div id="leaderboard-chart" class="leaderboard-chart"></div>
+        </div>
       </section>
     </div>
 
     <div class="stats-duo-layout stats-duo-layout-single">
-      <section class="panel active stats-panel stats-panel-spaced">
-        <h2>Player Performance</h2>
-        <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
-        <div class="inline-form">
-          <select id="player-filter"></select>
+      <section class="panel active stats-panel stats-panel-spaced collapsible is-collapsed">
+        <div class="panel-collapse-head">
+          <div>
+            <h2>Player Performance</h2>
+            <p class="muted">Drill into each player with matches played, wins, washouts, and money won.</p>
+          </div>
+          <button type="button" class="collapse-toggle panel-collapse-toggle" aria-expanded="false">
+            <span class="collapse-label">Show</span>
+            <span class="collapse-chevron" aria-hidden="true">▾</span>
+          </button>
         </div>
-        <div id="player-stats-card" class="feed"></div>
+        <div class="collapse-body">
+          <div class="inline-form">
+            <select id="player-filter"></select>
+          </div>
+          <div id="player-stats-card" class="feed"></div>
+        </div>
       </section>
     </div>
   </main>

@@ -11142,7 +11142,9 @@ th {
   .telegram-modal-panel {
     width: 100%;
     max-height: none;
-    min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 22px);
+    /* Hug content rather than stretching to viewport so footer buttons sit
+       directly under the form instead of being pushed to the bottom. */
+    min-height: auto;
     padding: 12px;
     border-radius: 18px;
   }
@@ -11516,7 +11518,22 @@ th {
   .scan-modal-panel {
     width: 100%;
     max-height: none;
-    min-height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 22px);
+    /* Fit content rather than stretching to fill the viewport so the footer
+       buttons (Save / Cancel) appear right below the form, not pushed to
+       the bottom of the screen with a huge empty gap. */
+    min-height: auto;
+    /* Make sure grid item doesn't stretch to fill the implicit track even
+       if a parent rule sets align-items: stretch elsewhere. */
+    align-self: start;
+    height: auto;
+  }
+
+  /* Body inside the scan modal must NOT use flex:1 on mobile, otherwise it
+     grows beyond its content height when the panel fits inside the
+     viewport, leaving an empty gap above the footer buttons. */
+  .scan-modal-body {
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .scan-row {
@@ -11722,6 +11739,113 @@ th {
   .alias-row-actions {
     justify-content: flex-end;
   }
+}
+
+/* ---------- Mobile global form-input upgrade ----------
+   Anything < 16px triggers an automatic page zoom on iOS Safari when an
+   input is focused, which jolts the layout and is annoying. Bumping every
+   text-like input to 16px on mobile prevents that. Selects / number / date
+   inputs are included so behavior is uniform across the app. */
+@media (max-width: 760px) {
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ---------- Collapsible sections (industry-standard pattern) ----------
+   Lightweight, no-JS-required collapse: wrap the toggle button in a
+   `.collapse-head`, the body in `.collapse-body`, and toggle the
+   `is-collapsed` class on the parent container.  */
+
+.collapse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.15));
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.collapse-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.collapse-toggle .collapse-chevron {
+  display: inline-block;
+  transition: transform 0.18s ease;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.is-collapsed>.collapse-body,
+.collapsible.is-collapsed>.collapse-body {
+  display: none;
+}
+
+.is-collapsed .collapse-toggle .collapse-chevron,
+.collapsible.is-collapsed .collapse-toggle .collapse-chevron {
+  transform: rotate(-90deg);
+}
+
+.collapse-summary {
+  font-size: 0.85rem;
+  color: var(--muted, rgba(255, 255, 255, 0.6));
+  margin-left: 6px;
+}
+
+/* Section header with title block on the left and a collapse toggle on
+   the right. Used by .panel.collapsible sections (settings, stats, etc.). */
+.panel-collapse-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.panel-collapse-head>div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.panel-collapse-head h2 {
+  margin: 0 0 4px;
+}
+
+.panel-collapse-head p {
+  margin: 0;
+}
+
+.panel-collapse-toggle {
+  flex: 0 0 auto;
+  align-self: center;
+}
+
+.collapsible.is-collapsed .panel-collapse-head {
+  margin-bottom: 0;
+}
+
+/* "Show more" pill for feed lists */
+.feed-collapse-controls {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+}
+
+.feed-collapse-controls .collapse-toggle {
+  padding: 8px 16px;
+  font-size: 0.85rem;
 }
 
 /* ---------- Match Edit Modal (mobile polish) ---------- */

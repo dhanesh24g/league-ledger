@@ -1,5 +1,6 @@
 import {
   callApi,
+  initCollapsibles,
   initWorkflowShell,
   registerMobileSelectProxy,
   setButtonLoading,
@@ -297,6 +298,8 @@ async function init() {
 
   currentUser = await initWorkflowShell('/league-settings');
   if (!currentUser) return;
+
+  initCollapsibles();
 
   const [membersResult, requestsResult] = await Promise.all([
     callApi('/api/league/members'),

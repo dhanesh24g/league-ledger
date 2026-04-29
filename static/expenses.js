@@ -155,13 +155,19 @@ function applyView() {
   }
 }
 
+const PAYMENTS_COLLAPSE_LIMIT = 3;
+let paymentsExpanded = false;
+
 function renderPaymentsFeed(payments) {
   paymentsFeed.innerHTML = '';
   if (!payments.length) {
     paymentsFeed.innerHTML = '<div class="feed-item">No payments recorded yet.</div>';
     return;
   }
-  payments.forEach((entry) => {
+  const visible = paymentsExpanded
+    ? payments
+    : payments.slice(0, PAYMENTS_COLLAPSE_LIMIT);
+  visible.forEach((entry) => {
     const item = document.createElement('div');
     item.className = 'feed-item workflow-feed-item';
     const directionLabel = entry.direction === 'collected' ? 'Collected from' : 'Distributed to';
@@ -187,6 +193,27 @@ function renderPaymentsFeed(payments) {
     }
     paymentsFeed.appendChild(item);
   });
+
+  if (payments.length > PAYMENTS_COLLAPSE_LIMIT) {
+    const controls = document.createElement('div');
+    controls.className = 'feed-collapse-controls';
+    const hidden = payments.length - PAYMENTS_COLLAPSE_LIMIT;
+    const label = paymentsExpanded
+      ? 'Show fewer payments'
+      : `Show all ${payments.length} payments (+${hidden} more)`;
+    const chevron = paymentsExpanded ? '▴' : '▾';
+    controls.innerHTML = `
+      <button type="button" class="collapse-toggle" aria-expanded="${paymentsExpanded}">
+        <span>${label}</span>
+        <span class="collapse-chevron" aria-hidden="true">${chevron}</span>
+      </button>
+    `;
+    controls.querySelector('button').addEventListener('click', () => {
+      paymentsExpanded = !paymentsExpanded;
+      renderPaymentsFeed(payments);
+    });
+    paymentsFeed.appendChild(controls);
+  }
 }
 
 function populatePlayerSelect() {

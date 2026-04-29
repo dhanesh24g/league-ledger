@@ -450,6 +450,28 @@ export function showLoading(message = 'Saving...') {
   return () => dismissToast(toast);
 }
 
+/**
+ * Wires every `.collapse-toggle` button inside `root` so clicking it toggles
+ * the `is-collapsed` class on its closest `.collapsible` ancestor. Updates
+ * `aria-expanded` and any `.collapse-label` ("Show" / "Hide") inside the button.
+ * Idempotent: safe to call multiple times.
+ */
+export function initCollapsibles(root = document) {
+  const toggles = root.querySelectorAll('.collapse-toggle:not([data-collapse-bound])');
+  toggles.forEach((btn) => {
+    const section = btn.closest('.collapsible');
+    if (!section) return;
+    btn.dataset.collapseBound = '1';
+    btn.addEventListener('click', () => {
+      const willCollapse = !section.classList.contains('is-collapsed');
+      section.classList.toggle('is-collapsed', willCollapse);
+      btn.setAttribute('aria-expanded', String(!willCollapse));
+      const labelEl = btn.querySelector('.collapse-label');
+      if (labelEl) labelEl.textContent = willCollapse ? 'Show' : 'Hide';
+    });
+  });
+}
+
 export function setButtonLoading(button, loadingText = 'Processing...') {
   if (!button) return () => { };
 
