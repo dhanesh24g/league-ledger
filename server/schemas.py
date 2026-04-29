@@ -106,3 +106,18 @@ class BulkAliasPayload(BaseModel):
 
 class AliasUpdatePayload(BaseModel):
     player_id: int = Field(ge=1)
+
+
+class SettlementPaymentPayload(BaseModel):
+    player_id: int = Field(ge=1)
+    direction: str = Field(pattern="^(collected|distributed)$")
+    amount: float = Field(gt=0)
+    paid_on: str | None = Field(default=None, max_length=40)
+    note: str | None = Field(default=None, max_length=300)
+
+
+class SettlementPaymentUpdatePayload(BaseModel):
+    direction: str | None = Field(default=None, pattern="^(collected|distributed)$")
+    amount: float | None = Field(default=None, gt=0)
+    paid_on: str | None = Field(default=None, max_length=40)
+    note: str | None = Field(default=None, max_length=300)

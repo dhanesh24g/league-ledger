@@ -41,6 +41,8 @@ from .schemas import (
     MatchPayload,
     MatchUpdatePayload,
     PlayerPayload,
+    SettlementPaymentPayload,
+    SettlementPaymentUpdatePayload,
     WinnersPayload,
 )
 logger = logging.getLogger(__name__)
@@ -631,7 +633,33 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
             if player_id in used_players:
                 raise HTTPException(status_code=400, detail="A player is assigned in multiple ranks")
             used_players.add(player_id)
-    
+
+    # Pool integrity: total distributed must not exceed entry_fee * participants.
+    # Mirrors the disbursement loop below to compute what would actually be paid out.
+    _entry_fee = float(league["entry_fee"])
+    _pool = round(_entry_fee * max(len(participant_ids), 0), 2)
+    _distributed = 0.0
+    _rank = 1
+    while _rank <= winner_limit:
+        _winners = rank_to_players.get(_rank, [])
+        if not _winners:
+            _rank += 1
+            continue
+        _tie = len(_winners)
+        _end = min(winner_limit, _rank + _tie - 1)
+        _distributed += sum(float(payouts.get(rr, 0.0)) for rr in range(_rank, _end + 1))
+        _rank += max(1, _tie)
+    if round(_distributed, 2) - _pool > 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Payouts exceed match pool. Configured payouts total {round(_distributed, 2):.2f} "
+                f"but the pool is only {_pool:.2f} (entry fee {_entry_fee:.2f} x "
+                f"{len(participant_ids)} participants). Reduce the configured payouts or add "
+                "participants before saving."
+            ),
+        )
+
     # Delete existing winner entries
     supabase.table("winner_entries").delete().eq("match_id", match_id).execute()
     
@@ -1181,6 +1209,237 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
     }
     _cache_set(league_id, "ledger", response)
     return response
+
+
+def _compute_ledger_rows_supabase(supabase: Any, league_id: int) -> tuple[list[dict[str, Any]], float, int]:
+    league_response = supabase.table("league").select("*").eq("id", league_id).limit(1).execute()
+    if not league_response.data:
+        return [], 0.0, 0
+    league = league_response.data[0]
+
+    matches_response = (
+        supabase.table("matches")
+        .select("id, status, participant_ids_json")
+        .eq("league_id", league_id)
+        .in_("status", ["completed", "canceled"])
+        .order("id", desc=True)
+        .execute()
+    )
+    matches = matches_response.data or []
+    players = _sync_active_members_to_players(supabase, league_id)
+
+    winnings: list[dict[str, Any]] = []
+    if matches:
+        winnings_response = (
+            supabase.table("winner_entries")
+            .select("player_id, amount, match_id")
+            .in_("match_id", [int(m["id"]) for m in matches])
+            .execute()
+        )
+        winnings = winnings_response.data or []
+
+    by_match_winnings: dict[int, list[dict[str, Any]]] = {}
+    for item in winnings:
+        by_match_winnings.setdefault(int(item["match_id"]), []).append(
+            {"player_id": int(item["player_id"]), "amount": float(item["amount"])}
+        )
+
+    entry_fee = float(league["entry_fee"])
+    fallback_participants = [int(p["id"]) for p in players]
+    match_counts_by_player: dict[int, int] = {}
+    winnings_map: dict[int, float] = {}
+
+    for match in matches:
+        match_id = int(match["id"])
+        participant_ids = parse_participant_ids(match.get("participant_ids_json")) or fallback_participants
+        effective_rows = (
+            _build_refund_rows(match_id, participant_ids, entry_fee)
+            if str(match["status"]) == "canceled"
+            else by_match_winnings.get(match_id, [])
+        )
+        for player_id in participant_ids:
+            match_counts_by_player[player_id] = match_counts_by_player.get(player_id, 0) + 1
+        for item in effective_rows:
+            player_id = int(item["player_id"])
+            winnings_map[player_id] = round(winnings_map.get(player_id, 0.0) + float(item["amount"]), 2)
+
+    rows: list[dict[str, Any]] = []
+    for player in players:
+        pid = int(player["id"])
+        spent = round(match_counts_by_player.get(pid, 0) * entry_fee, 2)
+        won = round(winnings_map.get(pid, 0.0), 2)
+        net = round(won - spent, 2)
+        rows.append({"player_id": pid, "name": player["name"], "spent": spent, "won": won, "net": net})
+
+    return rows, entry_fee, len(matches)
+
+
+def _build_settlement_summary(ledger_rows: list[dict[str, Any]], payments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    collected_by_player: dict[int, float] = {}
+    distributed_by_player: dict[int, float] = {}
+    for entry in payments:
+        pid = int(entry["player_id"])
+        amount = float(entry["amount"])
+        direction = str(entry.get("direction") or "").lower()
+        if direction == "collected":
+            collected_by_player[pid] = round(collected_by_player.get(pid, 0.0) + amount, 2)
+        elif direction == "distributed":
+            distributed_by_player[pid] = round(distributed_by_player.get(pid, 0.0) + amount, 2)
+
+    summary: list[dict[str, Any]] = []
+    for row in ledger_rows:
+        pid = int(row["player_id"])
+        net = float(row["net"])
+        collected = round(collected_by_player.get(pid, 0.0), 2)
+        distributed = round(distributed_by_player.get(pid, 0.0), 2)
+        balance = round(net + collected - distributed, 2)
+        if abs(balance) < 0.005:
+            status = "settled"
+        elif balance < 0:
+            status = "owes"
+        else:
+            status = "owed"
+        summary.append({
+            **row,
+            "collected": collected,
+            "distributed": distributed,
+            "balance": balance,
+            "status": status,
+        })
+    return summary
+
+
+def list_settlements(user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    ledger_rows, entry_fee, completed_matches = _compute_ledger_rows_supabase(supabase, league_id)
+    player_names = {int(row["player_id"]): row["name"] for row in ledger_rows}
+
+    payments_response = (
+        supabase.table("settlement_payments")
+        .select("id, player_id, direction, amount, paid_on, note, created_at, created_by_user_id")
+        .eq("league_id", league_id)
+        .order("paid_on", desc=True)
+        .order("id", desc=True)
+        .execute()
+    )
+    payments_rows = payments_response.data or []
+
+    payments = [
+        {
+            "id": int(row["id"]),
+            "player_id": int(row["player_id"]),
+            "player_name": player_names.get(int(row["player_id"])),
+            "direction": row["direction"],
+            "amount": round(float(row["amount"]), 2),
+            "paid_on": row.get("paid_on"),
+            "note": row.get("note"),
+            "created_at": row.get("created_at"),
+            "created_by_user_id": row.get("created_by_user_id"),
+        }
+        for row in payments_rows
+    ]
+    summary = _build_settlement_summary(ledger_rows, payments)
+
+    return {
+        "rows": summary,
+        "payments": payments,
+        "entry_fee": entry_fee,
+        "completed_matches": completed_matches,
+    }
+
+
+def add_settlement_payment(payload: SettlementPaymentPayload, user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    player_response = (
+        supabase.table("players")
+        .select("id")
+        .eq("id", payload.player_id)
+        .eq("league_id", league_id)
+        .limit(1)
+        .execute()
+    )
+    if not player_response.data:
+        raise HTTPException(status_code=404, detail="Player not found in this league")
+
+    supabase.table("settlement_payments").insert({
+        "league_id": league_id,
+        "player_id": payload.player_id,
+        "direction": payload.direction,
+        "amount": float(payload.amount),
+        "paid_on": (payload.paid_on.strip() if payload.paid_on else None),
+        "note": (payload.note.strip() if payload.note else None),
+        "created_by_user_id": user.get("id"),
+    }).execute()
+    _invalidate_league_cache(league_id)
+    return {"message": "Payment recorded"}
+
+
+def update_settlement_payment(
+    payment_id: int,
+    payload: SettlementPaymentUpdatePayload,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    updates: dict[str, Any] = {}
+    if payload.direction is not None:
+        updates["direction"] = payload.direction
+    if payload.amount is not None:
+        updates["amount"] = float(payload.amount)
+    if payload.paid_on is not None:
+        updates["paid_on"] = payload.paid_on.strip() or None
+    if payload.note is not None:
+        updates["note"] = payload.note.strip() or None
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    existing = (
+        supabase.table("settlement_payments")
+        .select("id")
+        .eq("id", payment_id)
+        .eq("league_id", league_id)
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    supabase.table("settlement_payments").update(updates).eq("id", payment_id).eq("league_id", league_id).execute()
+    _invalidate_league_cache(league_id)
+    return {"message": "Payment updated"}
+
+
+def delete_settlement_payment(payment_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    existing = (
+        supabase.table("settlement_payments")
+        .select("id")
+        .eq("id", payment_id)
+        .eq("league_id", league_id)
+        .limit(1)
+        .execute()
+    )
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    supabase.table("settlement_payments").delete().eq("id", payment_id).eq("league_id", league_id).execute()
+    _invalidate_league_cache(league_id)
+    return {"message": "Payment deleted"}
 
 
 def get_stats(user: dict[str, Any]) -> dict[str, Any]:

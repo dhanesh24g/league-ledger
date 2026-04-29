@@ -271,6 +271,31 @@ def _create_sqlite_tables(connection: sqlite3.Connection) -> None:
 
     connection.execute(
         """
+        CREATE TABLE IF NOT EXISTS settlement_payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            league_id INTEGER NOT NULL,
+            player_id INTEGER NOT NULL,
+            direction TEXT NOT NULL,
+            amount REAL NOT NULL,
+            paid_on TEXT,
+            note TEXT,
+            created_by_user_id INTEGER,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(league_id) REFERENCES league(id),
+            FOREIGN KEY(player_id) REFERENCES players(id),
+            FOREIGN KEY(created_by_user_id) REFERENCES users(id)
+        )
+        """
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_settlement_payments_league ON settlement_payments(league_id)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_settlement_payments_player ON settlement_payments(player_id)"
+    )
+
+    connection.execute(
+        """
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,

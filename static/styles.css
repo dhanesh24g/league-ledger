@@ -11723,3 +11723,117 @@ th {
     justify-content: flex-end;
   }
 }
+
+/* ---------- Match Edit Modal (mobile polish) ---------- */
+@media (max-width: 760px) {
+  /* Force the edit modal's date+VS row to stack on mobile so neither column
+     gets squished. The matches-page rule already handles .form-row globally,
+     but the modal's date input needs explicit full-width handling. */
+  #match-edit-modal .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  #match-edit-modal .form-group input[type="date"] {
+    width: 100%;
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  #match-edit-modal .scan-modal-head {
+    gap: 8px;
+  }
+
+  #match-edit-modal .scan-modal-head h2 {
+    font-size: 1rem;
+    line-height: 1.25;
+  }
+
+  #match-edit-modal .scan-modal-foot {
+    flex-wrap: wrap;
+  }
+
+  #match-edit-modal .scan-modal-foot .primary,
+  #match-edit-modal .scan-modal-foot .ghost {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+  }
+}
+
+/* ---------- Expenses page (mobile polish) ---------- */
+.expenses-page .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.expenses-page .table-scroll table {
+  min-width: 720px;
+}
+
+@media (max-width: 760px) {
+  .expenses-page .workflow-section-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .expenses-page .workflow-section-head .primary {
+    width: 100%;
+  }
+
+  .expenses-page .table-scroll table {
+    min-width: 640px;
+    font-size: 0.85rem;
+  }
+
+  .expenses-page .table-scroll th,
+  .expenses-page .table-scroll td {
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .expenses-page .feed-item {
+    padding: 12px;
+  }
+
+  .expenses-page .workflow-feed-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .expenses-page .workflow-chip-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Payment modal: stack form rows and full-width inputs */
+  #payment-modal .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  #payment-modal .form-group input,
+  #payment-modal .form-group select {
+    width: 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  #payment-modal .scan-modal-foot {
+    flex-wrap: wrap;
+  }
+
+  #payment-modal .scan-modal-foot .primary,
+  #payment-modal .scan-modal-foot .ghost {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 0;
+  }
+
+  /* Delete sits on its own row above Cancel/Save when visible */
+  #payment-modal #payment-delete-btn:not(.hidden) {
+    flex: 1 1 100%;
+    margin-right: 0 !important;
+    order: -1;
+  }
+}

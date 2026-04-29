@@ -66,6 +66,11 @@ def ledger_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "ledger.html")
 
 
+@app.get("/expenses")
+def expenses_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "expenses.html")
+
+
 @app.get("/login")
 def login_page() -> FileResponse:
     return FileResponse(STATIC_DIR / "login.html")

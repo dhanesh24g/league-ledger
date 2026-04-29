@@ -36,6 +36,8 @@ from .schemas import (
     MatchPayload,
     MatchUpdatePayload,
     PlayerPayload,
+    SettlementPaymentPayload,
+    SettlementPaymentUpdatePayload,
     WinnersPayload,
 )
 
@@ -60,6 +62,10 @@ try:
         register_telegram_webhook as supabase_register_telegram_webhook,
         reopen_match as supabase_reopen_match,
         update_match as supabase_update_match,
+        list_settlements as supabase_list_settlements,
+        add_settlement_payment as supabase_add_settlement_payment,
+        update_settlement_payment as supabase_update_settlement_payment,
+        delete_settlement_payment as supabase_delete_settlement_payment,
         upsert_league as supabase_upsert_league,
         save_winners as supabase_save_winners,
         extract_winners_from_screenshot as supabase_extract_winners_from_screenshot,
@@ -497,6 +503,56 @@ def add_match(payload: MatchPayload, user: dict[str, Any]) -> dict[str, str]:
     return {"message": "Match added"}
 
 
+def _validate_payouts_within_pool(
+    *,
+    payouts: dict[int, float],
+    rank_to_players: dict[int, list[int]],
+    winner_limit: int,
+    entry_fee: float,
+    participant_count: int,
+) -> None:
+    """Reject saves where total distributed amount exceeds the match pool.
+
+    Pool integrity rule: across a match, sum(distributed to winners) must be
+    less-than-or-equal to entry_fee * participant_count. Without this check,
+    later sums of `Won` and `Spent` across the league fall out of balance and
+    the admin would have to settle the gap from their own pocket.
+
+    The walk below mirrors the actual disbursement loop in `save_winners`:
+    each assigned rank starts a tie-group consuming `tie_size` ranks and
+    distributing the sum of their configured payouts. Cancellation/refund
+    flows do not call this helper because their per-player share is derived
+    from the pool itself and is balanced by construction.
+    """
+    pool = round(entry_fee * max(participant_count, 0), 2)
+    total_distributed = 0.0
+    rank = 1
+    while rank <= winner_limit:
+        winners_at_rank = rank_to_players.get(rank, [])
+        if not winners_at_rank:
+            rank += 1
+            continue
+        tie_size = len(winners_at_rank)
+        payout_end_rank = min(winner_limit, rank + tie_size - 1)
+        total_distributed += sum(
+            float(payouts.get(r, 0.0)) for r in range(rank, payout_end_rank + 1)
+        )
+        rank += max(1, tie_size)
+
+    total_distributed = round(total_distributed, 2)
+    # 1 paisa tolerance to avoid float false-positives.
+    if total_distributed - pool > 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Payouts exceed match pool. Configured payouts total "
+                f"{total_distributed:.2f} but the pool is only {pool:.2f} "
+                f"(entry fee {entry_fee:.2f} x {participant_count} participants). "
+                "Reduce the configured payouts or add participants before saving."
+            ),
+        )
+
+
 def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -> dict[str, str]:
     if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
         return supabase_save_winners(match_id, payload, user)
@@ -528,6 +584,14 @@ def save_winners(match_id: int, payload: WinnersPayload, user: dict[str, Any]) -
                 if player_id in used_players:
                     raise HTTPException(status_code=400, detail="A player is assigned in multiple ranks")
                 used_players.add(player_id)
+
+        _validate_payouts_within_pool(
+            payouts=payouts,
+            rank_to_players=rank_to_players,
+            winner_limit=winner_limit,
+            entry_fee=float(league_row["entry_fee"]),
+            participant_count=len(participant_ids),
+        )
 
         c.execute("DELETE FROM winner_entries WHERE match_id = ?", (match_id,))
 
@@ -1422,6 +1486,241 @@ def get_ledger(user: dict[str, Any]) -> dict[str, Any]:
         rows.append({"player_id": player["id"], "name": player["name"], "spent": spent, "won": won, "net": net})
 
     return {"rows": rows, "completed_matches": completed_matches, "entry_fee": entry_fee}
+
+
+def _compute_ledger_rows_sqlite(c: Any, league_id: int) -> tuple[list[dict[str, Any]], float, int]:
+    """Internal helper: returns (ledger_rows, entry_fee, completed_matches).
+
+    Mirrors the calculation used by `get_ledger` but without the admin gate, so
+    settlement views can render balances for any active member.
+    """
+    league_row = c.execute("SELECT * FROM league WHERE id = ?", (league_id,)).fetchone()
+    if not league_row:
+        return [], 0.0, 0
+
+    players = _sync_active_members_to_players(c, league_id)
+    matches = c.execute(
+        "SELECT id, status, participant_ids_json FROM matches WHERE league_id = ? AND status IN ('completed', 'canceled') ORDER BY id DESC",
+        (league_id,),
+    ).fetchall()
+    winnings = c.execute(
+        """
+        SELECT we.match_id, we.player_id, we.amount
+        FROM winner_entries we
+        JOIN matches m ON m.id = we.match_id
+        WHERE m.league_id = ?
+        """,
+        (league_id,),
+    ).fetchall()
+
+    by_match_winnings: dict[int, list[dict[str, Any]]] = {}
+    for row in winnings:
+        by_match_winnings.setdefault(int(row["match_id"]), []).append(
+            {"player_id": int(row["player_id"]), "amount": float(row["amount"])}
+        )
+
+    entry_fee = float(league_row["entry_fee"])
+    fallback_participants = [int(player["id"]) for player in players]
+    match_counts_by_player: dict[int, int] = {}
+    winnings_map: dict[int, float] = {}
+
+    for match in matches:
+        match_id = int(match["id"])
+        participant_ids = parse_participant_ids(match["participant_ids_json"]) or fallback_participants
+        effective_rows = (
+            _build_refund_rows(match_id, participant_ids, entry_fee)
+            if str(match["status"]) == "canceled"
+            else by_match_winnings.get(match_id, [])
+        )
+        for player_id in participant_ids:
+            match_counts_by_player[player_id] = match_counts_by_player.get(player_id, 0) + 1
+        for row in effective_rows:
+            player_id = int(row["player_id"])
+            winnings_map[player_id] = round(winnings_map.get(player_id, 0.0) + float(row["amount"]), 2)
+
+    rows: list[dict[str, Any]] = []
+    for player in players:
+        pid = int(player["id"])
+        spent = round(match_counts_by_player.get(pid, 0) * entry_fee, 2)
+        won = round(winnings_map.get(pid, 0.0), 2)
+        net = round(won - spent, 2)
+        rows.append({"player_id": pid, "name": player["name"], "spent": spent, "won": won, "net": net})
+
+    return rows, entry_fee, len(matches)
+
+
+def _build_settlement_summary(ledger_rows: list[dict[str, Any]], payments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    collected_by_player: dict[int, float] = {}
+    distributed_by_player: dict[int, float] = {}
+    for entry in payments:
+        pid = int(entry["player_id"])
+        amount = float(entry["amount"])
+        direction = str(entry.get("direction") or "").lower()
+        if direction == "collected":
+            collected_by_player[pid] = round(collected_by_player.get(pid, 0.0) + amount, 2)
+        elif direction == "distributed":
+            distributed_by_player[pid] = round(distributed_by_player.get(pid, 0.0) + amount, 2)
+
+    summary: list[dict[str, Any]] = []
+    for row in ledger_rows:
+        pid = int(row["player_id"])
+        net = float(row["net"])
+        collected = round(collected_by_player.get(pid, 0.0), 2)
+        distributed = round(distributed_by_player.get(pid, 0.0), 2)
+        balance = round(net + collected - distributed, 2)
+        if abs(balance) < 0.005:
+            status = "settled"
+        elif balance < 0:
+            status = "owes"
+        else:
+            status = "owed"
+        summary.append({
+            **row,
+            "collected": collected,
+            "distributed": distributed,
+            "balance": balance,
+            "status": status,
+        })
+    return summary
+
+
+def list_settlements(user: dict[str, Any]) -> dict[str, Any]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_list_settlements(user)
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        ledger_rows, entry_fee, completed_matches = _compute_ledger_rows_sqlite(c, league_id)
+        payments_rows = c.execute(
+            """
+            SELECT sp.id, sp.player_id, sp.direction, sp.amount, sp.paid_on, sp.note,
+                   sp.created_at, sp.created_by_user_id, p.name AS player_name
+            FROM settlement_payments sp
+            LEFT JOIN players p ON p.id = sp.player_id
+            WHERE sp.league_id = ?
+            ORDER BY COALESCE(sp.paid_on, '') DESC, sp.id DESC
+            """,
+            (league_id,),
+        ).fetchall()
+
+    payments = [
+        {
+            "id": int(row["id"]),
+            "player_id": int(row["player_id"]),
+            "player_name": row["player_name"],
+            "direction": row["direction"],
+            "amount": round(float(row["amount"]), 2),
+            "paid_on": row["paid_on"],
+            "note": row["note"],
+            "created_at": row["created_at"],
+            "created_by_user_id": row["created_by_user_id"],
+        }
+        for row in payments_rows
+    ]
+    summary = _build_settlement_summary(ledger_rows, payments)
+
+    return {
+        "rows": summary,
+        "payments": payments,
+        "entry_fee": entry_fee,
+        "completed_matches": completed_matches,
+    }
+
+
+def add_settlement_payment(payload: SettlementPaymentPayload, user: dict[str, Any]) -> dict[str, Any]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_add_settlement_payment(payload, user)
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        player_row = c.execute(
+            "SELECT id FROM players WHERE id = ? AND league_id = ?",
+            (payload.player_id, league_id),
+        ).fetchone()
+        if not player_row:
+            raise HTTPException(status_code=404, detail="Player not found in this league")
+
+        cursor = c.execute(
+            """
+            INSERT INTO settlement_payments
+                (league_id, player_id, direction, amount, paid_on, note, created_by_user_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                league_id,
+                payload.player_id,
+                payload.direction,
+                float(payload.amount),
+                (payload.paid_on.strip() if payload.paid_on else None),
+                (payload.note.strip() if payload.note else None),
+                user.get("id"),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise HTTPException(status_code=500, detail="Settlement payment insert failed")
+
+    return {"message": "Payment recorded"}
+
+
+def update_settlement_payment(
+    payment_id: int,
+    payload: SettlementPaymentUpdatePayload,
+    user: dict[str, Any],
+) -> dict[str, Any]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_update_settlement_payment(payment_id, payload, user)
+
+    league_id = _league_id_from_user(user)
+    sets: list[str] = []
+    values: list[Any] = []
+    if payload.direction is not None:
+        sets.append("direction = ?")
+        values.append(payload.direction)
+    if payload.amount is not None:
+        sets.append("amount = ?")
+        values.append(float(payload.amount))
+    if payload.paid_on is not None:
+        sets.append("paid_on = ?")
+        values.append(payload.paid_on.strip() or None)
+    if payload.note is not None:
+        sets.append("note = ?")
+        values.append(payload.note.strip() or None)
+
+    if not sets:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    with DatabaseManager() as c:
+        row = c.execute(
+            "SELECT id FROM settlement_payments WHERE id = ? AND league_id = ?",
+            (payment_id, league_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        values.extend([payment_id, league_id])
+        c.execute(
+            f"UPDATE settlement_payments SET {', '.join(sets)} WHERE id = ? AND league_id = ?",
+            tuple(values),
+        )
+    return {"message": "Payment updated"}
+
+
+def delete_settlement_payment(payment_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_delete_settlement_payment(payment_id, user)
+
+    league_id = _league_id_from_user(user)
+    with DatabaseManager() as c:
+        row = c.execute(
+            "SELECT id FROM settlement_payments WHERE id = ? AND league_id = ?",
+            (payment_id, league_id),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Payment not found")
+        c.execute(
+            "DELETE FROM settlement_payments WHERE id = ? AND league_id = ?",
+            (payment_id, league_id),
+        )
+    return {"message": "Payment deleted"}
 
 
 def get_stats(user: dict[str, Any]) -> dict[str, Any]:
