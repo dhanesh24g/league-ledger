@@ -107,18 +107,29 @@
         style="margin:12px 0;padding:12px 14px;border-radius:8px;border:1px solid rgba(238,82,83,0.45);background:rgba(238,82,83,0.12);color:#ee5253;font-size:0.9rem;line-height:1.4;">
       </div>
 
+      <div class="expenses-toolbar">
+        <input id="expenses-search" type="search" placeholder="Search player..." autocomplete="off">
+        <select id="expenses-status-filter" aria-label="Filter by status">
+          <option value="all">All statuses</option>
+          <option value="owes">Owes (loser to pay)</option>
+          <option value="owed">Owed (winner to receive)</option>
+          <option value="settled">Settled</option>
+        </select>
+        <span id="expenses-result-count" class="muted small"></span>
+      </div>
+
       <div class="table-scroll">
-        <table>
+        <table class="sortable-table">
           <thead>
             <tr>
-              <th>Player</th>
-              <th>Spent</th>
-              <th>Won</th>
-              <th>Net</th>
-              <th>Collected</th>
-              <th>Distributed</th>
-              <th>Balance</th>
-              <th>Status</th>
+              <th data-sort-key="name" class="sortable">Player <span class="sort-indicator"></span></th>
+              <th data-sort-key="spent" class="sortable num">Spent <span class="sort-indicator"></span></th>
+              <th data-sort-key="won" class="sortable num">Won <span class="sort-indicator"></span></th>
+              <th data-sort-key="net" class="sortable num">Net <span class="sort-indicator"></span></th>
+              <th data-sort-key="collected" class="sortable num">Collected <span class="sort-indicator"></span></th>
+              <th data-sort-key="distributed" class="sortable num">Distributed <span class="sort-indicator"></span></th>
+              <th data-sort-key="balance" class="sortable num">Balance <span class="sort-indicator"></span></th>
+              <th data-sort-key="status" class="sortable">Status <span class="sort-indicator"></span></th>
             </tr>
           </thead>
           <tbody id="expenses-body"></tbody>

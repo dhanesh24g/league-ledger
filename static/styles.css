@@ -11726,6 +11726,7 @@ th {
 
 /* ---------- Match Edit Modal (mobile polish) ---------- */
 @media (max-width: 760px) {
+
   /* Force the edit modal's date+VS row to stack on mobile so neither column
      gets squished. The matches-page rule already handles .form-row globally,
      but the modal's date input needs explicit full-width handling. */
@@ -11760,7 +11761,7 @@ th {
   }
 }
 
-/* ---------- Expenses page (mobile polish) ---------- */
+/* ---------- Expenses page ---------- */
 .expenses-page .table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -11768,6 +11769,68 @@ th {
 
 .expenses-page .table-scroll table {
   min-width: 720px;
+}
+
+.expenses-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 12px;
+}
+
+.expenses-toolbar #expenses-search {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 320px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--panel, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  font: inherit;
+}
+
+.expenses-toolbar #expenses-search:focus {
+  outline: none;
+  border-color: var(--accent-solid, #6366f1);
+  box-shadow: 0 0 0 3px var(--input-focus-ring, rgba(99, 102, 241, 0.25));
+}
+
+.expenses-toolbar #expenses-status-filter {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
+  background: var(--panel, rgba(255, 255, 255, 0.04));
+  color: inherit;
+  font: inherit;
+  min-height: 38px;
+}
+
+.expenses-toolbar #expenses-result-count {
+  margin-left: auto;
+}
+
+.sortable-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.sortable-table th.sortable:hover {
+  color: var(--accent-solid, #818cf8);
+}
+
+.sortable-table th.sort-active {
+  color: var(--accent-solid, #818cf8);
+}
+
+.sortable-table th .sort-indicator {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 0.75em;
+  opacity: 0.85;
+  min-width: 0.7em;
 }
 
 @media (max-width: 760px) {
@@ -11779,6 +11842,23 @@ th {
 
   .expenses-page .workflow-section-head .primary {
     width: 100%;
+  }
+
+  .expenses-toolbar {
+    gap: 8px;
+  }
+
+  .expenses-toolbar #expenses-search,
+  .expenses-toolbar #expenses-status-filter {
+    flex: 1 1 100%;
+    max-width: none;
+    min-height: 42px;
+    font-size: 16px;
+  }
+
+  .expenses-toolbar #expenses-result-count {
+    margin-left: 0;
+    flex: 1 1 100%;
   }
 
   .expenses-page .table-scroll table {
