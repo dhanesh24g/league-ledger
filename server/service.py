@@ -34,6 +34,7 @@ from .schemas import (
     BulkAliasPayload,
     LeaguePayload,
     MatchPayload,
+    MatchUpdatePayload,
     PlayerPayload,
     WinnersPayload,
 )
@@ -58,6 +59,7 @@ try:
         send_match_update_to_telegram as supabase_send_match_update_to_telegram,
         register_telegram_webhook as supabase_register_telegram_webhook,
         reopen_match as supabase_reopen_match,
+        update_match as supabase_update_match,
         upsert_league as supabase_upsert_league,
         save_winners as supabase_save_winners,
         extract_winners_from_screenshot as supabase_extract_winners_from_screenshot,
@@ -916,6 +918,43 @@ def reopen_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
         c.execute("UPDATE matches SET status = 'pending' WHERE id = ?", (match_id,))
 
     return {"message": "Match reopened for winner assignment"}
+
+
+def update_match(match_id: int, payload: MatchUpdatePayload, user: dict[str, Any]) -> dict[str, str]:
+    if get_supabase_client() and SUPABASE_SERVICE_AVAILABLE:
+        return supabase_update_match(match_id, payload, user)
+
+    league_id = _league_id_from_user(user)
+    title = payload.title.strip() if payload.title is not None else None
+    match_date = payload.match_date.strip() if payload.match_date is not None else None
+
+    if title is None and match_date is None:
+        raise HTTPException(status_code=400, detail="Provide a new title or match date")
+
+    with DatabaseManager() as c:
+        match_row = c.execute(
+            "SELECT id FROM matches WHERE id = ? AND league_id = ?",
+            (match_id, league_id),
+        ).fetchone()
+        if not match_row:
+            raise HTTPException(status_code=404, detail="Match not found")
+
+        sets: list[str] = []
+        values: list[Any] = []
+        if title is not None:
+            sets.append("title = ?")
+            values.append(title)
+        if match_date is not None:
+            sets.append("match_date = ?")
+            values.append(match_date)
+        values.extend([match_id, league_id])
+
+        c.execute(
+            f"UPDATE matches SET {', '.join(sets)} WHERE id = ? AND league_id = ?",
+            tuple(values),
+        )
+
+    return {"message": "Match updated"}
 
 
 def _utc_now() -> datetime:

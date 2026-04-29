@@ -39,6 +39,7 @@ from .schemas import (
     BulkAliasPayload,
     LeaguePayload,
     MatchPayload,
+    MatchUpdatePayload,
     PlayerPayload,
     WinnersPayload,
 )
@@ -725,6 +726,33 @@ def reopen_match(match_id: int, user: dict[str, Any]) -> dict[str, str]:
     _invalidate_league_cache(league_id)
 
     return {"message": "Match reopened for winner assignment"}
+
+
+def update_match(match_id: int, payload: MatchUpdatePayload, user: dict[str, Any]) -> dict[str, str]:
+    supabase = get_supabase_client()
+    if not supabase:
+        raise HTTPException(status_code=500, detail="Supabase not configured")
+    league_id = _league_id_from_user(user)
+
+    title = payload.title.strip() if payload.title is not None else None
+    match_date = payload.match_date.strip() if payload.match_date is not None else None
+    if title is None and match_date is None:
+        raise HTTPException(status_code=400, detail="Provide a new title or match date")
+
+    match_response = supabase.table("matches").select("id").eq("id", match_id).eq("league_id", league_id).limit(1).execute()
+    if not match_response.data:
+        raise HTTPException(status_code=404, detail="Match not found")
+
+    updates: dict[str, Any] = {}
+    if title is not None:
+        updates["title"] = title
+    if match_date is not None:
+        updates["match_date"] = match_date
+
+    supabase.table("matches").update(updates).eq("id", match_id).eq("league_id", league_id).execute()
+    _invalidate_league_cache(league_id)
+
+    return {"message": "Match updated"}
 
 
 def _utc_now() -> datetime:

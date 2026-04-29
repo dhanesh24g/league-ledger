@@ -41,6 +41,7 @@ from .schemas import (
     LeaguePayload,
     LoginPayload,
     MatchPayload,
+    MatchUpdatePayload,
     MembershipRolePayload,
     PlayerPayload,
     RefreshTokenPayload,
@@ -78,6 +79,7 @@ from .service import (
     save_player_aliases,
     save_winners,
     send_match_update_to_telegram,
+    update_match,
     update_player_alias,
     upsert_league,
 )
@@ -116,6 +118,15 @@ def remove_player(player_id: int, user: dict[str, Any] = Depends(require_admin))
 @router.post("/matches")
 def create_match(payload: MatchPayload, user: dict[str, Any] = Depends(require_admin)) -> dict[str, str]:
     return add_match(payload, user)
+
+
+@router.patch("/matches/{match_id}")
+def edit_match(
+    match_id: int,
+    payload: MatchUpdatePayload,
+    user: dict[str, Any] = Depends(require_admin),
+) -> dict[str, str]:
+    return update_match(match_id, payload, user)
 
 
 @router.post("/matches/{match_id}/winners")
